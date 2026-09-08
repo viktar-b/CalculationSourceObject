@@ -1,95 +1,81 @@
 import { CodePanel } from '../CodePanel.tsx';
 import { SiteNav } from '../SiteNav.tsx';
+import {
+  pipelineSteps,
+  pythonSnippet,
+  sourceSnippet,
+} from '../calculation-story.ts';
 
 export const dynamic = 'force-static';
 export const revalidate = false;
 
-const pipelineSteps = [
-  {
-    label: 'Author',
-    title: 'Annotated Python',
-    body: 'Engineers write constrained Python with metadata-bearing inputs and annotated calculation steps.',
-  },
-  {
-    label: 'Capture and verify',
-    title: 'CalculationSourceObject',
-    body: 'Python captures source and runtime observations. Verified commands use core to evaluate the documented formulas independently.',
-  },
-  {
-    label: 'Render',
-    title: 'FormulaSheet',
-    body: 'The source object becomes a sheet model with explicit rows for symbols, formulas, values, units, and comments.',
-  },
-  {
-    label: 'Display',
-    title: 'MathML',
-    body: 'FormulaSheet renders symbols, units, and formula trees as native MathML so reviewers see real notation.',
-  },
-] as const;
-
 const contentsLinks = [
   ['Motivation', '#motivation'],
-  ['Authoring Layer', '#authoring-layer'],
-  ['Source Object', '#source-object'],
+  ['Authoring layer', '#authoring-layer'],
+  ['Source object', '#source-object'],
   ['FormulaSheet', '#formulasheet'],
+  ['Prepared documents', '#prepared-documents'],
+  ['Printing and checks', '#printing'],
+  ['Python code generation', '#python-codegen'],
   ['MathML', '#mathml'],
 ] as const;
 
-const pythonSnippet = `from typing import Annotated, TypeAlias
-from cso_python import CalculationResults, calculation, section, symbol, text
+const formulaSheetSnippet = `import {
+  parseCalculationSourceJson,
+  createSheetFromCalculationSourceObject,
+} from '@viktar-b/cso-core';
+import { FormulaSheet } from '@viktar-b/cso-react';
+import '@viktar-b/cso-react/style.css';
 
-ConcreteWidth: TypeAlias = Annotated[
-    float, symbol(glyph="w_{c}", unit="mm", description="Concrete width")
-]
-ConcreteDepth: TypeAlias = Annotated[
-    float, symbol(glyph="h_{c}", unit="mm", description="Concrete depth")
-]
-
-@calculation(id="beam-check", title="Beam Check")
-@section(id="concrete", title="Concrete", root=True)
-def calculate_beam(width: ConcreteWidth, depth: ConcreteDepth) -> CalculationResults:
-    text(id="notation", content="Subscript c denotes concrete.")
-    area: Annotated[
-        float, symbol(glyph="A_{c}", unit="mm^2", description="Concrete area")
-    ] = width * depth
-    return {"area": area}`;
-
-const sourceSnippet = `{
-  "id": "area",
-  "glyph": "A_{c}",
-  "unit": "mm^2",
-  "valueTree": {
-    "rootKey": "area",
-    "nodes": [
-      { "key": "width", "mode": "SYMBOL", "symbol": { "id": "width" } },
-      { "key": "depth", "mode": "SYMBOL", "symbol": { "id": "depth" } },
-      {
-        "key": "area",
-        "mode": "FUNCTION",
-        "funcSpec": { "id": "fg.multiply" },
-        "funcArgs": [{ "key": "width" }, { "key": "depth" }]
-      }
-    ]
-  }
+export function CalculationSheet({ json }: { json: unknown }) {
+  const source = parseCalculationSourceJson(json);
+  const calculation = createSheetFromCalculationSourceObject(source, {
+    id: 'calculation-sheet',
+    label: source.title,
+  });
+  return <FormulaSheet sheet={calculation.sheet} />;
 }`;
 
-const formulaSheetSnippet = `const source = parseCalculationSourceJson(json);
-const calculation = createSheetFromCalculationSourceObject(source, {
-  id: "beam-check",
-  label: source.title,
-});
+const preparedDocumentSnippet = `import {
+  type ExecutionPayload,
+  type ResolvedAsset,
+  verifyExecution,
+} from '@viktar-b/cso-core';
+import {
+  prepareExecutionDocument,
+  PreparedFormulaSheet,
+} from '@viktar-b/cso-react';
+import '@viktar-b/cso-react/style.css';
 
-<FormulaSheet sheet={calculation.sheet} />`;
+// The host supplies captured execution and validated assets.
+export function ExecutionDocument({ execution, assets }: {
+  execution: ExecutionPayload;
+  assets: readonly ResolvedAsset[];
+}) {
+  const report = verifyExecution({ execution });
+  if (!report.ok) throw new Error('Execution verification failed');
+  const document = prepareExecutionDocument({ execution, assets });
+  return <PreparedFormulaSheet document={document} />;
+}`;
+
+const pythonCodegenSnippet = `import {
+  type SheetDocument,
+  createPythonFromSheetDocument,
+} from '@viktar-b/cso-core';
+
+export function generatePython(sheet: SheetDocument) {
+  return createPythonFromSheetDocument(sheet);
+}`;
 
 const mathmlSnippet = `<math display="block">
   <mrow>
     <msub>
       <mi>A</mi>
-      <mi>c</mi>
+      <mi>rect</mi>
     </msub>
     <mo>=</mo>
-    <msub><mi>w</mi><mi>c</mi></msub>
-    <msub><mi>h</mi><mi>c</mi></msub>
+    <msub><mi>w</mi><mi>pan</mi></msub>
+    <msub><mi>h</mi><mi>pan</mi></msub>
   </mrow>
 </math>`;
 
@@ -123,16 +109,17 @@ export default function DocsPage() {
         <header className="grid gap-5 border-b border-gray-300 pb-6 min-xl:grid-cols-[minmax(0,1fr)_440px] min-xl:items-end">
           <div>
             <p className="font-['Plus_Jakarta_Sans'] text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-              Developer Docs
+              Developer docs
             </p>
             <h1 className="mt-3 max-w-[920px] font-['Plus_Jakarta_Sans'] text-[34px] font-semibold leading-tight text-gray-950 min-md:text-[44px]">
-              Transparent backend calculations for engineering review
+              From constrained Python to reviewable documents
             </h1>
             <p className="mt-4 max-w-[860px] font-['Plus_Jakarta_Sans'] text-[15px] leading-7 text-gray-600">
-              In structural engineering and similar fields, calculation logic
-              often lives in backend code while the people approving the work
-              need a readable calculation sheet. This architecture keeps the
-              code path and the review path tied to the same validated source.
+              Capture source and execution observations, check documented
+              formulas, then prepare a document for review. Source-to-document
+              consistency, independent numerical agreement and visual inspection
+              each answer a different question. Human engineering approval
+              remains separate.
             </p>
           </div>
 
@@ -140,7 +127,7 @@ export default function DocsPage() {
             {[
               ['Input', 'Python'],
               ['Contract', 'CSO'],
-              ['Review', 'MathML'],
+              ['Display', 'MathML'],
             ].map(([label, value]) => (
               <div
                 key={label}
@@ -159,15 +146,15 @@ export default function DocsPage() {
 
         <section
           aria-label="Architecture pipeline"
-          className="grid border border-gray-300 bg-white min-lg:grid-cols-4"
+          className="grid border border-gray-300 bg-white min-xl:grid-cols-5"
         >
           {pipelineSteps.map((step, index) => (
             <div
               key={step.title}
-              className="relative border-b border-gray-300 px-4 py-4 last:border-b-0 min-lg:border-r min-lg:border-b-0 min-lg:last:border-r-0"
+              className="relative border-b border-gray-300 px-4 py-4 last:border-b-0 min-xl:border-r min-xl:border-b-0 min-xl:last:border-r-0"
             >
               <p className="font-mono text-[11px] uppercase text-gray-500">
-                {step.label}
+                Step {index + 1}
               </p>
               <h2 className="mt-2 font-['Plus_Jakarta_Sans'] text-[17px] font-semibold text-gray-950">
                 {step.title}
@@ -178,7 +165,7 @@ export default function DocsPage() {
               {index < pipelineSteps.length - 1 && (
                 <span
                   aria-hidden="true"
-                  className="absolute right-3 top-4 hidden font-mono text-[18px] text-gray-300 min-lg:block"
+                  className="absolute right-3 top-4 hidden font-mono text-[18px] text-gray-300 min-xl:block"
                 >
                   →
                 </span>
@@ -216,8 +203,8 @@ export default function DocsPage() {
             >
               <SectionHeading
                 eyebrow="Motivation"
-                title="Keep code-backed calculations inspectable"
-                body="Backend calculations remain traceable to formulas, symbols, units, comments, and runtime results that non-programming reviewers can inspect."
+                title="Keep calculations inspectable"
+                body="A CalculationSourceObject records formulas, symbols, units, explanations, ordered content and source metadata. FormulaSheet is its reviewable mathematical presentation, not the complete calculation source."
               />
             </section>
 
@@ -227,12 +214,15 @@ export default function DocsPage() {
             >
               <div className="border border-gray-300 bg-white px-4 py-5 min-md:px-6">
                 <SectionHeading
-                  eyebrow="Authoring Layer"
+                  eyebrow="Authoring layer"
                   title="Calculation inputs carry reusable metadata"
-                  body="Signature annotations define inputs. Annotated assignments define calculation steps, including intermediates omitted from public returns. Shared metadata follows quantities through composed calls."
+                  body="Signature annotations define inputs. Shared Annotated aliases keep their metadata reusable. This panel-area fragment uses the maintained two-panel notation: pan means panel and rect means rectangle. It is illustration-only, not a captured execution or the full maintained calculation."
                 />
               </div>
-              <CodePanel title="Annotated Python" language="python">
+              <CodePanel
+                title="Annotated Python illustration"
+                language="python"
+              >
                 {pythonSnippet}
               </CodePanel>
             </section>
@@ -243,12 +233,12 @@ export default function DocsPage() {
             >
               <div className="border border-gray-300 bg-white px-4 py-5 min-md:px-6">
                 <SectionHeading
-                  eyebrow="Source Object"
-                  title="The exporter emits CalculationSourceObject JSON"
-                  body="The captured execution pairs a CalculationSourceObject with source hashes, input bindings, assignment observations and public outputs. Core checks formulas and outputs separately; execution success alone is not a verification pass."
+                  eyebrow="Source object"
+                  title="Capture and execute produce CSO plus evidence"
+                  body="The captured execution pairs a CalculationSourceObject with source hashes, input bindings, assignment observations and public outputs. Core verifyExecution checks source-to-document consistency; execution success alone is not a verification pass. Legacy export and dev-export remain unverified development paths. The adjacent JSON is a formula fragment with illustrative values, not a complete CSO or execution record."
                 />
               </div>
-              <CodePanel title="Formula Graph" language="json">
+              <CodePanel title="CSO fragment" language="json">
                 {sourceSnippet}
               </CodePanel>
             </section>
@@ -261,11 +251,64 @@ export default function DocsPage() {
                 <SectionHeading
                   eyebrow="FormulaSheet"
                   title="The source object becomes a review sheet"
-                  body="FormulaSheet receives a sheet model derived from CalculationSourceObject. It renders rows for the same symbols and formula graph, without becoming a calculation engine."
+                  body="FormulaSheet receives a sheet model derived from CalculationSourceObject. Its columns show descriptions, symbols, values, units and comments, with formula and substitution details. This mathematical projection omits figures and standalone prose; rendering does not verify supplied values."
                 />
               </div>
-              <CodePanel title="Render Boundary" language="tsx">
+              <CodePanel title="Mathematical sheet rendering" language="tsx">
                 {formulaSheetSnippet}
+              </CodePanel>
+            </section>
+
+            <section
+              id="prepared-documents"
+              className="grid scroll-mt-6 gap-4 min-lg:grid-cols-2"
+            >
+              <div className="border border-gray-300 bg-white px-4 py-5 min-md:px-6">
+                <SectionHeading
+                  eyebrow="Prepared documents"
+                  title="Preserve ordered engineering content"
+                  body="prepareExecutionDocument binds supplied execution and captured assets to a PreparedDocument. PreparedFormulaSheet displays its ordered inputs, formulas, prose, figures and results. The host captures assets; React does not fetch files or execute Python. The example checks consistency without supplying an independent reference case, so it establishes no independent agreement."
+                />
+              </div>
+              <CodePanel title="Prepare a supplied execution" language="tsx">
+                {preparedDocumentSnippet}
+              </CodePanel>
+            </section>
+
+            <section
+              id="printing"
+              className="scroll-mt-6 border border-gray-300 bg-white px-4 py-5 min-md:px-6"
+            >
+              <SectionHeading
+                eyebrow="Printing and checks"
+                title="Browser print and verified PDF publication"
+                body="printFormulaSheet is development browser printing. Its boolean result means the print request was accepted; deferred failures use onError. It does not run verification or publish CLI evidence. cso pdf verifies a captured execution and uses that same execution for document preparation and PDF publication, with evidence by default."
+              />
+              <p className="mt-4 text-[14px] leading-6 text-gray-600">
+                Optional independent references compare separately established
+                expected values bound to the source, function and resolved
+                inputs. No matching case means not applicable, not a pass.
+                Document preservation accounts for every input, formula,
+                explanation, figure, unit and result. Inspect every PDF page for
+                missing content, notation, clipping and pagination, and bind
+                findings to the exact PDF bytes. Generation leaves inspection
+                pending and establishes no human engineering approval.
+              </p>
+            </section>
+
+            <section
+              id="python-codegen"
+              className="grid scroll-mt-6 gap-4 min-lg:grid-cols-2"
+            >
+              <div className="border border-gray-300 bg-white px-4 py-5 min-md:px-6">
+                <SectionHeading
+                  eyebrow="Python code generation"
+                  title="Generate source from a validated sheet"
+                  body="Core createPythonFromSheetDocument orders assignments by dependency and generates Python. It does not execute or verify the generated code. C# and TypeScript export and package-manager hosting remain planned."
+                />
+              </div>
+              <CodePanel title="Core code generation" language="tsx">
+                {pythonCodegenSnippet}
               </CodePanel>
             </section>
 
@@ -275,7 +318,7 @@ export default function DocsPage() {
             >
               <div className="border border-gray-300 bg-white px-4 py-5 min-md:px-6">
                 <SectionHeading
-                  eyebrow="MathML Architecture"
+                  eyebrow="MathML notation"
                   title="FormulaSheet renders notation with native MathML"
                   body="Glyphs and units pass through the ASCII math parser, value-tree functions pass through structured renderers, and the row output uses MathML elements for notation that remains inspectable in HTML."
                 />
@@ -288,23 +331,23 @@ export default function DocsPage() {
                       <mrow>
                         <msub>
                           <mi>A</mi>
-                          <mi>c</mi>
+                          <mi>rect</mi>
                         </msub>
                         <mo>=</mo>
                         <msub>
                           <mi>w</mi>
-                          <mi>c</mi>
+                          <mi>pan</mi>
                         </msub>
                         <msub>
                           <mi>h</mi>
-                          <mi>c</mi>
+                          <mi>pan</mi>
                         </msub>
                       </mrow>
                     </math>
                   </div>
                 </div>
               </div>
-              <CodePanel title="MathML Output" language="html">
+              <CodePanel title="MathML output" language="html">
                 {mathmlSnippet}
               </CodePanel>
             </section>

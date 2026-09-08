@@ -18,8 +18,10 @@ export default function ExamplesPage() {
               Examples
             </h1>
             <p className="mt-3 max-w-[760px] font-['Plus_Jakarta_Sans'] text-[14px] leading-6 text-gray-600">
-              Inspect real CalculationSourceObject examples rendered by
-              FormulaSheet.
+              Inspect supplied CalculationSourceObject data rendered by
+              FormulaSheet. The workspace launcher defaults to a synthetic
+              protocol fixture, not a captured execution of the maintained
+              two-panel calculation.
             </p>
           </div>
         </header>

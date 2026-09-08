@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'CalculationSourceObject',
     short_name: 'CSO',
     description:
-      'A Zod CalculationSourceObject exported to FormulaSheet, print/PDF workflows, Python, and future language targets.',
+      'Constrained Python, CalculationSourceObject and reviewable FormulaSheet documents. Source-to-document consistency, independent numerical references and visual inspection are separate checks.',
     start_url: '/',
     display: 'standalone',
     background_color: '#f6f5f1',

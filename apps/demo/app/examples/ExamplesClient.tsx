@@ -5,11 +5,6 @@ import type { SheetExample } from '../../src/examples/sheet-gallery.ts';
 import { printFormulaSheet } from '@viktar-b/cso-react';
 import { useState } from 'react';
 
-const sourceLabelPrefix = /^GLOBAL:\s*Structural Shape\s*-\s*/;
-
-const formatSourceLabel = (label: string): string =>
-  label.replace(sourceLabelPrefix, '');
-
 export function ExamplesClient({
   examples,
 }: { readonly examples: SheetExample[] }) {
@@ -17,14 +12,22 @@ export function ExamplesClient({
   const selectedExample =
     examples.find((example) => example.id === selectedExampleId) ?? examples[0];
   if (!selectedExample) return <p>No calculations have been supplied.</p>;
-  const selectedSourceLabel = formatSourceLabel(selectedExample.label);
+  const selectedSourceLabel = selectedExample.label;
   const handlePrintSelectedSheet = (): void => {
     printFormulaSheet({ title: selectedSourceLabel });
   };
 
   return (
     <section className="grid gap-5 min-xl:grid-cols-[260px_minmax(0,1fr)]">
-      <p className="text-sm text-gray-600 min-xl:col-span-2">This gallery is a mathematical projection. Figures and standalone prose are omitted here. <a className="underline" href="/preservation">Open the complete preservation cases</a>.</p>
+      <p className="text-sm text-gray-600 min-xl:col-span-2">
+        This gallery is a mathematical projection. Figures and standalone prose
+        are omitted here.{' '}
+        <a className="underline" href="/preservation">
+          Open the supplied prepared documents
+        </a>
+        . Browser printing is for development; use cso pdf for verified PDF
+        publication with evidence.
+      </p>
       <aside className="min-xl:sticky min-xl:top-6 min-xl:self-start">
         <div className="flex max-h-[320px] min-h-0 flex-col border border-gray-300 bg-white min-xl:max-h-[calc(100vh-180px)]">
           <div className="flex items-center justify-between gap-3 border-b border-gray-300 px-4 py-3">
@@ -38,7 +41,7 @@ export function ExamplesClient({
           <div className="min-h-0 overflow-y-auto">
             {examples.map((example, exampleIndex) => {
               const selected = example.id === selectedExample.id;
-              const sourceLabel = formatSourceLabel(example.label);
+              const sourceLabel = example.label;
               return (
                 <button
                   key={example.id}
@@ -94,7 +97,7 @@ export function ExamplesClient({
             aria-label={`Print ${selectedSourceLabel}`}
             className="border border-gray-300 bg-white px-3 py-2 font-['Plus_Jakarta_Sans'] text-[12px] font-semibold uppercase tracking-[0.08em] text-gray-700 transition-colors hover:bg-gray-950 hover:text-white"
           >
-            Print
+            Browser print
           </button>
         </div>
       </div>

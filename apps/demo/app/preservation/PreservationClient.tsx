@@ -39,7 +39,7 @@ export function PreservationClient({
             });
           }}
         >
-          Print selected document
+          Browser print selected document
         </button>
       </div>
       {printError && <p role="alert">{printError}</p>}

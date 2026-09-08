@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: 'CalculationSourceObject',
   description:
-    'A Zod CalculationSourceObject exported to FormulaSheet, print/PDF workflows, Python, and future language targets.',
+    'Constrained Python, CalculationSourceObject and reviewable FormulaSheet documents. Source-to-document consistency, independent numerical references and visual inspection are separate checks.',
 };
 
 export default function RootLayout({
