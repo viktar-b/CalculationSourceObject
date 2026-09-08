@@ -6,7 +6,8 @@ and synthetic fixtures. Package/app behavior tests stay in their owning projects
 - `core/`: conversion, shared contracts and formula verification.
 - `react/`: document preparation and content retention.
 - `installed/`: actual package archives, wheel installation and CLI/PDF checks.
-- `fixtures/demo-preservation/`: prepared two-panel and synthetic pagination data.
+- [fixtures/demo-preservation/](fixtures/demo-preservation/README.md): synthetic
+  protocol presentations and pagination data, independent of the maintained example.
 
 Run from the root with the Python wheel installed in `PYTHON`:
 

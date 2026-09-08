@@ -17,9 +17,10 @@ const response = ExecutionResponseSchema.parse(
     ),
   ),
 );
-if (!response.ok) throw new Error('Expected a successful two-panel fixture');
+if (!response.ok)
+  throw new Error('Expected a successful synthetic protocol fixture');
 writeFileSync(
-  join(gallery, 'two-panel.json'),
+  join(gallery, 'synthetic-contract-case.json'),
   JSON.stringify(response.execution.cso),
 );
 try {

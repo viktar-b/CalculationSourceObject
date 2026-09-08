@@ -38,6 +38,8 @@ separate LaTeX document.
 - **Verify or generate a PDF:** [CLI guide](apps/cso-cli/README.md).
 - **Use the libraries:** [Python](packages/cso-python/README.md),
   [core](packages/cso-core/README.md), [React](packages/cso-react/README.md).
+- **Explore the demo:** [demo guide](apps/demo/README.md). After setup,
+  `npm run dev` starts it through the [workspace launcher](scripts/demo.ts).
 - **Change this repo:** [setup and checks](docs/development.md),
   [code map](docs/code-map.md), [agent guidance](AGENTS.md).
 - **Understand the contracts:** [domain terms](CONTEXT.md),

@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+import { pythonSnippet, sourceSnippet } from './calculation-story.ts';
 import { CodeBlock, type CodeLanguage } from './CodePanel.tsx';
 import { SiteNav } from './SiteNav.tsx';
 
@@ -6,8 +8,8 @@ export const revalidate = false;
 
 const contractSignals = [
   [
-    'Variables',
-    'ASCII names, rendered symbols, and code identifiers stay tied to one field.',
+    'Symbols',
+    'Descriptive code identifiers, displayed glyphs, units and values identify each quantity.',
   ],
   [
     'Formulas',
@@ -29,43 +31,14 @@ const proofItems: readonly {
   readonly title: string;
 }[] = [
   {
-    body: `@calculation(id="beam-check", title="Beam Check")
-@section(title="Concrete", root=True)
-def calculate_beam(b: float, h: float):
-    area: Annotated[
-        float,
-        symbol(
-            glyph="A_c",
-            unit="mm^2",
-            description="Concrete area",
-        ),
-    ] = b * h
-
-    return {"area": area}`,
+    body: pythonSnippet,
     language: 'python',
-    title: 'Annotated Python',
+    title: 'Annotated Python file - {name}.cso.py',
   },
   {
-    body: `{
-  "id": "area",
-  "glyph": "A_c",
-  "valueTree": {
-    "rootKey": "area",
-    "result": { "kind": "number", "value": 150000 },
-    "nodes": [
-      { "key": "b", ... , "symbol": { "id": "b" } },
-      { "key": "h", ... , "symbol": { "id": "h" } },
-      {
-        "key": "area",
-        "mode": "FUNCTION",
-        "funcSpec": { "id": "fg.multiply" },
-        "funcArgs": [{ "key": "b" }, { "key": "h" }]
-      }
-    ]
-  }
-}`,
+    body: sourceSnippet,
     language: 'json',
-    title: 'Formula source',
+    title: 'CSO fragment',
   },
   {
     body: '',
@@ -73,41 +46,54 @@ def calculate_beam(b: float, h: float):
   },
 ];
 
+// Laptop+ FormulaSheet column. Stacked layout below `min-xl` is unchanged.
+const formulaSheetLaptopWidth = '22rem';
+
 const statusItems = [
   [
     'Available',
-    'Zod validation',
-    'Strict parsing rejects unknown public-source fields, duplicate ids, duplicate node keys, unresolved references, and unsupported functions.',
+    'Constrained Python authoring',
+    'Capture source and observe execution with annotated inputs, calculation steps and public outputs.',
   ],
   [
     'Available',
-    'FormulaSheet rendering',
-    'Validated calculations render as transparent sheet rows with formulas, values, units, descriptions, and comments.',
+    'Source-to-document consistency',
+    'Core verifyExecution compares documented formulas with Python observations. Structural parsing alone does not perform this check.',
   ],
   [
     'Available',
-    'Python export',
-    'The calculation graph exports to dependency-ordered Python from the same validated object.',
+    'Independent numerical references',
+    'Optional reference cases check separately established expected values. A missing matching case is not a pass.',
   ],
   [
     'Available',
-    'FormulaSheet print/PDF',
-    'Browser printing and repo PDF tooling keep sheets in the same transparent document lane.',
+    'FormulaSheet and prepared documents',
+    'React displays supplied data with notation, substitutions, units and explanations. It does not execute calculations.',
   ],
   [
     'Available',
-    'Annotated Python input',
-    'Author calculations in constrained Python, parse them into the contract, then export sheets and code through repo tooling.',
+    'Browser printing for development',
+    'printFormulaSheet requests a browser print. It does not run verification or publish CLI evidence.',
+  ],
+  [
+    'Available',
+    'Verified CLI PDF publication',
+    'cso pdf verifies one captured execution, prepares its document and publishes the PDF with evidence by default. Page inspection remains a separate check.',
+  ],
+  [
+    'Available',
+    'Core Python code generation',
+    'createPythonFromSheetDocument generates dependency-ordered Python from a validated sheet. Generation does not execute or verify it.',
   ],
   [
     'Planned',
     'C# / TypeScript export',
-    'Use the contract for future NuGet and npm language targets.',
+    'Additional language targets remain future work.',
   ],
   [
     'Planned',
     'Package-manager hosting',
-    'Host reusable calculation packages natively on PyPI/pip, npm, and NuGet.',
+    'Registry hosting for reusable calculation packages on PyPI, npm and NuGet remains future work.',
   ],
 ] as const;
 
@@ -146,9 +132,7 @@ const FormulaSheetProofRow = () => (
           <div className="py-[5px] pr-3 text-[12px] text-black/50">
             Description
           </div>
-          <div className="py-[5px] text-[12px] text-black/50">
-            Concrete area
-          </div>
+          <div className="py-[5px] text-[12px] text-black/50">Panel area</div>
         </div>
         <div className="grid grid-cols-[120px_minmax(0,1fr)] border-b border-gray-300">
           <div className="py-[5px] pr-3 text-[12px] text-black/50">
@@ -158,7 +142,7 @@ const FormulaSheetProofRow = () => (
             <math>
               <msub>
                 <mi>A</mi>
-                <mi>c</mi>
+                <mi>rect</mi>
               </msub>
             </math>
           </div>
@@ -169,26 +153,30 @@ const FormulaSheetProofRow = () => (
             <math>
               <msub>
                 <mi>A</mi>
-                <mi>c</mi>
+                <mi>rect</mi>
               </msub>
               <mo>=</mo>
-              <mi>b</mi>
-              <mi>h</mi>
+              <msub>
+                <mi>w</mi>
+                <mi>pan</mi>
+              </msub>
+              <msub>
+                <mi>h</mi>
+                <mi>pan</mi>
+              </msub>
             </math>
           </div>
         </div>
         <div className="grid grid-cols-[120px_minmax(0,1fr)] border-b border-gray-300">
           <div className="py-[5px] pr-3 text-[12px] text-black/50">Value</div>
-          <div className="py-[5px] font-['KaTeX_Main'] text-[16.335px]">
-            150000
-          </div>
+          <div className="py-[5px] font-['KaTeX_Main'] text-[16.335px]">6</div>
         </div>
         <div className="grid grid-cols-[120px_minmax(0,1fr)] border-b border-gray-300">
           <div className="py-[5px] pr-3 text-[12px] text-black/50">Unit</div>
           <div className="py-[5px]">
             <math>
               <msup>
-                <mi>mm</mi>
+                <mi>m</mi>
                 <mn>2</mn>
               </msup>
             </math>
@@ -197,7 +185,7 @@ const FormulaSheetProofRow = () => (
         <div className="grid grid-cols-[120px_minmax(0,1fr)]">
           <div className="py-[5px] pr-3 text-[12px] text-black/50">Comment</div>
           <div className="py-[5px] text-[12px] text-black/50">
-            Area from section width and depth
+            ...
           </div>
         </div>
       </div>
@@ -226,7 +214,7 @@ export default function Home() {
             className="border border-gray-300 bg-white p-4 font-['Plus_Jakarta_Sans']"
           >
             <h2 className="mb-3 text-center text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-              From calculation logic to trusted outputs
+              From calculation logic to reviewable outputs
             </h2>
 
             <div className="border-2 border-gray-950 px-4 py-3 text-center">
@@ -247,10 +235,10 @@ export default function Home() {
 
             <div className="border-2 border-gray-950 px-4 py-3 text-center">
               <p className="text-[18px] font-semibold leading-snug text-gray-950">
-                Zod validation
+                Capture and validation
               </p>
               <p className="mt-1 text-[12px] leading-5 text-gray-500">
-                Validate symbols, formulas, units, and results.
+                Capture Python execution and validate supplied calculation data.
               </p>
             </div>
 
@@ -295,11 +283,16 @@ export default function Home() {
                 </div>
                 <div className="grid place-items-center border-2 border-gray-950 px-3 py-3 text-center">
                   <p className="text-[18px] font-semibold leading-snug text-gray-950">
-                    Any Code Export
+                    Any code export
                   </p>
                 </div>
               </div>
             </div>
+            <p className="mt-3 text-center text-[12px] leading-5 text-gray-500">
+              Browser print is for development; cso pdf verifies captured
+              execution. Python export generates code without executing or
+              verifying it.
+            </p>
           </section>
         </header>
 
@@ -312,10 +305,17 @@ export default function Home() {
           </h2>
           <p className="mt-3 max-w-[820px] font-['Plus_Jakarta_Sans'] text-[14px] leading-6 text-gray-600">
             The Python authoring layer keeps the calculation executable while
-            giving the exporter enough metadata to build a transparent formula
-            graph for review.
+            capturing the metadata and observations needed to build a
+            transparent formula graph for review.
           </p>
-          <div className="mt-5 grid gap-3 min-xl:grid-cols-3">
+          <div
+            className="mt-5 grid gap-3 min-xl:[grid-template-columns:minmax(0,1fr)_minmax(0,1fr)_var(--formula-sheet-width)]"
+            style={
+              {
+                '--formula-sheet-width': formulaSheetLaptopWidth,
+              } as CSSProperties
+            }
+          >
             {proofItems.map(({ body, language, title }) => (
               <div key={title} className="min-w-0 border border-gray-300">
                 <h3 className="border-b border-gray-300 px-4 py-3 font-mono text-[13px] text-gray-950">
@@ -333,16 +333,15 @@ export default function Home() {
 
         <section className="border border-gray-300 bg-white px-4 py-5 min-md:px-6">
           <p className="font-['Plus_Jakarta_Sans'] text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-            Why It Matters
+            Calculation record
           </p>
           <h2 className="mt-2 font-['Plus_Jakarta_Sans'] text-[24px] font-semibold leading-tight text-gray-950">
-            A small contract for real calculations
+            What a CalculationSourceObject records
           </h2>
           <p className="mt-3 max-w-[760px] font-['Plus_Jakarta_Sans'] text-[14px] leading-6 text-gray-600">
-            FormulaSheet keeps the calculation object deliberately compact:
-            enough structure to validate engineering logic, make it inspectable,
-            and translate it without dragging along application workspace
-            baggage.
+            A CSO records formulas, symbols, results and source context.
+            FormulaSheet presents its mathematical rows; a rendered sheet is not
+            the complete calculation source.
           </p>
           <div className="mt-5 grid gap-3 min-md:grid-cols-2 min-xl:grid-cols-4">
             {contractSignals.map(([title, body]) => (
