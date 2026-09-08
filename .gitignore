@@ -38,3 +38,6 @@ test-results/
 .DS_Store
 .env
 .env*.local
+
+# Vercel local project link
+.vercel/
