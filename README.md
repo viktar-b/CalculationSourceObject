@@ -43,6 +43,12 @@ separate LaTeX document.
 - **Understand the contracts:** [domain terms](CONTEXT.md),
   [data and rendering](docs/rendering.md), [decisions](docs/adr/).
 
+## Community
+
+- [Contributing](CONTRIBUTING.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
+- [Security policy](SECURITY.md)
+
 Development uses local npm archives and a Python wheel. Follow
 [setup](docs/development.md#setup), then run a verified example from the root:
 

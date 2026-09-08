@@ -1,0 +1,39 @@
+name: Bug report
+description: Report unexpected behavior in this repository
+body:
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+    validations:
+      required: false
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+    validations:
+      required: false
+  - type: input
+    id: command
+    attributes:
+      label: Command run
+    validations:
+      required: false

@@ -1,0 +1,20 @@
+name: Design discussion
+description: Discuss a design idea. This does not mean it will be implemented.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This project is a prototype. Opening a discussion does not mean the
+        change will be implemented.
+  - type: textarea
+    id: discuss
+    attributes:
+      label: What you want to discuss
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters
+    validations:
+      required: true
