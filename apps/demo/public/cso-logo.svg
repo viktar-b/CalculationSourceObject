@@ -1,0 +1,47 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 512 512"
+  role="img"
+  aria-labelledby="title desc"
+>
+  <title id="title">CSO logo</title>
+  <desc id="desc">
+    A square CalculationSourceObject logo with the text { CSO }.
+  </desc>
+  <defs>
+    <linearGradient id="surface" x1="74" y1="60" x2="438" y2="452">
+      <stop offset="0" stop-color="#171f28" />
+      <stop offset="1" stop-color="#080d12" />
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="#f6f5f1" />
+  <rect
+    x="58"
+    y="58"
+    width="396"
+    height="396"
+    fill="url(#surface)"
+    stroke="#27313d"
+    stroke-width="2"
+  />
+  <path
+    d="M118 150H394M118 362H394M150 118V394M362 118V394"
+    fill="none"
+    stroke="#f8fafc"
+    stroke-width="1"
+    opacity="0.08"
+  />
+
+  <text
+    x="256"
+    y="284"
+    text-anchor="middle"
+    fill="#f8fafc"
+    font-family="SFMono-Regular, Menlo, Monaco, Consolas, Courier New, monospace"
+    font-size="86"
+    font-weight="700"
+    letter-spacing="0"
+  >{ CSO }</text>
+
+</svg>

@@ -1,0 +1,1913 @@
+{
+  "protocolVersion": "2",
+  "ok": true,
+  "diagnostics": [],
+  "execution": {
+    "authoring": {
+      "version": "2",
+      "parameters": [
+        {
+          "invocationId": "root",
+          "parameterName": "width",
+          "symbolId": "[\"symbol\",\"root\",\"width\"]",
+          "numericType": "float",
+          "unit": "m",
+          "location": {
+            "moduleId": "estimate.cso.py",
+            "start": {
+              "line": 8,
+              "column": 13
+            },
+            "end": {
+              "line": 8,
+              "column": 25
+            }
+          },
+          "origin": {
+            "kind": "local"
+          }
+        },
+        {
+          "invocationId": "root",
+          "parameterName": "height",
+          "symbolId": "[\"symbol\",\"root\",\"height\"]",
+          "numericType": "float",
+          "unit": "m",
+          "location": {
+            "moduleId": "estimate.cso.py",
+            "start": {
+              "line": 8,
+              "column": 31
+            },
+            "end": {
+              "line": 8,
+              "column": 45
+            }
+          },
+          "origin": {
+            "kind": "local"
+          }
+        },
+        {
+          "invocationId": "root/first",
+          "parameterName": "width",
+          "symbolId": "[\"symbol\",\"root\",\"width\"]",
+          "numericType": "float",
+          "unit": "m",
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 7,
+              "column": 14
+            },
+            "end": {
+              "line": 7,
+              "column": 26
+            }
+          },
+          "origin": {
+            "kind": "parameter",
+            "invocationId": "root",
+            "parameterName": "width"
+          }
+        },
+        {
+          "invocationId": "root/first",
+          "parameterName": "height",
+          "symbolId": "[\"symbol\",\"root\",\"height\"]",
+          "numericType": "float",
+          "unit": "m",
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 7,
+              "column": 28
+            },
+            "end": {
+              "line": 7,
+              "column": 42
+            }
+          },
+          "origin": {
+            "kind": "parameter",
+            "invocationId": "root",
+            "parameterName": "height"
+          }
+        },
+        {
+          "invocationId": "root/second",
+          "parameterName": "width",
+          "symbolId": "[\"symbol\",\"root\",\"width\"]",
+          "numericType": "float",
+          "unit": "m",
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 7,
+              "column": 14
+            },
+            "end": {
+              "line": 7,
+              "column": 26
+            }
+          },
+          "origin": {
+            "kind": "output",
+            "invocationId": "root/first",
+            "outputName": "width"
+          }
+        },
+        {
+          "invocationId": "root/second",
+          "parameterName": "height",
+          "symbolId": "[\"symbol\",\"root\",\"height\"]",
+          "numericType": "float",
+          "unit": "m",
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 7,
+              "column": 28
+            },
+            "end": {
+              "line": 7,
+              "column": 42
+            }
+          },
+          "origin": {
+            "kind": "parameter",
+            "invocationId": "root",
+            "parameterName": "height"
+          }
+        }
+      ],
+      "uses": [
+        {
+          "invocationId": "root/first",
+          "parameterName": "width",
+          "address": {
+            "symbolId": "[\"symbol\",\"root/first\",\"area\"]",
+            "nodeKey": "n2"
+          },
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 8,
+              "column": 80
+            },
+            "end": {
+              "line": 8,
+              "column": 85
+            }
+          }
+        },
+        {
+          "invocationId": "root/first",
+          "parameterName": "height",
+          "address": {
+            "symbolId": "[\"symbol\",\"root/first\",\"area\"]",
+            "nodeKey": "n3"
+          },
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 8,
+              "column": 88
+            },
+            "end": {
+              "line": 8,
+              "column": 94
+            }
+          }
+        },
+        {
+          "invocationId": "root/first",
+          "parameterName": "width",
+          "address": {
+            "symbolId": "[\"symbol\",\"root/first\",\"perimeter\"]",
+            "nodeKey": "n4"
+          },
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 9,
+              "column": 93
+            },
+            "end": {
+              "line": 9,
+              "column": 98
+            }
+          }
+        },
+        {
+          "invocationId": "root/first",
+          "parameterName": "height",
+          "address": {
+            "symbolId": "[\"symbol\",\"root/first\",\"perimeter\"]",
+            "nodeKey": "n5"
+          },
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 9,
+              "column": 101
+            },
+            "end": {
+              "line": 9,
+              "column": 107
+            }
+          }
+        },
+        {
+          "invocationId": "root/second",
+          "parameterName": "width",
+          "address": {
+            "symbolId": "[\"symbol\",\"root/second\",\"area\"]",
+            "nodeKey": "n2"
+          },
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 8,
+              "column": 80
+            },
+            "end": {
+              "line": 8,
+              "column": 85
+            }
+          }
+        },
+        {
+          "invocationId": "root/second",
+          "parameterName": "height",
+          "address": {
+            "symbolId": "[\"symbol\",\"root/second\",\"area\"]",
+            "nodeKey": "n3"
+          },
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 8,
+              "column": 88
+            },
+            "end": {
+              "line": 8,
+              "column": 94
+            }
+          }
+        },
+        {
+          "invocationId": "root/second",
+          "parameterName": "width",
+          "address": {
+            "symbolId": "[\"symbol\",\"root/second\",\"perimeter\"]",
+            "nodeKey": "n4"
+          },
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 9,
+              "column": 93
+            },
+            "end": {
+              "line": 9,
+              "column": 98
+            }
+          }
+        },
+        {
+          "invocationId": "root/second",
+          "parameterName": "height",
+          "address": {
+            "symbolId": "[\"symbol\",\"root/second\",\"perimeter\"]",
+            "nodeKey": "n5"
+          },
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 9,
+              "column": 101
+            },
+            "end": {
+              "line": 9,
+              "column": 107
+            }
+          }
+        }
+      ],
+      "outputDeclarations": [
+        {
+          "invocationId": "root",
+          "name": "total",
+          "symbolId": "[\"symbol\",\"root\",\"total\"]",
+          "source": {
+            "kind": "symbol",
+            "symbolId": "[\"symbol\",\"root\",\"total\"]"
+          },
+          "location": {
+            "moduleId": "estimate.cso.py",
+            "start": {
+              "line": 12,
+              "column": 21
+            },
+            "end": {
+              "line": 12,
+              "column": 26
+            }
+          }
+        },
+        {
+          "invocationId": "root/first",
+          "name": "area",
+          "symbolId": "[\"symbol\",\"root/first\",\"area\"]",
+          "source": {
+            "kind": "symbol",
+            "symbolId": "[\"symbol\",\"root/first\",\"area\"]"
+          },
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 10,
+              "column": 20
+            },
+            "end": {
+              "line": 10,
+              "column": 24
+            }
+          }
+        },
+        {
+          "invocationId": "root/first",
+          "name": "width",
+          "symbolId": "[\"symbol\",\"root\",\"width\"]",
+          "source": {
+            "kind": "parameter",
+            "invocationId": "root/first",
+            "parameterName": "width"
+          },
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 10,
+              "column": 35
+            },
+            "end": {
+              "line": 10,
+              "column": 40
+            }
+          }
+        },
+        {
+          "invocationId": "root/second",
+          "name": "area",
+          "symbolId": "[\"symbol\",\"root/second\",\"area\"]",
+          "source": {
+            "kind": "symbol",
+            "symbolId": "[\"symbol\",\"root/second\",\"area\"]"
+          },
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 10,
+              "column": 20
+            },
+            "end": {
+              "line": 10,
+              "column": 24
+            }
+          }
+        },
+        {
+          "invocationId": "root/second",
+          "name": "width",
+          "symbolId": "[\"symbol\",\"root\",\"width\"]",
+          "source": {
+            "kind": "parameter",
+            "invocationId": "root/second",
+            "parameterName": "width"
+          },
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 10,
+              "column": 35
+            },
+            "end": {
+              "line": 10,
+              "column": 40
+            }
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "invocationId": "root",
+          "name": "total",
+          "symbolId": "[\"symbol\",\"root\",\"total\"]",
+          "source": {
+            "kind": "symbol",
+            "symbolId": "[\"symbol\",\"root\",\"total\"]"
+          },
+          "location": {
+            "moduleId": "estimate.cso.py",
+            "start": {
+              "line": 12,
+              "column": 21
+            },
+            "end": {
+              "line": 12,
+              "column": 26
+            }
+          },
+          "value": 12
+        },
+        {
+          "invocationId": "root/first",
+          "name": "area",
+          "symbolId": "[\"symbol\",\"root/first\",\"area\"]",
+          "source": {
+            "kind": "symbol",
+            "symbolId": "[\"symbol\",\"root/first\",\"area\"]"
+          },
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 10,
+              "column": 20
+            },
+            "end": {
+              "line": 10,
+              "column": 24
+            }
+          },
+          "value": 6
+        },
+        {
+          "invocationId": "root/first",
+          "name": "width",
+          "symbolId": "[\"symbol\",\"root\",\"width\"]",
+          "source": {
+            "kind": "parameter",
+            "invocationId": "root/first",
+            "parameterName": "width"
+          },
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 10,
+              "column": 35
+            },
+            "end": {
+              "line": 10,
+              "column": 40
+            }
+          },
+          "value": 2
+        },
+        {
+          "invocationId": "root/second",
+          "name": "area",
+          "symbolId": "[\"symbol\",\"root/second\",\"area\"]",
+          "source": {
+            "kind": "symbol",
+            "symbolId": "[\"symbol\",\"root/second\",\"area\"]"
+          },
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 10,
+              "column": 20
+            },
+            "end": {
+              "line": 10,
+              "column": 24
+            }
+          },
+          "value": 6
+        },
+        {
+          "invocationId": "root/second",
+          "name": "width",
+          "symbolId": "[\"symbol\",\"root\",\"width\"]",
+          "source": {
+            "kind": "parameter",
+            "invocationId": "root/second",
+            "parameterName": "width"
+          },
+          "location": {
+            "moduleId": "geometry.cso.py",
+            "start": {
+              "line": 10,
+              "column": 35
+            },
+            "end": {
+              "line": 10,
+              "column": 40
+            }
+          },
+          "value": 2
+        }
+      ]
+    },
+    "cso": {
+      "schemaVersion": "1.0.0",
+      "title": "Estimate",
+      "source": {
+        "id": "estimate",
+        "metadata": {}
+      },
+      "rootSectionIds": [
+        "[\"section\",\"root\",\"summary\"]"
+      ],
+      "sections": [
+        {
+          "id": "[\"section\",\"root\",\"summary\"]",
+          "title": "Summary",
+          "items": [
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root\",\"width\"]",
+                "glyph": "w",
+                "glyphPlaintext": "w",
+                "description": "Width",
+                "unit": "m",
+                "comment": "",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 2
+                      }
+                    }
+                  ],
+                  "result": {
+                    "kind": "number",
+                    "value": 2
+                  }
+                },
+                "metadata": {
+                  "localId": "width",
+                  "invocationId": "root",
+                  "location": {
+                    "moduleId": "estimate.cso.py",
+                    "start": {
+                      "line": 8,
+                      "column": 13
+                    },
+                    "end": {
+                      "line": 8,
+                      "column": 25
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root\",\"height\"]",
+                "glyph": "h",
+                "glyphPlaintext": "h",
+                "description": "Height",
+                "unit": "m",
+                "comment": "",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 3
+                      }
+                    }
+                  ],
+                  "result": {
+                    "kind": "number",
+                    "value": 3
+                  }
+                },
+                "metadata": {
+                  "localId": "height",
+                  "invocationId": "root",
+                  "location": {
+                    "moduleId": "estimate.cso.py",
+                    "start": {
+                      "line": 8,
+                      "column": 31
+                    },
+                    "end": {
+                      "line": 8,
+                      "column": 45
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "section",
+              "id": "[\"section\",\"root/first\",\"geometry\"]",
+              "metadata": {
+                "invocationId": "root",
+                "location": {
+                  "moduleId": "estimate.cso.py",
+                  "start": {
+                    "line": 9,
+                    "column": 4
+                  },
+                  "end": {
+                    "line": 9,
+                    "column": 49
+                  }
+                }
+              }
+            },
+            {
+              "kind": "section",
+              "id": "[\"section\",\"root/second\",\"geometry\"]",
+              "metadata": {
+                "invocationId": "root",
+                "location": {
+                  "moduleId": "estimate.cso.py",
+                  "start": {
+                    "line": 10,
+                    "column": 4
+                  },
+                  "end": {
+                    "line": 10,
+                    "column": 59
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root\",\"total\"]",
+                "glyph": "A",
+                "glyphPlaintext": "A",
+                "description": "Total area",
+                "unit": "m^2",
+                "comment": "",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "metadata": {
+                        "invocationId": "root",
+                        "location": {
+                          "moduleId": "estimate.cso.py",
+                          "start": {
+                            "line": 11,
+                            "column": 87
+                          },
+                          "end": {
+                            "line": 11,
+                            "column": 117
+                          }
+                        }
+                      },
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.add"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n2"
+                        },
+                        {
+                          "key": "n3"
+                        }
+                      ]
+                    },
+                    {
+                      "key": "n2",
+                      "metadata": {
+                        "invocationId": "root",
+                        "location": {
+                          "moduleId": "estimate.cso.py",
+                          "start": {
+                            "line": 11,
+                            "column": 87
+                          },
+                          "end": {
+                            "line": 11,
+                            "column": 100
+                          }
+                        },
+                        "outputInvocationId": "root/first",
+                        "outputName": "area"
+                      },
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/first\",\"area\"]"
+                      }
+                    },
+                    {
+                      "key": "n3",
+                      "metadata": {
+                        "invocationId": "root",
+                        "location": {
+                          "moduleId": "estimate.cso.py",
+                          "start": {
+                            "line": 11,
+                            "column": 103
+                          },
+                          "end": {
+                            "line": 11,
+                            "column": 117
+                          }
+                        },
+                        "outputInvocationId": "root/second",
+                        "outputName": "area"
+                      },
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/second\",\"area\"]"
+                      }
+                    }
+                  ],
+                  "result": {
+                    "kind": "number",
+                    "value": 12
+                  }
+                },
+                "metadata": {
+                  "localId": "total",
+                  "invocationId": "root",
+                  "location": {
+                    "moduleId": "estimate.cso.py",
+                    "start": {
+                      "line": 11,
+                      "column": 4
+                    },
+                    "end": {
+                      "line": 11,
+                      "column": 117
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "metadata": {
+            "localId": "summary",
+            "invocationId": "root",
+            "location": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 7,
+                "column": 1
+              },
+              "end": {
+                "line": 7,
+                "column": 50
+              }
+            }
+          }
+        },
+        {
+          "id": "[\"section\",\"root/first\",\"geometry\"]",
+          "title": "Geometry",
+          "items": [
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/first\",\"area\"]",
+                "glyph": "A_{first}",
+                "glyphPlaintext": "A_{first}",
+                "description": "Area",
+                "unit": "m^2",
+                "comment": "",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "metadata": {
+                        "invocationId": "root/first",
+                        "location": {
+                          "moduleId": "geometry.cso.py",
+                          "start": {
+                            "line": 8,
+                            "column": 80
+                          },
+                          "end": {
+                            "line": 8,
+                            "column": 94
+                          }
+                        }
+                      },
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.multiply"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n2"
+                        },
+                        {
+                          "key": "n3"
+                        }
+                      ]
+                    },
+                    {
+                      "key": "n2",
+                      "metadata": {
+                        "invocationId": "root/first",
+                        "location": {
+                          "moduleId": "geometry.cso.py",
+                          "start": {
+                            "line": 8,
+                            "column": 80
+                          },
+                          "end": {
+                            "line": 8,
+                            "column": 85
+                          }
+                        },
+                        "parameterName": "width"
+                      },
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root\",\"width\"]"
+                      }
+                    },
+                    {
+                      "key": "n3",
+                      "metadata": {
+                        "invocationId": "root/first",
+                        "location": {
+                          "moduleId": "geometry.cso.py",
+                          "start": {
+                            "line": 8,
+                            "column": 88
+                          },
+                          "end": {
+                            "line": 8,
+                            "column": 94
+                          }
+                        },
+                        "parameterName": "height"
+                      },
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root\",\"height\"]"
+                      }
+                    }
+                  ],
+                  "result": {
+                    "kind": "number",
+                    "value": 6
+                  }
+                },
+                "metadata": {
+                  "localId": "area",
+                  "invocationId": "root/first",
+                  "location": {
+                    "moduleId": "geometry.cso.py",
+                    "start": {
+                      "line": 8,
+                      "column": 4
+                    },
+                    "end": {
+                      "line": 8,
+                      "column": 94
+                    }
+                  },
+                  "authoredGlyph": "A",
+                  "glyphScope": "first"
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/first\",\"perimeter\"]",
+                "glyph": "P_{first}",
+                "glyphPlaintext": "P_{first}",
+                "description": "Perimeter",
+                "unit": "m",
+                "comment": "",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "metadata": {
+                        "invocationId": "root/first",
+                        "location": {
+                          "moduleId": "geometry.cso.py",
+                          "start": {
+                            "line": 9,
+                            "column": 88
+                          },
+                          "end": {
+                            "line": 9,
+                            "column": 108
+                          }
+                        }
+                      },
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.multiply"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n2"
+                        },
+                        {
+                          "key": "n3"
+                        }
+                      ]
+                    },
+                    {
+                      "key": "n2",
+                      "metadata": {
+                        "invocationId": "root/first",
+                        "location": {
+                          "moduleId": "geometry.cso.py",
+                          "start": {
+                            "line": 9,
+                            "column": 88
+                          },
+                          "end": {
+                            "line": 9,
+                            "column": 89
+                          }
+                        }
+                      },
+                      "draft": "2",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 2
+                      }
+                    },
+                    {
+                      "key": "n3",
+                      "metadata": {
+                        "invocationId": "root/first",
+                        "location": {
+                          "moduleId": "geometry.cso.py",
+                          "start": {
+                            "line": 9,
+                            "column": 93
+                          },
+                          "end": {
+                            "line": 9,
+                            "column": 107
+                          }
+                        }
+                      },
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.add"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n4"
+                        },
+                        {
+                          "key": "n5"
+                        }
+                      ]
+                    },
+                    {
+                      "key": "n4",
+                      "metadata": {
+                        "invocationId": "root/first",
+                        "location": {
+                          "moduleId": "geometry.cso.py",
+                          "start": {
+                            "line": 9,
+                            "column": 93
+                          },
+                          "end": {
+                            "line": 9,
+                            "column": 98
+                          }
+                        },
+                        "parameterName": "width"
+                      },
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root\",\"width\"]"
+                      }
+                    },
+                    {
+                      "key": "n5",
+                      "metadata": {
+                        "invocationId": "root/first",
+                        "location": {
+                          "moduleId": "geometry.cso.py",
+                          "start": {
+                            "line": 9,
+                            "column": 101
+                          },
+                          "end": {
+                            "line": 9,
+                            "column": 107
+                          }
+                        },
+                        "parameterName": "height"
+                      },
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root\",\"height\"]"
+                      }
+                    }
+                  ],
+                  "result": {
+                    "kind": "number",
+                    "value": 10
+                  }
+                },
+                "metadata": {
+                  "localId": "perimeter",
+                  "invocationId": "root/first",
+                  "location": {
+                    "moduleId": "geometry.cso.py",
+                    "start": {
+                      "line": 9,
+                      "column": 4
+                    },
+                    "end": {
+                      "line": 9,
+                      "column": 108
+                    }
+                  },
+                  "authoredGlyph": "P",
+                  "glyphScope": "first"
+                }
+              }
+            }
+          ],
+          "metadata": {
+            "localId": "geometry",
+            "invocationId": "root/first",
+            "location": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 6,
+                "column": 1
+              },
+              "end": {
+                "line": 6,
+                "column": 52
+              }
+            }
+          }
+        },
+        {
+          "id": "[\"section\",\"root/second\",\"geometry\"]",
+          "title": "Geometry",
+          "items": [
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/second\",\"area\"]",
+                "glyph": "A_{second}",
+                "glyphPlaintext": "A_{second}",
+                "description": "Area",
+                "unit": "m^2",
+                "comment": "",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "metadata": {
+                        "invocationId": "root/second",
+                        "location": {
+                          "moduleId": "geometry.cso.py",
+                          "start": {
+                            "line": 8,
+                            "column": 80
+                          },
+                          "end": {
+                            "line": 8,
+                            "column": 94
+                          }
+                        }
+                      },
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.multiply"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n2"
+                        },
+                        {
+                          "key": "n3"
+                        }
+                      ]
+                    },
+                    {
+                      "key": "n2",
+                      "metadata": {
+                        "invocationId": "root/second",
+                        "location": {
+                          "moduleId": "geometry.cso.py",
+                          "start": {
+                            "line": 8,
+                            "column": 80
+                          },
+                          "end": {
+                            "line": 8,
+                            "column": 85
+                          }
+                        },
+                        "parameterName": "width"
+                      },
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root\",\"width\"]"
+                      }
+                    },
+                    {
+                      "key": "n3",
+                      "metadata": {
+                        "invocationId": "root/second",
+                        "location": {
+                          "moduleId": "geometry.cso.py",
+                          "start": {
+                            "line": 8,
+                            "column": 88
+                          },
+                          "end": {
+                            "line": 8,
+                            "column": 94
+                          }
+                        },
+                        "parameterName": "height"
+                      },
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root\",\"height\"]"
+                      }
+                    }
+                  ],
+                  "result": {
+                    "kind": "number",
+                    "value": 6
+                  }
+                },
+                "metadata": {
+                  "localId": "area",
+                  "invocationId": "root/second",
+                  "location": {
+                    "moduleId": "geometry.cso.py",
+                    "start": {
+                      "line": 8,
+                      "column": 4
+                    },
+                    "end": {
+                      "line": 8,
+                      "column": 94
+                    }
+                  },
+                  "authoredGlyph": "A",
+                  "glyphScope": "second"
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/second\",\"perimeter\"]",
+                "glyph": "P_{second}",
+                "glyphPlaintext": "P_{second}",
+                "description": "Perimeter",
+                "unit": "m",
+                "comment": "",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "metadata": {
+                        "invocationId": "root/second",
+                        "location": {
+                          "moduleId": "geometry.cso.py",
+                          "start": {
+                            "line": 9,
+                            "column": 88
+                          },
+                          "end": {
+                            "line": 9,
+                            "column": 108
+                          }
+                        }
+                      },
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.multiply"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n2"
+                        },
+                        {
+                          "key": "n3"
+                        }
+                      ]
+                    },
+                    {
+                      "key": "n2",
+                      "metadata": {
+                        "invocationId": "root/second",
+                        "location": {
+                          "moduleId": "geometry.cso.py",
+                          "start": {
+                            "line": 9,
+                            "column": 88
+                          },
+                          "end": {
+                            "line": 9,
+                            "column": 89
+                          }
+                        }
+                      },
+                      "draft": "2",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 2
+                      }
+                    },
+                    {
+                      "key": "n3",
+                      "metadata": {
+                        "invocationId": "root/second",
+                        "location": {
+                          "moduleId": "geometry.cso.py",
+                          "start": {
+                            "line": 9,
+                            "column": 93
+                          },
+                          "end": {
+                            "line": 9,
+                            "column": 107
+                          }
+                        }
+                      },
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.add"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n4"
+                        },
+                        {
+                          "key": "n5"
+                        }
+                      ]
+                    },
+                    {
+                      "key": "n4",
+                      "metadata": {
+                        "invocationId": "root/second",
+                        "location": {
+                          "moduleId": "geometry.cso.py",
+                          "start": {
+                            "line": 9,
+                            "column": 93
+                          },
+                          "end": {
+                            "line": 9,
+                            "column": 98
+                          }
+                        },
+                        "parameterName": "width"
+                      },
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root\",\"width\"]"
+                      }
+                    },
+                    {
+                      "key": "n5",
+                      "metadata": {
+                        "invocationId": "root/second",
+                        "location": {
+                          "moduleId": "geometry.cso.py",
+                          "start": {
+                            "line": 9,
+                            "column": 101
+                          },
+                          "end": {
+                            "line": 9,
+                            "column": 107
+                          }
+                        },
+                        "parameterName": "height"
+                      },
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root\",\"height\"]"
+                      }
+                    }
+                  ],
+                  "result": {
+                    "kind": "number",
+                    "value": 10
+                  }
+                },
+                "metadata": {
+                  "localId": "perimeter",
+                  "invocationId": "root/second",
+                  "location": {
+                    "moduleId": "geometry.cso.py",
+                    "start": {
+                      "line": 9,
+                      "column": 4
+                    },
+                    "end": {
+                      "line": 9,
+                      "column": 108
+                    }
+                  },
+                  "authoredGlyph": "P",
+                  "glyphScope": "second"
+                }
+              }
+            }
+          ],
+          "metadata": {
+            "localId": "geometry",
+            "invocationId": "root/second",
+            "location": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 6,
+                "column": 1
+              },
+              "end": {
+                "line": 6,
+                "column": 52
+              }
+            }
+          }
+        }
+      ]
+    },
+    "entry": {
+      "moduleId": "estimate.cso.py",
+      "sourceHash": "a2c27163b70d5c2f6fe690f4fe5c20e476f667dd8f068bd9ad34a56aff7b62b6",
+      "function": "estimate",
+      "invocationId": "root",
+      "resolvedInputs": {
+        "width": 2,
+        "height": 3
+      }
+    },
+    "sourceManifest": [
+      {
+        "moduleId": "_cso_bindings/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "moduleId": "_cso_bindings/geometry.py",
+        "sha256": "b70d32f223d2f8956843c11ec7a1015ee593247983eb04f4073c08f414abcf73"
+      },
+      {
+        "moduleId": "estimate.cso.py",
+        "sha256": "a2c27163b70d5c2f6fe690f4fe5c20e476f667dd8f068bd9ad34a56aff7b62b6"
+      },
+      {
+        "moduleId": "geometry.cso.py",
+        "sha256": "2fc607d5bbaa2ecf12ceb871326ae325f81503de94b20b9ede4d82c49c400593"
+      },
+      {
+        "moduleId": "quantities.py",
+        "sha256": "1a6a823b4f05479c53e18652f982c39572586b3438bf32ed94ab491a421024df"
+      }
+    ],
+    "sourceClosureHash": "302b3970fa28679806f7c69c5f0637f84aafaa5b6f66157838a5860a1bd764c7",
+    "invocations": [
+      {
+        "id": "root",
+        "moduleId": "estimate.cso.py",
+        "function": "estimate",
+        "resolvedInputs": {
+          "width": 2,
+          "height": 3
+        },
+        "inputBindings": [
+          {
+            "parameterName": "width",
+            "parameterLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 8,
+                "column": 13
+              },
+              "end": {
+                "line": 8,
+                "column": 25
+              }
+            },
+            "kind": "parsedDefault",
+            "value": 2,
+            "defaultLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 8,
+                "column": 28
+              },
+              "end": {
+                "line": 8,
+                "column": 29
+              }
+            }
+          },
+          {
+            "parameterName": "height",
+            "parameterLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 8,
+                "column": 31
+              },
+              "end": {
+                "line": 8,
+                "column": 45
+              }
+            },
+            "kind": "parsedDefault",
+            "value": 3,
+            "defaultLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 8,
+                "column": 48
+              },
+              "end": {
+                "line": 8,
+                "column": 49
+              }
+            }
+          }
+        ],
+        "symbols": [
+          {
+            "symbolId": "[\"symbol\",\"root\",\"width\"]",
+            "localId": "width",
+            "variableName": "width",
+            "definitionLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 8,
+                "column": 13
+              },
+              "end": {
+                "line": 8,
+                "column": 25
+              }
+            },
+            "kind": "input",
+            "givenSource": {
+              "kind": "parameter",
+              "parameterName": "width"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root\",\"height\"]",
+            "localId": "height",
+            "variableName": "height",
+            "definitionLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 8,
+                "column": 31
+              },
+              "end": {
+                "line": 8,
+                "column": 45
+              }
+            },
+            "kind": "input",
+            "givenSource": {
+              "kind": "parameter",
+              "parameterName": "height"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root\",\"total\"]",
+            "localId": "total",
+            "variableName": "total",
+            "definitionLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 11,
+                "column": 4
+              },
+              "end": {
+                "line": 11,
+                "column": 117
+              }
+            },
+            "kind": "formula",
+            "address": {
+              "symbolId": "[\"symbol\",\"root\",\"total\"]",
+              "nodeKey": "n1"
+            }
+          }
+        ]
+      },
+      {
+        "id": "root/first",
+        "moduleId": "geometry.cso.py",
+        "function": "rectangle",
+        "resolvedInputs": {
+          "width": 2,
+          "height": 3
+        },
+        "inputBindings": [
+          {
+            "parameterName": "width",
+            "parameterLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 7,
+                "column": 14
+              },
+              "end": {
+                "line": 7,
+                "column": 26
+              }
+            },
+            "kind": "callerSymbol",
+            "source": {
+              "symbolId": "[\"symbol\",\"root\",\"width\"]",
+              "nodeKey": "n1"
+            },
+            "callerLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 9,
+                "column": 28
+              },
+              "end": {
+                "line": 9,
+                "column": 33
+              }
+            }
+          },
+          {
+            "parameterName": "height",
+            "parameterLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 7,
+                "column": 28
+              },
+              "end": {
+                "line": 7,
+                "column": 42
+              }
+            },
+            "kind": "callerSymbol",
+            "source": {
+              "symbolId": "[\"symbol\",\"root\",\"height\"]",
+              "nodeKey": "n1"
+            },
+            "callerLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 9,
+                "column": 42
+              },
+              "end": {
+                "line": 9,
+                "column": 48
+              }
+            }
+          }
+        ],
+        "symbols": [
+          {
+            "symbolId": "[\"symbol\",\"root/first\",\"area\"]",
+            "localId": "area",
+            "variableName": "area",
+            "definitionLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 8,
+                "column": 4
+              },
+              "end": {
+                "line": 8,
+                "column": 94
+              }
+            },
+            "kind": "formula",
+            "address": {
+              "symbolId": "[\"symbol\",\"root/first\",\"area\"]",
+              "nodeKey": "n1"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root/first\",\"perimeter\"]",
+            "localId": "perimeter",
+            "variableName": "perimeter",
+            "definitionLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 9,
+                "column": 4
+              },
+              "end": {
+                "line": 9,
+                "column": 108
+              }
+            },
+            "kind": "formula",
+            "address": {
+              "symbolId": "[\"symbol\",\"root/first\",\"perimeter\"]",
+              "nodeKey": "n1"
+            }
+          }
+        ],
+        "parentInvocationId": "root",
+        "callBindingName": "first",
+        "callSite": {
+          "moduleId": "estimate.cso.py",
+          "start": {
+            "line": 9,
+            "column": 4
+          },
+          "end": {
+            "line": 9,
+            "column": 49
+          }
+        }
+      },
+      {
+        "id": "root/second",
+        "moduleId": "geometry.cso.py",
+        "function": "rectangle",
+        "resolvedInputs": {
+          "width": 2,
+          "height": 3
+        },
+        "inputBindings": [
+          {
+            "parameterName": "width",
+            "parameterLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 7,
+                "column": 14
+              },
+              "end": {
+                "line": 7,
+                "column": 26
+              }
+            },
+            "kind": "callerSymbol",
+            "source": {
+              "symbolId": "[\"symbol\",\"root\",\"width\"]",
+              "nodeKey": "n1"
+            },
+            "callerLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 10,
+                "column": 29
+              },
+              "end": {
+                "line": 10,
+                "column": 43
+              }
+            }
+          },
+          {
+            "parameterName": "height",
+            "parameterLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 7,
+                "column": 28
+              },
+              "end": {
+                "line": 7,
+                "column": 42
+              }
+            },
+            "kind": "callerSymbol",
+            "source": {
+              "symbolId": "[\"symbol\",\"root\",\"height\"]",
+              "nodeKey": "n1"
+            },
+            "callerLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 10,
+                "column": 52
+              },
+              "end": {
+                "line": 10,
+                "column": 58
+              }
+            }
+          }
+        ],
+        "symbols": [
+          {
+            "symbolId": "[\"symbol\",\"root/second\",\"area\"]",
+            "localId": "area",
+            "variableName": "area",
+            "definitionLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 8,
+                "column": 4
+              },
+              "end": {
+                "line": 8,
+                "column": 94
+              }
+            },
+            "kind": "formula",
+            "address": {
+              "symbolId": "[\"symbol\",\"root/second\",\"area\"]",
+              "nodeKey": "n1"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root/second\",\"perimeter\"]",
+            "localId": "perimeter",
+            "variableName": "perimeter",
+            "definitionLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 9,
+                "column": 4
+              },
+              "end": {
+                "line": 9,
+                "column": 108
+              }
+            },
+            "kind": "formula",
+            "address": {
+              "symbolId": "[\"symbol\",\"root/second\",\"perimeter\"]",
+              "nodeKey": "n1"
+            }
+          }
+        ],
+        "parentInvocationId": "root",
+        "callBindingName": "second",
+        "callSite": {
+          "moduleId": "estimate.cso.py",
+          "start": {
+            "line": 10,
+            "column": 4
+          },
+          "end": {
+            "line": 10,
+            "column": 59
+          }
+        }
+      }
+    ],
+    "observations": [
+      {
+        "symbolId": "[\"symbol\",\"root\",\"width\"]",
+        "kind": "input",
+        "definitionLocation": {
+          "moduleId": "estimate.cso.py",
+          "start": {
+            "line": 8,
+            "column": 13
+          },
+          "end": {
+            "line": 8,
+            "column": 25
+          }
+        },
+        "invocationId": "root",
+        "value": 2
+      },
+      {
+        "symbolId": "[\"symbol\",\"root\",\"height\"]",
+        "kind": "input",
+        "definitionLocation": {
+          "moduleId": "estimate.cso.py",
+          "start": {
+            "line": 8,
+            "column": 31
+          },
+          "end": {
+            "line": 8,
+            "column": 45
+          }
+        },
+        "invocationId": "root",
+        "value": 3
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/first\",\"area\"]",
+        "kind": "formula",
+        "definitionLocation": {
+          "moduleId": "geometry.cso.py",
+          "start": {
+            "line": 8,
+            "column": 4
+          },
+          "end": {
+            "line": 8,
+            "column": 94
+          }
+        },
+        "invocationId": "root/first",
+        "value": 6
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/first\",\"perimeter\"]",
+        "kind": "formula",
+        "definitionLocation": {
+          "moduleId": "geometry.cso.py",
+          "start": {
+            "line": 9,
+            "column": 4
+          },
+          "end": {
+            "line": 9,
+            "column": 108
+          }
+        },
+        "invocationId": "root/first",
+        "value": 10
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/second\",\"area\"]",
+        "kind": "formula",
+        "definitionLocation": {
+          "moduleId": "geometry.cso.py",
+          "start": {
+            "line": 8,
+            "column": 4
+          },
+          "end": {
+            "line": 8,
+            "column": 94
+          }
+        },
+        "invocationId": "root/second",
+        "value": 6
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/second\",\"perimeter\"]",
+        "kind": "formula",
+        "definitionLocation": {
+          "moduleId": "geometry.cso.py",
+          "start": {
+            "line": 9,
+            "column": 4
+          },
+          "end": {
+            "line": 9,
+            "column": 108
+          }
+        },
+        "invocationId": "root/second",
+        "value": 10
+      },
+      {
+        "symbolId": "[\"symbol\",\"root\",\"total\"]",
+        "kind": "formula",
+        "definitionLocation": {
+          "moduleId": "estimate.cso.py",
+          "start": {
+            "line": 11,
+            "column": 4
+          },
+          "end": {
+            "line": 11,
+            "column": 117
+          }
+        },
+        "invocationId": "root",
+        "value": 12
+      }
+    ],
+    "assets": [],
+    "versions": {
+      "pythonPackage": "0.1.0",
+      "pythonInterpreter": "synthetic-fixture",
+      "pythonVersion": "3.14.3"
+    }
+  }
+}

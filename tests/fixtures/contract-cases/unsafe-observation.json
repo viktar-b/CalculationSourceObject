@@ -1,0 +1,299 @@
+{
+  "protocolVersion": "1",
+  "ok": true,
+  "diagnostics": [],
+  "execution": {
+    "cso": {
+      "schemaVersion": "1.0.0",
+      "title": "Synthetic contract case",
+      "source": {
+        "id": "contract-fixture",
+        "metadata": {
+          "purpose": "Protocol shape only; no captured Python execution"
+        }
+      },
+      "rootSectionIds": [
+        "[\"section\",\"root\",\"function\"]"
+      ],
+      "sections": [
+        {
+          "id": "[\"section\",\"root\",\"function\"]",
+          "title": "calculate",
+          "metadata": {
+            "invocationId": "root",
+            "localId": "function",
+            "location": {
+              "moduleId": "single.cso.py",
+              "start": {
+                "line": 1,
+                "column": 0
+              },
+              "end": {
+                "line": 1,
+                "column": 20
+              }
+            }
+          },
+          "items": [
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root\",\"width\"]",
+                "glyph": "width",
+                "glyphPlaintext": "width",
+                "unit": "m",
+                "description": "width",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "result": {
+                    "kind": "number",
+                    "value": 2
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 2
+                      },
+                      "result": {
+                        "kind": "number",
+                        "value": 2
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root",
+                  "localId": "width",
+                  "location": {
+                    "moduleId": "single.cso.py",
+                    "start": {
+                      "line": 10,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 10,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root\",\"area\"]",
+                "glyph": "area",
+                "glyphPlaintext": "area",
+                "unit": "m^2",
+                "description": "area",
+                "valueTree": {
+                  "rootKey": "n3",
+                  "result": {
+                    "kind": "number",
+                    "value": 8
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root\",\"width\"]"
+                      }
+                    },
+                    {
+                      "key": "n2",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 4
+                      }
+                    },
+                    {
+                      "key": "n3",
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.multiply"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n1"
+                        },
+                        {
+                          "key": "n2"
+                        }
+                      ],
+                      "result": {
+                        "kind": "number",
+                        "value": 8
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root",
+                  "localId": "area",
+                  "location": {
+                    "moduleId": "single.cso.py",
+                    "start": {
+                      "line": 11,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 11,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "entry": {
+      "moduleId": "single.cso.py",
+      "function": "calculate",
+      "sourceHash": "481f5b4a77bfcdea3b9b4e7d4be6275012d99f469944b4e04c7fd4da67de15ac",
+      "invocationId": "root",
+      "resolvedInputs": {
+        "width": 2
+      }
+    },
+    "sourceManifest": [
+      {
+        "moduleId": "single.cso.py",
+        "sha256": "481f5b4a77bfcdea3b9b4e7d4be6275012d99f469944b4e04c7fd4da67de15ac"
+      }
+    ],
+    "sourceClosureHash": "09518d9806015947a86419d1c09fd6c9029f25d9bbff84f89a0a9ba62ae40156",
+    "invocations": [
+      {
+        "id": "root",
+        "moduleId": "single.cso.py",
+        "function": "calculate",
+        "resolvedInputs": {
+          "width": 2
+        },
+        "inputBindings": [
+          {
+            "kind": "parsedDefault",
+            "parameterName": "width",
+            "parameterLocation": {
+              "moduleId": "single.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            },
+            "value": 2,
+            "defaultLocation": {
+              "moduleId": "single.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            }
+          }
+        ],
+        "symbols": [
+          {
+            "symbolId": "[\"symbol\",\"root\",\"width\"]",
+            "localId": "width",
+            "variableName": "width",
+            "definitionLocation": {
+              "moduleId": "single.cso.py",
+              "start": {
+                "line": 10,
+                "column": 0
+              },
+              "end": {
+                "line": 10,
+                "column": 20
+              }
+            },
+            "kind": "input",
+            "givenSource": {
+              "kind": "parameter",
+              "parameterName": "width"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root\",\"area\"]",
+            "localId": "area",
+            "variableName": "area",
+            "definitionLocation": {
+              "moduleId": "single.cso.py",
+              "start": {
+                "line": 11,
+                "column": 0
+              },
+              "end": {
+                "line": 11,
+                "column": 20
+              }
+            },
+            "kind": "formula",
+            "address": {
+              "symbolId": "[\"symbol\",\"root\",\"area\"]",
+              "nodeKey": "n3"
+            }
+          }
+        ]
+      }
+    ],
+    "observations": [
+      {
+        "symbolId": "[\"symbol\",\"root\",\"width\"]",
+        "invocationId": "root",
+        "kind": "input",
+        "value": 9007199254740992,
+        "definitionLocation": {
+          "moduleId": "single.cso.py",
+          "start": {
+            "line": 10,
+            "column": 0
+          },
+          "end": {
+            "line": 10,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root\",\"area\"]",
+        "invocationId": "root",
+        "kind": "formula",
+        "value": 8,
+        "definitionLocation": {
+          "moduleId": "single.cso.py",
+          "start": {
+            "line": 11,
+            "column": 0
+          },
+          "end": {
+            "line": 11,
+            "column": 20
+          }
+        }
+      }
+    ],
+    "operationObservations": [],
+    "assets": [],
+    "versions": {
+      "pythonPackage": "0.1.0-contract-fixture",
+      "pythonInterpreter": "synthetic-fixture",
+      "pythonVersion": "3.14"
+    }
+  }
+}

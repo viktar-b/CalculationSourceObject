@@ -1,0 +1,12 @@
+"""Transport regression: sqrt and an odd power retain negative zero."""
+from typing import Annotated
+from math import sqrt
+from cso_python import calculation, section, symbol, given, CalculationResults
+
+@calculation(id="signed-zero", title="Signed zero transport")
+@section(id="signed-zero", title="Signed zero transport", root=True)
+def signed_zero(x: float = 0.0) -> CalculationResults:
+    a: Annotated[float, symbol(glyph="a", description="Supplied input", unit="")] = given(x)
+    root: Annotated[float, symbol(glyph="r", description="Square root retains the zero sign", unit="")] = sqrt(a)
+    cube: Annotated[float, symbol(glyph="c", description="Odd power retains the zero sign", unit="")] = a ** 3
+    return {"a": a, "root": root, "cube": cube}

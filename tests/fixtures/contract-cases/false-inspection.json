@@ -1,0 +1,80 @@
+{
+  "reportVersion": "1",
+  "command": "pdf",
+  "toolVersion": "0.1.0",
+  "ok": true,
+  "numericPolicy": {
+    "absoluteTolerance": 1e-09,
+    "relativeTolerance": 1e-12,
+    "numberDomain": "finite-real-safe-integer"
+  },
+  "provenance": {
+    "entryModuleId": "illustration.cso.py",
+    "entrySourceHash": "8571e11afdad7ef03866dcd6a49fcbb20dbf22e4bef3d4f1d0a108e3d52f89a7",
+    "sourceClosureHash": "acc1dcff13779ce20956259df8785b392b0f16c4f92cbbb04418ebd489c0157e",
+    "function": "calculate_illustration",
+    "resolvedInputs": {
+      "width": 2
+    },
+    "sourceManifest": [
+      {
+        "moduleId": "illustration.cso.py",
+        "sha256": "8571e11afdad7ef03866dcd6a49fcbb20dbf22e4bef3d4f1d0a108e3d52f89a7"
+      }
+    ],
+    "versions": {
+      "pythonPackage": "0.1.0",
+      "pythonInterpreter": "/illustrative/venv/bin/python",
+      "pythonVersion": "3.11.0"
+    }
+  },
+  "checks": {
+    "executionValidity": {
+      "status": "passed"
+    },
+    "inputConsistency": {
+      "status": "passed",
+      "counts": {
+        "checked": 1,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    "constantConsistency": {
+      "status": "not_applicable",
+      "counts": {
+        "checked": 0,
+        "passed": 0,
+        "failed": 0
+      }
+    },
+    "formulaConsistency": {
+      "status": "passed",
+      "counts": {
+        "checked": 1,
+        "passed": 1,
+        "failed": 0
+      }
+    },
+    "sourceToDocumentConsistency": {
+      "status": "passed"
+    },
+    "independentReferenceAgreement": {
+      "status": "not_applicable"
+    },
+    "documentContent": {
+      "status": "passed"
+    },
+    "rendering": {
+      "status": "passed"
+    },
+    "visualInspection": {
+      "status": "passed"
+    }
+  },
+  "diagnostics": [],
+  "output": {
+    "path": "/illustrative/output/calculation.pdf",
+    "sha256": "067516a5ada2536813d2c6cc6fc0753e0294e6d92547bec07179567e173638e8"
+  }
+}

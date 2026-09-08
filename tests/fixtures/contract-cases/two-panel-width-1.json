@@ -1,0 +1,2577 @@
+{
+  "protocolVersion": "1",
+  "ok": true,
+  "diagnostics": [],
+  "execution": {
+    "cso": {
+      "schemaVersion": "1.0.0",
+      "title": "Synthetic contract case",
+      "source": {
+        "id": "contract-fixture",
+        "metadata": {
+          "purpose": "Protocol shape only; no captured Python execution"
+        }
+      },
+      "rootSectionIds": [
+        "[\"section\",\"root\",\"function\"]"
+      ],
+      "sections": [
+        {
+          "id": "[\"section\",\"root\",\"function\"]",
+          "title": "estimate",
+          "metadata": {
+            "invocationId": "root",
+            "localId": "function",
+            "location": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 1,
+                "column": 0
+              },
+              "end": {
+                "line": 1,
+                "column": 20
+              }
+            }
+          },
+          "items": [
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root\",\"width\"]",
+                "glyph": "width",
+                "glyphPlaintext": "width",
+                "unit": "m",
+                "description": "width",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "result": {
+                    "kind": "number",
+                    "value": 1
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 1
+                      },
+                      "result": {
+                        "kind": "number",
+                        "value": 1
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root",
+                  "localId": "width",
+                  "location": {
+                    "moduleId": "estimate.cso.py",
+                    "start": {
+                      "line": 10,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 10,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root\",\"height_a\"]",
+                "glyph": "height_a",
+                "glyphPlaintext": "height_a",
+                "unit": "m",
+                "description": "height_a",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "result": {
+                    "kind": "number",
+                    "value": 3
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 3
+                      },
+                      "result": {
+                        "kind": "number",
+                        "value": 3
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root",
+                  "localId": "height_a",
+                  "location": {
+                    "moduleId": "estimate.cso.py",
+                    "start": {
+                      "line": 11,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 11,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root\",\"height_b\"]",
+                "glyph": "height_b",
+                "glyphPlaintext": "height_b",
+                "unit": "m",
+                "description": "height_b",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "result": {
+                    "kind": "number",
+                    "value": 4
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 4
+                      },
+                      "result": {
+                        "kind": "number",
+                        "value": 4
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root",
+                  "localId": "height_b",
+                  "location": {
+                    "moduleId": "estimate.cso.py",
+                    "start": {
+                      "line": 12,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 12,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root\",\"thickness\"]",
+                "glyph": "thickness",
+                "glyphPlaintext": "thickness",
+                "unit": "m",
+                "description": "thickness",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "result": {
+                    "kind": "number",
+                    "value": 0.1
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 0.1
+                      },
+                      "result": {
+                        "kind": "number",
+                        "value": 0.1
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root",
+                  "localId": "thickness",
+                  "location": {
+                    "moduleId": "estimate.cso.py",
+                    "start": {
+                      "line": 13,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 13,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root\",\"density\"]",
+                "glyph": "density",
+                "glyphPlaintext": "density",
+                "unit": "kg/m^3",
+                "description": "density",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "result": {
+                    "kind": "number",
+                    "value": 500
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 500
+                      },
+                      "result": {
+                        "kind": "number",
+                        "value": 500
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root",
+                  "localId": "density",
+                  "location": {
+                    "moduleId": "estimate.cso.py",
+                    "start": {
+                      "line": 14,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 14,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "section",
+              "id": "[\"section\",\"root/panel_a\",\"function\"]"
+            },
+            {
+              "kind": "section",
+              "id": "[\"section\",\"root/panel_b\",\"function\"]"
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root\",\"area\"]",
+                "glyph": "area",
+                "glyphPlaintext": "area",
+                "unit": "m^2",
+                "description": "area",
+                "valueTree": {
+                  "rootKey": "n3",
+                  "result": {
+                    "kind": "number",
+                    "value": 7
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/panel_a\",\"area\"]"
+                      }
+                    },
+                    {
+                      "key": "n2",
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/panel_b\",\"area\"]"
+                      }
+                    },
+                    {
+                      "key": "n3",
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.add"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n1"
+                        },
+                        {
+                          "key": "n2"
+                        }
+                      ],
+                      "result": {
+                        "kind": "number",
+                        "value": 7
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root",
+                  "localId": "area",
+                  "location": {
+                    "moduleId": "estimate.cso.py",
+                    "start": {
+                      "line": 22,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 22,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "section",
+              "id": "[\"section\",\"root/material\",\"function\"]"
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root\",\"volume\"]",
+                "glyph": "volume",
+                "glyphPlaintext": "volume",
+                "unit": "m^3",
+                "description": "volume",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "result": {
+                    "kind": "number",
+                    "value": 0.7
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/material\",\"volume\"]"
+                      },
+                      "result": {
+                        "kind": "number",
+                        "value": 0.7
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root",
+                  "localId": "volume",
+                  "location": {
+                    "moduleId": "estimate.cso.py",
+                    "start": {
+                      "line": 24,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 24,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root\",\"mass\"]",
+                "glyph": "mass",
+                "glyphPlaintext": "mass",
+                "unit": "kg",
+                "description": "mass",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "result": {
+                    "kind": "number",
+                    "value": 350
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/material\",\"mass\"]"
+                      },
+                      "result": {
+                        "kind": "number",
+                        "value": 350
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root",
+                  "localId": "mass",
+                  "location": {
+                    "moduleId": "estimate.cso.py",
+                    "start": {
+                      "line": 25,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 25,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbolRef",
+              "id": "[\"symbol\",\"root\",\"mass\"]",
+              "metadata": {
+                "location": {
+                  "moduleId": "estimate.cso.py",
+                  "start": {
+                    "line": 26,
+                    "column": 0
+                  },
+                  "end": {
+                    "line": 26,
+                    "column": 20
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "[\"section\",\"root/panel_a\",\"function\"]",
+          "title": "rectangle",
+          "metadata": {
+            "invocationId": "root/panel_a",
+            "localId": "function",
+            "location": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 1,
+                "column": 0
+              },
+              "end": {
+                "line": 1,
+                "column": 20
+              }
+            }
+          },
+          "items": [
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/panel_a\",\"width\"]",
+                "glyph": "width",
+                "glyphPlaintext": "width",
+                "unit": "m",
+                "description": "width",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "result": {
+                    "kind": "number",
+                    "value": 1
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 1
+                      },
+                      "result": {
+                        "kind": "number",
+                        "value": 1
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root/panel_a",
+                  "localId": "width",
+                  "location": {
+                    "moduleId": "geometry.cso.py",
+                    "start": {
+                      "line": 10,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 10,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/panel_a\",\"height\"]",
+                "glyph": "height",
+                "glyphPlaintext": "height",
+                "unit": "m",
+                "description": "height",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "result": {
+                    "kind": "number",
+                    "value": 3
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 3
+                      },
+                      "result": {
+                        "kind": "number",
+                        "value": 3
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root/panel_a",
+                  "localId": "height",
+                  "location": {
+                    "moduleId": "geometry.cso.py",
+                    "start": {
+                      "line": 11,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 11,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/panel_a\",\"area\"]",
+                "glyph": "area",
+                "glyphPlaintext": "area",
+                "unit": "m^2",
+                "description": "area",
+                "valueTree": {
+                  "rootKey": "n3",
+                  "result": {
+                    "kind": "number",
+                    "value": 3
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/panel_a\",\"width\"]"
+                      }
+                    },
+                    {
+                      "key": "n2",
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/panel_a\",\"height\"]"
+                      }
+                    },
+                    {
+                      "key": "n3",
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.multiply"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n1"
+                        },
+                        {
+                          "key": "n2"
+                        }
+                      ],
+                      "result": {
+                        "kind": "number",
+                        "value": 3
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root/panel_a",
+                  "localId": "area",
+                  "location": {
+                    "moduleId": "geometry.cso.py",
+                    "start": {
+                      "line": 12,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 12,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/panel_a\",\"perimeter\"]",
+                "glyph": "perimeter",
+                "glyphPlaintext": "perimeter",
+                "unit": "m",
+                "description": "perimeter",
+                "valueTree": {
+                  "rootKey": "n5",
+                  "result": {
+                    "kind": "number",
+                    "value": 8
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/panel_a\",\"width\"]"
+                      }
+                    },
+                    {
+                      "key": "n2",
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/panel_a\",\"height\"]"
+                      }
+                    },
+                    {
+                      "key": "n3",
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.add"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n1"
+                        },
+                        {
+                          "key": "n2"
+                        }
+                      ],
+                      "result": {
+                        "kind": "number",
+                        "value": 4
+                      }
+                    },
+                    {
+                      "key": "n4",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 2
+                      }
+                    },
+                    {
+                      "key": "n5",
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.multiply"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n3"
+                        },
+                        {
+                          "key": "n4"
+                        }
+                      ],
+                      "result": {
+                        "kind": "number",
+                        "value": 8
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root/panel_a",
+                  "localId": "perimeter",
+                  "location": {
+                    "moduleId": "geometry.cso.py",
+                    "start": {
+                      "line": 13,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 13,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "[\"section\",\"root/panel_b\",\"function\"]",
+          "title": "rectangle",
+          "metadata": {
+            "invocationId": "root/panel_b",
+            "localId": "function",
+            "location": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 1,
+                "column": 0
+              },
+              "end": {
+                "line": 1,
+                "column": 20
+              }
+            }
+          },
+          "items": [
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/panel_b\",\"width\"]",
+                "glyph": "width",
+                "glyphPlaintext": "width",
+                "unit": "m",
+                "description": "width",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "result": {
+                    "kind": "number",
+                    "value": 1
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 1
+                      },
+                      "result": {
+                        "kind": "number",
+                        "value": 1
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root/panel_b",
+                  "localId": "width",
+                  "location": {
+                    "moduleId": "geometry.cso.py",
+                    "start": {
+                      "line": 10,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 10,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/panel_b\",\"height\"]",
+                "glyph": "height",
+                "glyphPlaintext": "height",
+                "unit": "m",
+                "description": "height",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "result": {
+                    "kind": "number",
+                    "value": 4
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 4
+                      },
+                      "result": {
+                        "kind": "number",
+                        "value": 4
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root/panel_b",
+                  "localId": "height",
+                  "location": {
+                    "moduleId": "geometry.cso.py",
+                    "start": {
+                      "line": 11,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 11,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/panel_b\",\"area\"]",
+                "glyph": "area",
+                "glyphPlaintext": "area",
+                "unit": "m^2",
+                "description": "area",
+                "valueTree": {
+                  "rootKey": "n3",
+                  "result": {
+                    "kind": "number",
+                    "value": 4
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/panel_b\",\"width\"]"
+                      }
+                    },
+                    {
+                      "key": "n2",
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/panel_b\",\"height\"]"
+                      }
+                    },
+                    {
+                      "key": "n3",
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.multiply"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n1"
+                        },
+                        {
+                          "key": "n2"
+                        }
+                      ],
+                      "result": {
+                        "kind": "number",
+                        "value": 4
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root/panel_b",
+                  "localId": "area",
+                  "location": {
+                    "moduleId": "geometry.cso.py",
+                    "start": {
+                      "line": 12,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 12,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/panel_b\",\"perimeter\"]",
+                "glyph": "perimeter",
+                "glyphPlaintext": "perimeter",
+                "unit": "m",
+                "description": "perimeter",
+                "valueTree": {
+                  "rootKey": "n5",
+                  "result": {
+                    "kind": "number",
+                    "value": 10
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/panel_b\",\"width\"]"
+                      }
+                    },
+                    {
+                      "key": "n2",
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/panel_b\",\"height\"]"
+                      }
+                    },
+                    {
+                      "key": "n3",
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.add"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n1"
+                        },
+                        {
+                          "key": "n2"
+                        }
+                      ],
+                      "result": {
+                        "kind": "number",
+                        "value": 5
+                      }
+                    },
+                    {
+                      "key": "n4",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 2
+                      }
+                    },
+                    {
+                      "key": "n5",
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.multiply"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n3"
+                        },
+                        {
+                          "key": "n4"
+                        }
+                      ],
+                      "result": {
+                        "kind": "number",
+                        "value": 10
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root/panel_b",
+                  "localId": "perimeter",
+                  "location": {
+                    "moduleId": "geometry.cso.py",
+                    "start": {
+                      "line": 13,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 13,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "[\"section\",\"root/material\",\"function\"]",
+          "title": "material",
+          "metadata": {
+            "invocationId": "root/material",
+            "localId": "function",
+            "location": {
+              "moduleId": "material.cso.py",
+              "start": {
+                "line": 1,
+                "column": 0
+              },
+              "end": {
+                "line": 1,
+                "column": 20
+              }
+            }
+          },
+          "items": [
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/material\",\"area\"]",
+                "glyph": "area",
+                "glyphPlaintext": "area",
+                "unit": "m^2",
+                "description": "area",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "result": {
+                    "kind": "number",
+                    "value": 7
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 7
+                      },
+                      "result": {
+                        "kind": "number",
+                        "value": 7
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root/material",
+                  "localId": "area",
+                  "location": {
+                    "moduleId": "material.cso.py",
+                    "start": {
+                      "line": 10,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 10,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/material\",\"thickness\"]",
+                "glyph": "thickness",
+                "glyphPlaintext": "thickness",
+                "unit": "m",
+                "description": "thickness",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "result": {
+                    "kind": "number",
+                    "value": 0.1
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 0.1
+                      },
+                      "result": {
+                        "kind": "number",
+                        "value": 0.1
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root/material",
+                  "localId": "thickness",
+                  "location": {
+                    "moduleId": "material.cso.py",
+                    "start": {
+                      "line": 11,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 11,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/material\",\"density\"]",
+                "glyph": "density",
+                "glyphPlaintext": "density",
+                "unit": "kg/m^3",
+                "description": "density",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "result": {
+                    "kind": "number",
+                    "value": 500
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 500
+                      },
+                      "result": {
+                        "kind": "number",
+                        "value": 500
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root/material",
+                  "localId": "density",
+                  "location": {
+                    "moduleId": "material.cso.py",
+                    "start": {
+                      "line": 12,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 12,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/material\",\"volume\"]",
+                "glyph": "volume",
+                "glyphPlaintext": "volume",
+                "unit": "m^3",
+                "description": "volume",
+                "valueTree": {
+                  "rootKey": "n3",
+                  "result": {
+                    "kind": "number",
+                    "value": 0.7
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/material\",\"area\"]"
+                      }
+                    },
+                    {
+                      "key": "n2",
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/material\",\"thickness\"]"
+                      }
+                    },
+                    {
+                      "key": "n3",
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.multiply"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n1"
+                        },
+                        {
+                          "key": "n2"
+                        }
+                      ],
+                      "result": {
+                        "kind": "number",
+                        "value": 0.7
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root/material",
+                  "localId": "volume",
+                  "location": {
+                    "moduleId": "material.cso.py",
+                    "start": {
+                      "line": 13,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 13,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/material\",\"mass\"]",
+                "glyph": "mass",
+                "glyphPlaintext": "mass",
+                "unit": "kg",
+                "description": "mass",
+                "valueTree": {
+                  "rootKey": "n3",
+                  "result": {
+                    "kind": "number",
+                    "value": 350
+                  },
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/material\",\"volume\"]"
+                      }
+                    },
+                    {
+                      "key": "n2",
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/material\",\"density\"]"
+                      }
+                    },
+                    {
+                      "key": "n3",
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.multiply"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n1"
+                        },
+                        {
+                          "key": "n2"
+                        }
+                      ],
+                      "result": {
+                        "kind": "number",
+                        "value": 350
+                      }
+                    }
+                  ]
+                },
+                "metadata": {
+                  "invocationId": "root/material",
+                  "localId": "mass",
+                  "location": {
+                    "moduleId": "material.cso.py",
+                    "start": {
+                      "line": 14,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 14,
+                      "column": 20
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "entry": {
+      "moduleId": "estimate.cso.py",
+      "function": "estimate",
+      "sourceHash": "b22993a2cd3eee420d3c6887f80e6006725877e2f4a176aa830a8f15501b81f4",
+      "invocationId": "root",
+      "resolvedInputs": {
+        "width": 1,
+        "height_a": 3,
+        "height_b": 4,
+        "thickness": 0.1,
+        "density": 500
+      }
+    },
+    "sourceManifest": [
+      {
+        "moduleId": "estimate.cso.py",
+        "sha256": "b22993a2cd3eee420d3c6887f80e6006725877e2f4a176aa830a8f15501b81f4"
+      },
+      {
+        "moduleId": "geometry.cso.py",
+        "sha256": "6529f0a92e075a804e15d58329fcd15acaed4b7fec9bd3e5290903ab991a778c"
+      },
+      {
+        "moduleId": "material.cso.py",
+        "sha256": "ec931a3ce150d14ec40526e93cb8ef10da869c627094f7b423e2342cad25e430"
+      }
+    ],
+    "sourceClosureHash": "78eb5ffef46cb1012e4999cfcf0e420105836a895ecc98ef50141cfa7ebee138",
+    "invocations": [
+      {
+        "id": "root",
+        "moduleId": "estimate.cso.py",
+        "function": "estimate",
+        "resolvedInputs": {
+          "width": 1,
+          "height_a": 3,
+          "height_b": 4,
+          "thickness": 0.1,
+          "density": 500
+        },
+        "inputBindings": [
+          {
+            "kind": "parsedDefault",
+            "parameterName": "width",
+            "parameterLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            },
+            "value": 1,
+            "defaultLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            }
+          },
+          {
+            "kind": "parsedDefault",
+            "parameterName": "height_a",
+            "parameterLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            },
+            "value": 3,
+            "defaultLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            }
+          },
+          {
+            "kind": "parsedDefault",
+            "parameterName": "height_b",
+            "parameterLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            },
+            "value": 4,
+            "defaultLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            }
+          },
+          {
+            "kind": "parsedDefault",
+            "parameterName": "thickness",
+            "parameterLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            },
+            "value": 0.1,
+            "defaultLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            }
+          },
+          {
+            "kind": "parsedDefault",
+            "parameterName": "density",
+            "parameterLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            },
+            "value": 500,
+            "defaultLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            }
+          }
+        ],
+        "symbols": [
+          {
+            "symbolId": "[\"symbol\",\"root\",\"width\"]",
+            "localId": "width",
+            "variableName": "width",
+            "definitionLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 10,
+                "column": 0
+              },
+              "end": {
+                "line": 10,
+                "column": 20
+              }
+            },
+            "kind": "input",
+            "givenSource": {
+              "kind": "parameter",
+              "parameterName": "width"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root\",\"height_a\"]",
+            "localId": "height_a",
+            "variableName": "height_a",
+            "definitionLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 11,
+                "column": 0
+              },
+              "end": {
+                "line": 11,
+                "column": 20
+              }
+            },
+            "kind": "input",
+            "givenSource": {
+              "kind": "parameter",
+              "parameterName": "height_a"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root\",\"height_b\"]",
+            "localId": "height_b",
+            "variableName": "height_b",
+            "definitionLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 12,
+                "column": 0
+              },
+              "end": {
+                "line": 12,
+                "column": 20
+              }
+            },
+            "kind": "input",
+            "givenSource": {
+              "kind": "parameter",
+              "parameterName": "height_b"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root\",\"thickness\"]",
+            "localId": "thickness",
+            "variableName": "thickness",
+            "definitionLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 13,
+                "column": 0
+              },
+              "end": {
+                "line": 13,
+                "column": 20
+              }
+            },
+            "kind": "input",
+            "givenSource": {
+              "kind": "parameter",
+              "parameterName": "thickness"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root\",\"density\"]",
+            "localId": "density",
+            "variableName": "density",
+            "definitionLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 14,
+                "column": 0
+              },
+              "end": {
+                "line": 14,
+                "column": 20
+              }
+            },
+            "kind": "input",
+            "givenSource": {
+              "kind": "parameter",
+              "parameterName": "density"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root\",\"area\"]",
+            "localId": "area",
+            "variableName": "area",
+            "definitionLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 22,
+                "column": 0
+              },
+              "end": {
+                "line": 22,
+                "column": 20
+              }
+            },
+            "kind": "formula",
+            "address": {
+              "symbolId": "[\"symbol\",\"root\",\"area\"]",
+              "nodeKey": "n3"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root\",\"volume\"]",
+            "localId": "volume",
+            "variableName": "volume",
+            "definitionLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 24,
+                "column": 0
+              },
+              "end": {
+                "line": 24,
+                "column": 20
+              }
+            },
+            "kind": "formula",
+            "address": {
+              "symbolId": "[\"symbol\",\"root\",\"volume\"]",
+              "nodeKey": "n1"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root\",\"mass\"]",
+            "localId": "mass",
+            "variableName": "mass",
+            "definitionLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 25,
+                "column": 0
+              },
+              "end": {
+                "line": 25,
+                "column": 20
+              }
+            },
+            "kind": "formula",
+            "address": {
+              "symbolId": "[\"symbol\",\"root\",\"mass\"]",
+              "nodeKey": "n1"
+            }
+          }
+        ]
+      },
+      {
+        "id": "root/panel_a",
+        "moduleId": "geometry.cso.py",
+        "function": "rectangle",
+        "resolvedInputs": {
+          "width": 1,
+          "height": 3
+        },
+        "inputBindings": [
+          {
+            "kind": "callerSymbol",
+            "parameterName": "width",
+            "parameterLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            },
+            "callerLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 20,
+                "column": 0
+              },
+              "end": {
+                "line": 20,
+                "column": 20
+              }
+            },
+            "source": {
+              "symbolId": "[\"symbol\",\"root\",\"width\"]",
+              "nodeKey": "n1"
+            }
+          },
+          {
+            "kind": "callerSymbol",
+            "parameterName": "height",
+            "parameterLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            },
+            "callerLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 20,
+                "column": 0
+              },
+              "end": {
+                "line": 20,
+                "column": 20
+              }
+            },
+            "source": {
+              "symbolId": "[\"symbol\",\"root\",\"height_a\"]",
+              "nodeKey": "n1"
+            }
+          }
+        ],
+        "symbols": [
+          {
+            "symbolId": "[\"symbol\",\"root/panel_a\",\"width\"]",
+            "localId": "width",
+            "variableName": "width",
+            "definitionLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 10,
+                "column": 0
+              },
+              "end": {
+                "line": 10,
+                "column": 20
+              }
+            },
+            "kind": "input",
+            "givenSource": {
+              "kind": "parameter",
+              "parameterName": "width"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root/panel_a\",\"height\"]",
+            "localId": "height",
+            "variableName": "height",
+            "definitionLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 11,
+                "column": 0
+              },
+              "end": {
+                "line": 11,
+                "column": 20
+              }
+            },
+            "kind": "input",
+            "givenSource": {
+              "kind": "parameter",
+              "parameterName": "height"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root/panel_a\",\"area\"]",
+            "localId": "area",
+            "variableName": "area",
+            "definitionLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 12,
+                "column": 0
+              },
+              "end": {
+                "line": 12,
+                "column": 20
+              }
+            },
+            "kind": "formula",
+            "address": {
+              "symbolId": "[\"symbol\",\"root/panel_a\",\"area\"]",
+              "nodeKey": "n3"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root/panel_a\",\"perimeter\"]",
+            "localId": "perimeter",
+            "variableName": "perimeter",
+            "definitionLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 13,
+                "column": 0
+              },
+              "end": {
+                "line": 13,
+                "column": 20
+              }
+            },
+            "kind": "formula",
+            "address": {
+              "symbolId": "[\"symbol\",\"root/panel_a\",\"perimeter\"]",
+              "nodeKey": "n5"
+            }
+          }
+        ],
+        "parentInvocationId": "root",
+        "callBindingName": "panel_a",
+        "callSite": {
+          "moduleId": "estimate.cso.py",
+          "start": {
+            "line": 20,
+            "column": 0
+          },
+          "end": {
+            "line": 20,
+            "column": 20
+          }
+        }
+      },
+      {
+        "id": "root/panel_b",
+        "moduleId": "geometry.cso.py",
+        "function": "rectangle",
+        "resolvedInputs": {
+          "width": 1,
+          "height": 4
+        },
+        "inputBindings": [
+          {
+            "kind": "callerSymbol",
+            "parameterName": "width",
+            "parameterLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            },
+            "callerLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 21,
+                "column": 0
+              },
+              "end": {
+                "line": 21,
+                "column": 20
+              }
+            },
+            "source": {
+              "symbolId": "[\"symbol\",\"root\",\"width\"]",
+              "nodeKey": "n1"
+            }
+          },
+          {
+            "kind": "callerSymbol",
+            "parameterName": "height",
+            "parameterLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            },
+            "callerLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 21,
+                "column": 0
+              },
+              "end": {
+                "line": 21,
+                "column": 20
+              }
+            },
+            "source": {
+              "symbolId": "[\"symbol\",\"root\",\"height_b\"]",
+              "nodeKey": "n1"
+            }
+          }
+        ],
+        "symbols": [
+          {
+            "symbolId": "[\"symbol\",\"root/panel_b\",\"width\"]",
+            "localId": "width",
+            "variableName": "width",
+            "definitionLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 10,
+                "column": 0
+              },
+              "end": {
+                "line": 10,
+                "column": 20
+              }
+            },
+            "kind": "input",
+            "givenSource": {
+              "kind": "parameter",
+              "parameterName": "width"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root/panel_b\",\"height\"]",
+            "localId": "height",
+            "variableName": "height",
+            "definitionLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 11,
+                "column": 0
+              },
+              "end": {
+                "line": 11,
+                "column": 20
+              }
+            },
+            "kind": "input",
+            "givenSource": {
+              "kind": "parameter",
+              "parameterName": "height"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root/panel_b\",\"area\"]",
+            "localId": "area",
+            "variableName": "area",
+            "definitionLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 12,
+                "column": 0
+              },
+              "end": {
+                "line": 12,
+                "column": 20
+              }
+            },
+            "kind": "formula",
+            "address": {
+              "symbolId": "[\"symbol\",\"root/panel_b\",\"area\"]",
+              "nodeKey": "n3"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root/panel_b\",\"perimeter\"]",
+            "localId": "perimeter",
+            "variableName": "perimeter",
+            "definitionLocation": {
+              "moduleId": "geometry.cso.py",
+              "start": {
+                "line": 13,
+                "column": 0
+              },
+              "end": {
+                "line": 13,
+                "column": 20
+              }
+            },
+            "kind": "formula",
+            "address": {
+              "symbolId": "[\"symbol\",\"root/panel_b\",\"perimeter\"]",
+              "nodeKey": "n5"
+            }
+          }
+        ],
+        "parentInvocationId": "root",
+        "callBindingName": "panel_b",
+        "callSite": {
+          "moduleId": "estimate.cso.py",
+          "start": {
+            "line": 21,
+            "column": 0
+          },
+          "end": {
+            "line": 21,
+            "column": 20
+          }
+        }
+      },
+      {
+        "id": "root/material",
+        "moduleId": "material.cso.py",
+        "function": "material",
+        "resolvedInputs": {
+          "area": 7,
+          "thickness": 0.1,
+          "density": 500
+        },
+        "inputBindings": [
+          {
+            "kind": "callerSymbol",
+            "parameterName": "area",
+            "parameterLocation": {
+              "moduleId": "material.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            },
+            "callerLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 23,
+                "column": 0
+              },
+              "end": {
+                "line": 23,
+                "column": 20
+              }
+            },
+            "source": {
+              "symbolId": "[\"symbol\",\"root\",\"area\"]",
+              "nodeKey": "n3"
+            }
+          },
+          {
+            "kind": "callerSymbol",
+            "parameterName": "thickness",
+            "parameterLocation": {
+              "moduleId": "material.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            },
+            "callerLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 23,
+                "column": 0
+              },
+              "end": {
+                "line": 23,
+                "column": 20
+              }
+            },
+            "source": {
+              "symbolId": "[\"symbol\",\"root\",\"thickness\"]",
+              "nodeKey": "n1"
+            }
+          },
+          {
+            "kind": "callerSymbol",
+            "parameterName": "density",
+            "parameterLocation": {
+              "moduleId": "material.cso.py",
+              "start": {
+                "line": 2,
+                "column": 0
+              },
+              "end": {
+                "line": 2,
+                "column": 20
+              }
+            },
+            "callerLocation": {
+              "moduleId": "estimate.cso.py",
+              "start": {
+                "line": 23,
+                "column": 0
+              },
+              "end": {
+                "line": 23,
+                "column": 20
+              }
+            },
+            "source": {
+              "symbolId": "[\"symbol\",\"root\",\"density\"]",
+              "nodeKey": "n1"
+            }
+          }
+        ],
+        "symbols": [
+          {
+            "symbolId": "[\"symbol\",\"root/material\",\"area\"]",
+            "localId": "area",
+            "variableName": "area",
+            "definitionLocation": {
+              "moduleId": "material.cso.py",
+              "start": {
+                "line": 10,
+                "column": 0
+              },
+              "end": {
+                "line": 10,
+                "column": 20
+              }
+            },
+            "kind": "input",
+            "givenSource": {
+              "kind": "parameter",
+              "parameterName": "area"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root/material\",\"thickness\"]",
+            "localId": "thickness",
+            "variableName": "thickness",
+            "definitionLocation": {
+              "moduleId": "material.cso.py",
+              "start": {
+                "line": 11,
+                "column": 0
+              },
+              "end": {
+                "line": 11,
+                "column": 20
+              }
+            },
+            "kind": "input",
+            "givenSource": {
+              "kind": "parameter",
+              "parameterName": "thickness"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root/material\",\"density\"]",
+            "localId": "density",
+            "variableName": "density",
+            "definitionLocation": {
+              "moduleId": "material.cso.py",
+              "start": {
+                "line": 12,
+                "column": 0
+              },
+              "end": {
+                "line": 12,
+                "column": 20
+              }
+            },
+            "kind": "input",
+            "givenSource": {
+              "kind": "parameter",
+              "parameterName": "density"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root/material\",\"volume\"]",
+            "localId": "volume",
+            "variableName": "volume",
+            "definitionLocation": {
+              "moduleId": "material.cso.py",
+              "start": {
+                "line": 13,
+                "column": 0
+              },
+              "end": {
+                "line": 13,
+                "column": 20
+              }
+            },
+            "kind": "formula",
+            "address": {
+              "symbolId": "[\"symbol\",\"root/material\",\"volume\"]",
+              "nodeKey": "n3"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root/material\",\"mass\"]",
+            "localId": "mass",
+            "variableName": "mass",
+            "definitionLocation": {
+              "moduleId": "material.cso.py",
+              "start": {
+                "line": 14,
+                "column": 0
+              },
+              "end": {
+                "line": 14,
+                "column": 20
+              }
+            },
+            "kind": "formula",
+            "address": {
+              "symbolId": "[\"symbol\",\"root/material\",\"mass\"]",
+              "nodeKey": "n3"
+            }
+          }
+        ],
+        "parentInvocationId": "root",
+        "callBindingName": "material",
+        "callSite": {
+          "moduleId": "estimate.cso.py",
+          "start": {
+            "line": 23,
+            "column": 0
+          },
+          "end": {
+            "line": 23,
+            "column": 20
+          }
+        }
+      }
+    ],
+    "observations": [
+      {
+        "symbolId": "[\"symbol\",\"root\",\"width\"]",
+        "invocationId": "root",
+        "kind": "input",
+        "value": 1,
+        "definitionLocation": {
+          "moduleId": "estimate.cso.py",
+          "start": {
+            "line": 10,
+            "column": 0
+          },
+          "end": {
+            "line": 10,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root\",\"height_a\"]",
+        "invocationId": "root",
+        "kind": "input",
+        "value": 3,
+        "definitionLocation": {
+          "moduleId": "estimate.cso.py",
+          "start": {
+            "line": 11,
+            "column": 0
+          },
+          "end": {
+            "line": 11,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root\",\"height_b\"]",
+        "invocationId": "root",
+        "kind": "input",
+        "value": 4,
+        "definitionLocation": {
+          "moduleId": "estimate.cso.py",
+          "start": {
+            "line": 12,
+            "column": 0
+          },
+          "end": {
+            "line": 12,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root\",\"thickness\"]",
+        "invocationId": "root",
+        "kind": "input",
+        "value": 0.1,
+        "definitionLocation": {
+          "moduleId": "estimate.cso.py",
+          "start": {
+            "line": 13,
+            "column": 0
+          },
+          "end": {
+            "line": 13,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root\",\"density\"]",
+        "invocationId": "root",
+        "kind": "input",
+        "value": 500,
+        "definitionLocation": {
+          "moduleId": "estimate.cso.py",
+          "start": {
+            "line": 14,
+            "column": 0
+          },
+          "end": {
+            "line": 14,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/panel_a\",\"width\"]",
+        "invocationId": "root/panel_a",
+        "kind": "input",
+        "value": 1,
+        "definitionLocation": {
+          "moduleId": "geometry.cso.py",
+          "start": {
+            "line": 10,
+            "column": 0
+          },
+          "end": {
+            "line": 10,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/panel_a\",\"height\"]",
+        "invocationId": "root/panel_a",
+        "kind": "input",
+        "value": 3,
+        "definitionLocation": {
+          "moduleId": "geometry.cso.py",
+          "start": {
+            "line": 11,
+            "column": 0
+          },
+          "end": {
+            "line": 11,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/panel_a\",\"area\"]",
+        "invocationId": "root/panel_a",
+        "kind": "formula",
+        "value": 3,
+        "definitionLocation": {
+          "moduleId": "geometry.cso.py",
+          "start": {
+            "line": 12,
+            "column": 0
+          },
+          "end": {
+            "line": 12,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/panel_a\",\"perimeter\"]",
+        "invocationId": "root/panel_a",
+        "kind": "formula",
+        "value": 8,
+        "definitionLocation": {
+          "moduleId": "geometry.cso.py",
+          "start": {
+            "line": 13,
+            "column": 0
+          },
+          "end": {
+            "line": 13,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/panel_b\",\"width\"]",
+        "invocationId": "root/panel_b",
+        "kind": "input",
+        "value": 1,
+        "definitionLocation": {
+          "moduleId": "geometry.cso.py",
+          "start": {
+            "line": 10,
+            "column": 0
+          },
+          "end": {
+            "line": 10,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/panel_b\",\"height\"]",
+        "invocationId": "root/panel_b",
+        "kind": "input",
+        "value": 4,
+        "definitionLocation": {
+          "moduleId": "geometry.cso.py",
+          "start": {
+            "line": 11,
+            "column": 0
+          },
+          "end": {
+            "line": 11,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/panel_b\",\"area\"]",
+        "invocationId": "root/panel_b",
+        "kind": "formula",
+        "value": 4,
+        "definitionLocation": {
+          "moduleId": "geometry.cso.py",
+          "start": {
+            "line": 12,
+            "column": 0
+          },
+          "end": {
+            "line": 12,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/panel_b\",\"perimeter\"]",
+        "invocationId": "root/panel_b",
+        "kind": "formula",
+        "value": 10,
+        "definitionLocation": {
+          "moduleId": "geometry.cso.py",
+          "start": {
+            "line": 13,
+            "column": 0
+          },
+          "end": {
+            "line": 13,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root\",\"area\"]",
+        "invocationId": "root",
+        "kind": "formula",
+        "value": 7,
+        "definitionLocation": {
+          "moduleId": "estimate.cso.py",
+          "start": {
+            "line": 22,
+            "column": 0
+          },
+          "end": {
+            "line": 22,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/material\",\"area\"]",
+        "invocationId": "root/material",
+        "kind": "input",
+        "value": 7,
+        "definitionLocation": {
+          "moduleId": "material.cso.py",
+          "start": {
+            "line": 10,
+            "column": 0
+          },
+          "end": {
+            "line": 10,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/material\",\"thickness\"]",
+        "invocationId": "root/material",
+        "kind": "input",
+        "value": 0.1,
+        "definitionLocation": {
+          "moduleId": "material.cso.py",
+          "start": {
+            "line": 11,
+            "column": 0
+          },
+          "end": {
+            "line": 11,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/material\",\"density\"]",
+        "invocationId": "root/material",
+        "kind": "input",
+        "value": 500,
+        "definitionLocation": {
+          "moduleId": "material.cso.py",
+          "start": {
+            "line": 12,
+            "column": 0
+          },
+          "end": {
+            "line": 12,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/material\",\"volume\"]",
+        "invocationId": "root/material",
+        "kind": "formula",
+        "value": 0.7,
+        "definitionLocation": {
+          "moduleId": "material.cso.py",
+          "start": {
+            "line": 13,
+            "column": 0
+          },
+          "end": {
+            "line": 13,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/material\",\"mass\"]",
+        "invocationId": "root/material",
+        "kind": "formula",
+        "value": 350,
+        "definitionLocation": {
+          "moduleId": "material.cso.py",
+          "start": {
+            "line": 14,
+            "column": 0
+          },
+          "end": {
+            "line": 14,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root\",\"volume\"]",
+        "invocationId": "root",
+        "kind": "formula",
+        "value": 0.7,
+        "definitionLocation": {
+          "moduleId": "estimate.cso.py",
+          "start": {
+            "line": 24,
+            "column": 0
+          },
+          "end": {
+            "line": 24,
+            "column": 20
+          }
+        }
+      },
+      {
+        "symbolId": "[\"symbol\",\"root\",\"mass\"]",
+        "invocationId": "root",
+        "kind": "formula",
+        "value": 350,
+        "definitionLocation": {
+          "moduleId": "estimate.cso.py",
+          "start": {
+            "line": 25,
+            "column": 0
+          },
+          "end": {
+            "line": 25,
+            "column": 20
+          }
+        }
+      }
+    ],
+    "operationObservations": [],
+    "assets": [],
+    "versions": {
+      "pythonPackage": "0.1.0-contract-fixture",
+      "pythonInterpreter": "synthetic-fixture",
+      "pythonVersion": "3.14"
+    }
+  }
+}

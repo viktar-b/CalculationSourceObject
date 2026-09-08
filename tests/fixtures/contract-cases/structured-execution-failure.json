@@ -1,0 +1,26 @@
+{
+  "protocolVersion": "1",
+  "ok": false,
+  "diagnostics": [
+    {
+      "code": "UNSUPPORTED_SYNTAX",
+      "message": "General with statements are unsupported",
+      "stage": "source",
+      "location": {
+        "moduleId": "single.cso.py",
+        "start": {
+          "line": 7,
+          "column": 0
+        },
+        "end": {
+          "line": 7,
+          "column": 20
+        }
+      }
+    }
+  ],
+  "provenance": {
+    "entryModuleId": "single.cso.py",
+    "function": "calculate"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "reportVersion": "1",
+  "toolVersion": "0.1.0",
+  "ok": false,
+  "numericPolicy": {
+    "absoluteTolerance": 1e-09,
+    "relativeTolerance": 1e-12,
+    "numberDomain": "finite-real-safe-integer"
+  },
+  "provenance": {},
+  "checks": {
+    "executionValidity": {
+      "status": "not_applicable"
+    },
+    "inputConsistency": {
+      "status": "not_applicable"
+    },
+    "constantConsistency": {
+      "status": "not_applicable"
+    },
+    "formulaConsistency": {
+      "status": "not_applicable"
+    },
+    "sourceToDocumentConsistency": {
+      "status": "not_applicable"
+    },
+    "independentReferenceAgreement": {
+      "status": "not_applicable"
+    },
+    "documentContent": {
+      "status": "not_applicable"
+    },
+    "rendering": {
+      "status": "not_applicable"
+    },
+    "visualInspection": {
+      "status": "not_applicable"
+    }
+  },
+  "diagnostics": [
+    {
+      "code": "UNKNOWN_COMMAND",
+      "stage": "usage",
+      "message": "Unknown command. Source, execution and later checks did not run."
+    }
+  ]
+}

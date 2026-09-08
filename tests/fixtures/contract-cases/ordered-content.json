@@ -1,0 +1,268 @@
+{
+  "documentVersion": "2",
+  "source": {
+    "kind": "execution",
+    "entryModuleId": "estimate.cso.py",
+    "entrySourceHash": "b22993a2cd3eee420d3c6887f80e6006725877e2f4a176aa830a8f15501b81f4",
+    "sourceClosureHash": "78eb5ffef46cb1012e4999cfcf0e420105836a895ecc98ef50141cfa7ebee138",
+    "function": "estimate",
+    "resolvedInputs": {
+      "width": 2,
+      "height_a": 3,
+      "height_b": 4,
+      "thickness": 0.1,
+      "density": 500
+    }
+  },
+  "title": "Ordered contract content",
+  "rootSectionIds": [
+    "[\"section\",\"root\",\"calculation\"]"
+  ],
+  "sections": [
+    {
+      "id": "[\"section\",\"root\",\"calculation\"]",
+      "title": "Calculation",
+      "sourcePlacementId": "root-heading",
+      "localId": "calculation",
+      "invocationId": "root",
+      "location": {
+        "moduleId": "estimate.cso.py",
+        "start": {
+          "line": 1,
+          "column": 0
+        },
+        "end": {
+          "line": 1,
+          "column": 10
+        }
+      },
+      "items": [
+        {
+          "kind": "text",
+          "id": "[\"text\",\"root\",\"intro\"]",
+          "text": {
+            "content": "Rectangle with uniform thickness. Review the stated dimensions."
+          },
+          "sourcePlacementId": "intro",
+          "localId": "intro",
+          "invocationId": "root",
+          "location": {
+            "moduleId": "estimate.cso.py",
+            "start": {
+              "line": 2,
+              "column": 0
+            },
+            "end": {
+              "line": 2,
+              "column": 10
+            }
+          },
+          "context": []
+        },
+        {
+          "kind": "symbol",
+          "symbol": {
+            "id": "[\"symbol\",\"root\",\"area\"]",
+            "glyph": "A",
+            "description": "Panel area",
+            "unit": "m^2",
+            "valueTree": {
+              "rootKey": "n1",
+              "nodes": [
+                {
+                  "key": "n1",
+                  "mode": "LITERAL",
+                  "literal": {
+                    "kind": "number",
+                    "value": 6
+                  }
+                }
+              ],
+              "result": {
+                "kind": "number",
+                "value": 6
+              }
+            }
+          },
+          "sourcePlacementId": "area-definition",
+          "localId": "area",
+          "invocationId": "root",
+          "location": {
+            "moduleId": "estimate.cso.py",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 10
+            }
+          },
+          "operands": [],
+          "context": []
+        },
+        {
+          "kind": "section",
+          "id": "[\"section\",\"root\",\"detail\"]",
+          "sourcePlacementId": "detail-call",
+          "localId": "detail",
+          "invocationId": "root",
+          "location": {
+            "moduleId": "estimate.cso.py",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 4,
+              "column": 10
+            }
+          },
+          "context": []
+        },
+        {
+          "kind": "symbolRef",
+          "id": "[\"symbol\",\"root\",\"area\"]",
+          "sourcePlacementId": "area-repeat",
+          "localId": "area",
+          "invocationId": "root",
+          "location": {
+            "moduleId": "estimate.cso.py",
+            "start": {
+              "line": 7,
+              "column": 0
+            },
+            "end": {
+              "line": 7,
+              "column": 10
+            }
+          },
+          "operands": [],
+          "context": []
+        },
+        {
+          "kind": "text",
+          "id": "[\"text\",\"root\",\"summary\"]",
+          "text": {
+            "content": "This summary resumes the parent section after its detail."
+          },
+          "sourcePlacementId": "summary",
+          "localId": "summary",
+          "invocationId": "root",
+          "location": {
+            "moduleId": "estimate.cso.py",
+            "start": {
+              "line": 8,
+              "column": 0
+            },
+            "end": {
+              "line": 8,
+              "column": 10
+            }
+          },
+          "context": []
+        }
+      ],
+      "context": []
+    },
+    {
+      "id": "[\"section\",\"root\",\"detail\"]",
+      "title": "Detail",
+      "sourcePlacementId": "detail-heading",
+      "localId": "detail",
+      "invocationId": "root",
+      "location": {
+        "moduleId": "estimate.cso.py",
+        "start": {
+          "line": 4,
+          "column": 0
+        },
+        "end": {
+          "line": 4,
+          "column": 10
+        }
+      },
+      "items": [
+        {
+          "kind": "figure",
+          "id": "[\"figure\",\"root\",\"diagram\"]",
+          "figure": {
+            "assetId": "diagram-bytes",
+            "caption": "Contract image bytes; not an engineering diagram.",
+            "alt": "One pixel contract test image"
+          },
+          "sourcePlacementId": "diagram",
+          "localId": "diagram",
+          "invocationId": "root",
+          "location": {
+            "moduleId": "estimate.cso.py",
+            "start": {
+              "line": 5,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 10
+            }
+          },
+          "context": []
+        },
+        {
+          "kind": "text",
+          "id": "[\"text\",\"root\",\"detail-note\"]",
+          "text": {
+            "content": "Figure descriptions belong to this placement."
+          },
+          "sourcePlacementId": "detail-note",
+          "localId": "detail-note",
+          "invocationId": "root",
+          "location": {
+            "moduleId": "estimate.cso.py",
+            "start": {
+              "line": 6,
+              "column": 0
+            },
+            "end": {
+              "line": 6,
+              "column": 10
+            }
+          },
+          "context": []
+        }
+      ],
+      "context": []
+    }
+  ],
+  "detachedSymbols": [],
+  "assets": [
+    {
+      "asset": {
+        "id": "diagram-bytes",
+        "moduleId": "estimate.cso.py",
+        "path": "assets/pixel.png",
+        "mediaType": "image/png",
+        "sha256": "716f825624421188f72ccff5fdb05a4d241a3ba81917388a08c9bb9bab2b5979"
+      },
+      "dataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWZkAAAAASUVORK5CYII="
+    }
+  ],
+  "historicalReviews": [
+    {
+      "scope": "historical",
+      "originalSource": {
+        "id": "synthetic-review",
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "format": "Synthetic review"
+      },
+      "attribution": "Synthetic review record; no human approval",
+      "originalFields": {
+        "reviewer": "Original reviewer",
+        "approved": true,
+        "notes": [
+          "Retained original field"
+        ]
+      }
+    }
+  ],
+  "context": []
+}

@@ -1,0 +1,106 @@
+{
+  "referenceVersion": "1",
+  "cases": [
+    {
+      "id": "rational-nine",
+      "revision": "hand-rational-v1",
+      "basis": {
+        "method": "Exact rational arithmetic",
+        "derivation": "a + b = 2 + 4 = 6. sum_times_c = 6 * 3 = 18. result = 18 / 2 = 9.",
+        "sourceDescription": "Synthetic arithmetic protocol fixture. No Python execution was captured. Formula: (a + b) * c / d where a=2, b=4, c=3, d=2."
+      },
+      "binding": {
+        "entryModuleId": "rational-nine.cso.py",
+        "entrySourceHash": "b0b7f34fde29288cabc9def7f90cad2c293681a175b4a4ba291423f94a2bc6bd",
+        "sourceClosureHash": "6e3f95160eb142532be3dd35dc857625fbfa25ad095d97484d5a216b88c3f4e7",
+        "function": "calculate_rational",
+        "resolvedInputs": {
+          "a": 2,
+          "b": 4,
+          "c": 3,
+          "d": 2
+        }
+      },
+      "expected": [
+        {
+          "symbolId": "[\"symbol\",\"root\",\"sum\"]",
+          "value": 6,
+          "unit": "1"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root\",\"sum_times_c\"]",
+          "value": 18,
+          "unit": "1"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root\",\"result\"]",
+          "value": 9,
+          "unit": "1"
+        }
+      ]
+    },
+    {
+      "id": "rational-zero",
+      "revision": "hand-rational-v1",
+      "basis": {
+        "method": "Exact rational arithmetic",
+        "derivation": "a + b = -2 + 2 = 0. sum_times_c = 0 * 7 = 0. result = 0 / 5 = 0.",
+        "sourceDescription": "Synthetic arithmetic protocol fixture. No Python execution was captured. Formula: (a + b) * c / d where a=-2, b=2, c=7, d=5."
+      },
+      "binding": {
+        "entryModuleId": "rational-zero.cso.py",
+        "entrySourceHash": "ca077c2cd058ebc1c9416d67d02fb4055cbf2950dacc441706c99d226b9f606c",
+        "sourceClosureHash": "c7a5c399ee7cd11820602df22509e841b654691601dc7b606f115e2db4393649",
+        "function": "calculate_rational",
+        "resolvedInputs": {
+          "a": -2,
+          "b": 2,
+          "c": 7,
+          "d": 5
+        }
+      },
+      "expected": [
+        {
+          "symbolId": "[\"symbol\",\"root\",\"sum\"]",
+          "value": 0,
+          "unit": "1"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root\",\"sum_times_c\"]",
+          "value": 0,
+          "unit": "1"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root\",\"result\"]",
+          "value": 0,
+          "unit": "1"
+        }
+      ]
+    },
+    {
+      "id": "sqrt-nine",
+      "revision": "hand-sqrt-v1",
+      "basis": {
+        "method": "Exact square-root arithmetic",
+        "derivation": "root = sqrt(81) = 9.",
+        "sourceDescription": "Synthetic arithmetic protocol fixture. No Python execution was captured. Formula: sqrt(radicand) where radicand=81."
+      },
+      "binding": {
+        "entryModuleId": "sqrt-nine.cso.py",
+        "entrySourceHash": "c9fe23de4e8a1358102c23ef20a2719a60b0a0b08d0d025dda1e5385683f539b",
+        "sourceClosureHash": "6ba14f891313cab5f094859f34218da8ff963f4f7ec8b46df74e88a2005e9602",
+        "function": "calculate_sqrt",
+        "resolvedInputs": {
+          "radicand": 81
+        }
+      },
+      "expected": [
+        {
+          "symbolId": "[\"symbol\",\"root\",\"root\"]",
+          "value": 9,
+          "unit": "m"
+        }
+      ]
+    }
+  ]
+}

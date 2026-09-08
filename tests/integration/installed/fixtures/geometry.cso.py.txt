@@ -1,0 +1,12 @@
+"""Rectangle geometry in metres; no openings."""
+from typing import Annotated
+from cso_python import calculation, section, symbol, given, CalculationResults
+
+@calculation(id="rectangle", title="Rectangle geometry")
+@section(id="geometry", title="Rectangle geometry")
+def rectangle(width: float, height: float) -> CalculationResults:
+    w: Annotated[float, symbol(glyph="w", description="Panel width", unit="m")] = given(width)
+    h: Annotated[float, symbol(glyph="h", description="Panel height", unit="m")] = given(height)
+    area: Annotated[float, symbol(glyph="A", description="Panel area", unit="m^2")] = w * h
+    perimeter: Annotated[float, symbol(glyph="P", description="Panel perimeter", unit="m")] = 2 * (w + h)
+    return {"w": w, "h": h, "area": area, "perimeter": perimeter}

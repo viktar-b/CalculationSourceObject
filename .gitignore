@@ -1,0 +1,40 @@
+# Dependencies and environments
+node_modules/
+.venv/
+venv/
+
+# Node / TypeScript
+.next/
+dist/
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.egg-info/
+build/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+.pyright/
+.ipynb_checkpoints/
+
+# CSO generated artifacts
+output/
+artifacts/
+*.evidence/
+*.tgz
+*.whl
+_cso_bindings/
+
+# Playwright / Vitest
+playwright-report/
+test-results/
+
+# OS and secrets
+.DS_Store
+.env
+.env*.local

@@ -1,0 +1,49 @@
+{
+  "name": "calculation-source-object-workspace",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/cso-core",
+    "packages/cso-react",
+    "apps/demo",
+    "apps/cso-cli"
+  ],
+  "scripts": {
+    "dev": "npm run build:lib && tsx scripts/demo.ts dev",
+    "build": "npm run build:cli && tsx scripts/demo.ts build",
+    "build:cli": "npm run build:lib && npm run build --workspace @viktar-b/cso-cli",
+    "build:demo": "npm run build:lib && tsx scripts/demo.ts build",
+    "build:lib": "npm run build --workspace @viktar-b/cso-core && npm run build --workspace @viktar-b/cso-react",
+    "build:css": "npm run build:css --workspace @viktar-b/cso-react",
+    "test": "npm run test:projects && npm run test:python && npm run test:integration",
+    "test:packages": "npm run build:cli && tsx tests/integration/installed/acceptance.ts",
+    "typecheck": "npm run build:lib && tsc --noEmit --pretty false && npm run typecheck --workspaces",
+    "lint": "npm run lint --workspaces && biome lint tests scripts/check-library-archives.ts scripts/run-python-tests.ts",
+    "format": "biome format --write ./apps/demo/app ./apps/demo/src ./packages/cso-core/src ./packages/cso-react/src ./packages/cso-core/tests ./packages/cso-react/tests ./tests",
+    "test:library-archives": "tsx scripts/check-library-archives.ts",
+    "test:python": "tsx scripts/run-python-tests.ts",
+    "test:projects": "npm run build:cli && npm run test --workspaces",
+    "test:integration": "vitest run --config vitest.config.ts",
+    "test:isolation": "tsx scripts/check-project-isolation.ts"
+  },
+  "overrides": {
+    "postcss": "8.5.12"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "playwright": "^1.60.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5",
+    "vitest": "^3.1.2",
+    "@viktar-b/cso-core": "0.1.0",
+    "@viktar-b/cso-react": "0.1.0",
+    "zod": "^4.4.1"
+  }
+}

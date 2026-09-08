@@ -1,0 +1,20 @@
+{
+  "purpose": "Encoding-only vector. Repeated-digit hashes are deliberate manifest data, not hashes of delivered calculation sources.",
+  "manifest": [
+    [
+      "estimate.cso.py",
+      "0000000000000000000000000000000000000000000000000000000000000000"
+    ],
+    [
+      "géométrie.cso.py",
+      "1111111111111111111111111111111111111111111111111111111111111111"
+    ],
+    [
+      "材料.cso.py",
+      "2222222222222222222222222222222222222222222222222222222222222222"
+    ]
+  ],
+  "serializedUtf8": "[[\"estimate.cso.py\",\"0000000000000000000000000000000000000000000000000000000000000000\"],[\"géométrie.cso.py\",\"1111111111111111111111111111111111111111111111111111111111111111\"],[\"材料.cso.py\",\"2222222222222222222222222222222222222222222222222222222222222222\"]]",
+  "sha256": "5ba64dca7730fc36bceb220295578aaf6d5ef08c416d23ebd7ad0cc252e29f03",
+  "namespacedSymbolId": "[\"symbol\",\"root/panel_a\",\"area\"]"
+}

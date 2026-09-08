@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="340" viewBox="0 0 720 340">
+  <rect width="720" height="340" fill="white"/>
+  <g stroke="#244c68" stroke-width="2" fill="#dbeaf4">
+    <path d="M80 85h170v195H80z"/>
+    <path d="m250 85 14-12v195l-14 12z" fill="#9ec2db"/>
+    <path d="M390 40h170v240H390z"/>
+    <path d="m560 40 14-12v240l-14 12z" fill="#9ec2db"/>
+  </g>
+  <g stroke="#667085" stroke-width="1" fill="none">
+    <path d="M80 295v18m170-18v18M80 305h170M390 295v18m170-18v18M390 305h170M62 85H45m17 195H45M53 85v195M590 40h18m-18 240h18M600 40v240"/>
+    <path d="m264 77 34-20"/>
+  </g>
+  <g fill="#101828" font-family="Arial, sans-serif" font-size="20" text-anchor="middle">
+    <text x="165" y="330">w<tspan baseline-shift="sub" font-size="13">pan</tspan></text><text x="475" y="330">w<tspan baseline-shift="sub" font-size="13">pan</tspan></text>
+    <text x="28" y="187">h<tspan baseline-shift="sub" font-size="13">fp</tspan></text><text x="632" y="164">h<tspan baseline-shift="sub" font-size="13">sp</tspan></text>
+    <text x="325" y="50">t<tspan baseline-shift="sub" font-size="13">pan</tspan></text>
+    <text x="165" y="174">First panel</text><text x="475" y="153">Second panel</text>
+  </g>
+</svg>

@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cso-python"
+version = "0.1.0"
+description = "Constrained Python authoring and CalculationSourceObject JSON export"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Viktar B" }]
+license = { text = "Apache-2.0" }
+dependencies = []
+
+[tool.setuptools]
+license-files = ["LICENSE", "NOTICE"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["cso_python*"]
+
+[tool.setuptools.package-data]
+cso_python = ["py.typed"]

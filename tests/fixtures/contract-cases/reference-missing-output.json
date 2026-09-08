@@ -1,0 +1,138 @@
+{
+  "referenceVersion": "1",
+  "cases": [
+    {
+      "id": "two-panel-width-2",
+      "revision": "hand-derived-v1",
+      "basis": {
+        "method": "Exact decimal rectangle arithmetic",
+        "derivation": "Rectangular panels, uniform thickness and density, no openings or waste. Area = width * height; perimeter = 2 * (width + height); total area = sum of panel areas; volume = total area * 0.1; mass = volume * 500. Material estimate, not capacity.",
+        "sourceDescription": "Synthetic protocol fixture. Independent expected values are hand-derived; they are not exporter or evaluator output."
+      },
+      "binding": {
+        "entryModuleId": "estimate.cso.py",
+        "entrySourceHash": "b22993a2cd3eee420d3c6887f80e6006725877e2f4a176aa830a8f15501b81f4",
+        "sourceClosureHash": "78eb5ffef46cb1012e4999cfcf0e420105836a895ecc98ef50141cfa7ebee138",
+        "function": "estimate",
+        "resolvedInputs": {
+          "width": 2,
+          "height_a": 3,
+          "height_b": 4,
+          "thickness": 0.1,
+          "density": 500
+        }
+      },
+      "expected": [
+        {
+          "symbolId": "[\"symbol\",\"root/panel_a\",\"area\"]",
+          "value": 6,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/panel_a\",\"perimeter\"]",
+          "value": 10,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/panel_b\",\"area\"]",
+          "value": 8,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root\",\"area\"]",
+          "value": 14,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/material\",\"volume\"]",
+          "value": 1.4,
+          "unit": "m^3"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/material\",\"mass\"]",
+          "value": 700,
+          "unit": "kg"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root\",\"volume\"]",
+          "value": 1.4,
+          "unit": "m^3"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root\",\"mass\"]",
+          "value": 700,
+          "unit": "kg"
+        }
+      ]
+    },
+    {
+      "id": "two-panel-width-1",
+      "revision": "hand-derived-v1",
+      "basis": {
+        "method": "Exact decimal rectangle arithmetic",
+        "derivation": "Rectangular panels, uniform thickness and density, no openings or waste. Area = width * height; perimeter = 2 * (width + height); total area = sum of panel areas; volume = total area * 0.1; mass = volume * 500. Material estimate, not capacity.",
+        "sourceDescription": "Synthetic protocol fixture. Independent expected values are hand-derived; they are not exporter or evaluator output."
+      },
+      "binding": {
+        "entryModuleId": "estimate.cso.py",
+        "entrySourceHash": "b22993a2cd3eee420d3c6887f80e6006725877e2f4a176aa830a8f15501b81f4",
+        "sourceClosureHash": "78eb5ffef46cb1012e4999cfcf0e420105836a895ecc98ef50141cfa7ebee138",
+        "function": "estimate",
+        "resolvedInputs": {
+          "width": 1,
+          "height_a": 3,
+          "height_b": 4,
+          "thickness": 0.1,
+          "density": 500
+        }
+      },
+      "expected": [
+        {
+          "symbolId": "[\"symbol\",\"root/panel_a\",\"area\"]",
+          "value": 3,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/panel_a\",\"perimeter\"]",
+          "value": 8,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/panel_b\",\"area\"]",
+          "value": 4,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/panel_b\",\"perimeter\"]",
+          "value": 10,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root\",\"area\"]",
+          "value": 7,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/material\",\"volume\"]",
+          "value": 0.7,
+          "unit": "m^3"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/material\",\"mass\"]",
+          "value": 350,
+          "unit": "kg"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root\",\"volume\"]",
+          "value": 0.7,
+          "unit": "m^3"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root\",\"mass\"]",
+          "value": 350,
+          "unit": "kg"
+        }
+      ]
+    }
+  ]
+}

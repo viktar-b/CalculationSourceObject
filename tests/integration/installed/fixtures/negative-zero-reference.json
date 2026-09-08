@@ -1,0 +1,25 @@
+{
+  "referenceVersion": "1",
+  "cases": [
+    {
+      "id": "signed-zero-negative",
+      "revision": "hand-derived-negative-zero-v1",
+      "basis": {
+        "method": "IEEE-754 signed-zero identities",
+        "derivation": "sqrt(-0.0) = -0.0 and (-0.0)^3 = -0.0. Input identity retains the zero sign; numerical comparisons keep the fixed tolerance.",
+        "sourceDescription": "CLI signed-zero transport fixture; expectations established from square-root and odd-power identities, not from exporter or verifier output."
+      },
+      "binding": {
+        "entryModuleId": "signed-zero.cso.py",
+        "entrySourceHash": "2fc8cf6b48ed9c26168810d5f0194b26adeed13344af7051abf1591313da3836",
+        "sourceClosureHash": "b309f7831880061db9f7d9602a836abbeeb3905a9cfbe2d3fdb6b1f48877456c",
+        "function": "signed_zero",
+        "resolvedInputs": {"x": -0.0}
+      },
+      "expected": [
+        {"symbolId": "[\"symbol\",\"root\",\"root\"]", "value": -0.0, "unit": ""},
+        {"symbolId": "[\"symbol\",\"root\",\"cube\"]", "value": -0.0, "unit": ""}
+      ]
+    }
+  ]
+}

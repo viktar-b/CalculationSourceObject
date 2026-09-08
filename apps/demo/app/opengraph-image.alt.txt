@@ -1,0 +1,1 @@
+CalculationSourceObject social preview: transparent calculations from code to FormulaSheet.
