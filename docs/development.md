@@ -1,6 +1,7 @@
 # Development
 
-Use Node 20.19+ and Python 3.11+. [Root scripts](../package.json) orchestrate the
+Use Node 24 LTS, selected by [`.nvmrc`](../.nvmrc), and Python 3.11+.
+[Root scripts](../package.json) orchestrate the
 workspace; each package/app owns its build, dependencies and behavior tests.
 The [code map](code-map.md) explains responsibility and execution order.
 
@@ -40,6 +41,33 @@ root commands; package manifests define their local commands.
 `npm run test:packages` installs actual archives and a wheel into fresh external
 consumers. These installation checks need build prerequisites and dependency
 access. PDF checks also need Chromium and Poppler.
+
+## Continuous integration
+
+[CI](../.github/workflows/ci.yml) runs on every pull request and pushes to `main`
+with Node 24 and Python 3.11 on Ubuntu. Its required checks are:
+
+- `quality`: dependency audit, lint, typechecking, workspace tests and demo build.
+- `isolation`: independent builds and tests for all five projects.
+- `installed-packages`: npm archives, Python wheel, CLI/PDF acceptance and library
+  type/export/browser consumers. Both archive commands are required.
+
+[Dependency review](../.github/workflows/dependency-review.yml) adds the required
+`dependency-review` check for newly introduced high or critical vulnerabilities,
+including development dependencies. The audit in `quality` also checks existing
+locked dependencies. [Dependabot](../.github/dependabot.yml) checks npm and action
+versions weekly. Repository settings enable vulnerability alerts and security
+updates separately from that file.
+
+Keep all four check names stable and required in the `Protect main` ruleset.
+Do not add path filters or allow failures on required checks. PR code runs with
+read-only repository permissions, and external actions use full commit SHAs.
+
+Isolation and installed-package jobs retain logs and evidence for 14 days,
+including generated PDFs and their hashes. Passing automated PDF checks leaves
+visual inspection pending; inspect every page before delivering a PDF.
+
+## Test data
 
 Generated test data belongs in disposable directories. Keep one canonical source
 for each engineering example; integration tests copy it when mutation is needed.
