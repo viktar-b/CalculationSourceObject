@@ -6,16 +6,17 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
 const repository = fileURLToPath(new URL('..', import.meta.url));
-const output = mkdtempSync(join(tmpdir(), 'cso-isolated-projects-'));
+const output = realpathSync(mkdtempSync(join(tmpdir(), 'cso-isolated-projects-')));
 const archives = join(output, 'archives');
 mkdirSync(archives);
 const commands: {
@@ -74,7 +75,7 @@ function copyProject(relative: string, name: string) {
   });
   return destination;
 }
-console.log(`Isolation artifacts: ${output}`);
+process.stdout.write(`Isolation artifacts: ${output}\n`);
 const dependencies = new Map<string, string>();
 for (const [name, relative] of [
   ['core', 'packages/cso-core'],
@@ -116,7 +117,7 @@ for (const [name, relative] of [
       .parse(JSON.parse(packed));
     dependencies.set(manifest.name, join(archives, filename));
   }
-  console.log(`${name}: isolated build, typecheck and tests passed`);
+  process.stdout.write(`${name}: isolated build, typecheck and tests passed\n`);
 }
 const directory = copyProject('packages/cso-python', 'python');
 const python = process.env.PYTHON ?? 'python3';
@@ -146,13 +147,16 @@ run('python', directory, installedPython, [
   join(archives, wheel),
 ]);
 run('python', directory, installedPython, ['-I', 'tests/run.py']);
-const identity = run('python', directory, installedPython, [
-  '-I',
-  '-c',
-  'import cso_python; print(cso_python.__file__)',
-]).trim();
-if (!identity.startsWith(venv))
+const identity = realpathSync(
+  run('python', directory, installedPython, [
+    '-I',
+    '-c',
+    'import cso_python; print(cso_python.__file__)',
+  ]).trim(),
+);
+if (!identity.startsWith(`${venv}${sep}`)) {
   throw new Error(`Unexpected Python import: ${identity}`);
+}
 const artifacts = readdirSync(archives).map((name) => ({
   path: join(archives, name),
   sha256: createHash('sha256')
@@ -176,6 +180,6 @@ writeFileSync(
     2,
   ),
 );
-console.log(
-  `All five isolated projects passed: ${join(output, 'qualification.json')}`,
+process.stdout.write(
+  `All five isolated projects passed: ${join(output, 'qualification.json')}\n`,
 );
