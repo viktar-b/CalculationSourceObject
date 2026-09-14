@@ -29,6 +29,9 @@
     "test:isolation": "tsx scripts/check-project-isolation.ts"
   },
   "overrides": {
+    "tsup": {
+      "esbuild": "0.28.2"
+    },
     "postcss": "8.5.28"
   },
   "devDependencies": {

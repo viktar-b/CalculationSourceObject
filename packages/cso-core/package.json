@@ -36,6 +36,9 @@
     "lint": "biome lint src tests",
     "pretest": "npm run build"
   },
+  "overrides": {
+    "esbuild": "0.28.2"
+  },
   "devDependencies": {
     "tsup": "^8.5.1",
     "typescript": "^5",

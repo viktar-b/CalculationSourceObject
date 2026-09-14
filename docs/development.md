@@ -82,6 +82,15 @@ retain their read-only tokens.
 The [security policy](../SECURITY.md) defines alert ownership, response targets
 and the manual fallback for failed automatic updates.
 
+The workspace and the three projects that use `tsup` pin esbuild to `0.28.2`
+through npm overrides. `tsup@8.5.1` still requires `^0.27.0`, which excludes the
+security fix in `0.28.1`; Vite's peer range already accepts `0.28.x`. The project
+overrides keep isolated builds on the patched version without reading root
+configuration. The browser-archive consumer also uses `0.28.2`. Validate changes
+to this pin through all required checks, including ESM/CJS builds, declarations,
+CLI/PDF acceptance and browser consumers. Remove the overrides when upstream
+ranges permit a patched version and fresh workspace/isolated installs confirm it.
+
 Isolation and installed-package jobs retain logs and evidence for 14 days,
 including generated PDFs and their hashes. Passing automated PDF checks leaves
 visual inspection pending; inspect every page before delivering a PDF.
