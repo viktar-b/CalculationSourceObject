@@ -32,14 +32,14 @@ export function SiteNav({
         >
           <span>{'{ CalculationSourceObject }'}</span>
         </Link>
-        <div className="flex flex-wrap border border-gray-300 bg-white">
+        <div className="grid grid-cols-2 border border-gray-300 bg-white min-sm:flex min-sm:w-fit">
           {items.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               prefetch={true}
               aria-current={item.active ? 'page' : undefined}
-              className={`border-r border-gray-300 px-4 py-2 font-['Plus_Jakarta_Sans'] text-[12px] font-semibold uppercase tracking-[0.08em] last:border-r-0 ${
+              className={`border-r border-gray-300 px-4 py-3 text-center font-['Plus_Jakarta_Sans'] text-[12px] font-semibold uppercase tracking-[0.08em] last:border-r-0 max-sm:even:border-r-0 max-sm:[&:nth-child(-n+2)]:border-b min-sm:py-2 ${
                 item.active
                   ? 'bg-gray-950 text-white'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-950'
