@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+      - run: npm ci
+      - name: Install the Python wheel
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip wheel --no-deps ./packages/cso-python --wheel-dir artifacts
+          .venv/bin/python -m pip install --no-index --find-links artifacts cso-python
+          echo "PYTHON=$GITHUB_WORKSPACE/.venv/bin/python" >> "$GITHUB_ENV"
+      - run: npx playwright install --with-deps chromium
+      - run: npm audit --audit-level=high
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build:demo
+
+  isolation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+      - run: npm ci
+      - name: Build and test each project in isolation
+        run: TMPDIR="$RUNNER_TEMP" npm run test:isolation 2>&1 | tee "$RUNNER_TEMP/isolation.log"
+      - name: Retain isolation evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: isolation-evidence
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/isolation.log
+            ${{ runner.temp }}/cso-isolated-projects-*/*.json
+            ${{ runner.temp }}/cso-isolated-projects-*/*.log
+
+  installed-packages:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+      - run: npm ci
+      - name: Install PDF prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes poppler-utils
+          npx playwright install --with-deps chromium
+      - name: Test installed npm archives and Python wheel
+        run: TMPDIR="$RUNNER_TEMP" npm run test:packages 2>&1 | tee "$RUNNER_TEMP/installed-packages.log"
+      - name: Test library types, exports, and browser consumers
+        run: TMPDIR="$RUNNER_TEMP" npm run test:library-archives 2>&1 | tee "$RUNNER_TEMP/library-archives.log"
+      - name: Retain package and PDF evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: installed-package-evidence
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/installed-packages.log
+            ${{ runner.temp }}/library-archives.log
+            ${{ runner.temp }}/cso installed packages */*.json
+            ${{ runner.temp }}/cso installed packages */*.log
+            ${{ runner.temp }}/cso installed packages */python-tests.stdout.txt
+            ${{ runner.temp }}/cso installed packages */archives/*
+            ${{ runner.temp }}/cso installed packages */full cli/*-results.json
+            ${{ runner.temp }}/cso installed packages */full cli/output/*
+            ${{ runner.temp }}/cso installed packages */full cli/pdf-output/**
