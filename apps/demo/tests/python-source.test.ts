@@ -19,6 +19,11 @@ function sourceBundle() {
       moduleId: 'sample.cso.py',
       code: 'from constants import FACTOR\n\ndef sample(width):\n    return width * FACTOR\n',
     },
+    { moduleId: '_cso_bindings/__init__.py', code: '' },
+    {
+      moduleId: 'utilities/__init__.py',
+      code: 'from constants import FACTOR\n',
+    },
   ].map((file) => ({
     ...file,
     sha256: createHash('sha256').update(file.code).digest('hex'),
@@ -88,6 +93,7 @@ describe('Python sources for prepared examples', () => {
         pythonFiles: [
           { moduleId: 'sample.cso.py', code: bundle.files[1].code },
           { moduleId: 'constants.py', code: bundle.files[0].code },
+          { moduleId: 'utilities/__init__.py', code: bundle.files[3].code },
         ],
       });
       writeFileSync(

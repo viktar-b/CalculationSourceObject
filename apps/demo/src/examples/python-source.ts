@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
+import { basename } from 'node:path';
 import {
   ExecutionBindingSchema,
   HashSchema,
@@ -92,6 +93,10 @@ export function loadPythonSource({
     );
   }
   return [...bundle.files]
+    .filter(
+      ({ moduleId, code }) =>
+        basename(moduleId) !== '__init__.py' || code.trim() !== '',
+    )
     .sort((left, right) => {
       const entry =
         Number(right.moduleId === bundle.binding.entryModuleId) -

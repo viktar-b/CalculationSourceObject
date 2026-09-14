@@ -63,9 +63,10 @@ states. An explicit Examples or CSO gallery directory skips canonical generation
 
 Examples shows Python and the calculation side by side from 1024 px, with
 Calculation/Python tabs below that width. A file selector exposes the entry and
-its local dependencies. Execution summaries, hashes, copy/download controls and
-printing controls are omitted. The document retains its input rows, units,
-formulas, prose and figures.
+its local dependencies. Empty `__init__.py` files are omitted from the selector
+and retained in the validated source bundle. Execution summaries, hashes,
+copy/download controls and printing controls are omitted. The document retains
+its input rows, units, formulas, prose and figures.
 An explicit CSO gallery is a mathematical projection and omits figures and
 standalone prose.
 

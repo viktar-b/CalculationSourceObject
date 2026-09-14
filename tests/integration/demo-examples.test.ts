@@ -65,9 +65,13 @@ test('prepares the canonical width-2 document with its execution and verificatio
     expect(example.pythonFiles[0]?.moduleId).toBe(
       execution.execution.entry.moduleId,
     );
-    expect(example.pythonFiles).toHaveLength(
-      execution.execution.sourceManifest.length,
+    expect(example.pythonFiles).toHaveLength(6);
+    expect(example.pythonFiles.map(({ moduleId }) => moduleId)).not.toContain(
+      '_cso_bindings/__init__.py',
     );
+    expect(
+      execution.execution.sourceManifest.map(({ moduleId }) => moduleId),
+    ).toContain('_cso_bindings/__init__.py');
     for (const file of example.pythonFiles) {
       expect(file.code).toBe(
         readFileSync(join(directory, 'source', file.moduleId), 'utf8'),
