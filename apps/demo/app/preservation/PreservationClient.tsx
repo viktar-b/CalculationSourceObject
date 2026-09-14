@@ -13,10 +13,10 @@ export function PreservationClient({
   return (
     <div>
       <div className="my-4 flex flex-wrap gap-3">
-        <label>
+        <label className="flex min-w-0 max-w-full flex-col gap-2 min-md:flex-row min-md:items-center">
           Calculation{' '}
           <select
-            className="ml-2 max-w-[600px] border p-2"
+            className="min-w-0 max-w-full border p-2 min-md:max-w-[600px]"
             value={selected}
             onChange={(event) => setSelected(Number(event.target.value))}
           >

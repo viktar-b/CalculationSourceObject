@@ -336,7 +336,7 @@ export default function Home() {
             Calculation record
           </p>
           <h2 className="mt-2 font-['Plus_Jakarta_Sans'] text-[24px] font-semibold leading-tight text-gray-950">
-            What a CalculationSourceObject records
+            What a Calculation<wbr />Source<wbr />Object records
           </h2>
           <p className="mt-3 max-w-[760px] font-['Plus_Jakarta_Sans'] text-[14px] leading-6 text-gray-600">
             A CSO records formulas, symbols, results and source context.
