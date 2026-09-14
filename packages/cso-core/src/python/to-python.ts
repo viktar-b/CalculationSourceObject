@@ -87,8 +87,8 @@ const toPythonIdentifier = (value: string, fallback: string): string => {
   const sanitized = value
     .toLowerCase()
     .replace(/[^a-z0-9_]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .replace(/_+/g, '_');
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
   const withFallback = sanitized || fallback;
   const safeLeadingCharacter = leadingDigitPattern.test(withFallback)
     ? `_${withFallback}`

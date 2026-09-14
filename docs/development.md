@@ -62,7 +62,25 @@ updates separately from that file.
 
 Keep all four check names stable and required in the `Protect main` ruleset.
 Do not add path filters or allow failures on required checks. PR code runs with
-read-only repository permissions, and external actions use full commit SHAs.
+read-only repository permissions in these workflows. External actions use full
+commit SHAs, enforced by the repository's Actions policy. Review any future
+reusable workflow references separately; that policy still permits tags for them.
+
+GitHub-managed CodeQL default setup scans JavaScript/TypeScript, Python and
+GitHub Actions on changes and weekly. Verify successful analysis and language
+coverage in the code-scanning tool status. `Protect main` also requires CodeQL
+results and blocks new high or critical security findings. This is a separate
+code-scanning rule, not a replacement for the four required checks above.
+
+GitHub's code-scanning rule does not cover Dependabot PRs analyzed by default
+setup or merge-queue groups, and alert locations must be in the PR diff. Review
+baseline findings separately and retain dependency review and the dependency
+audit. Verify coverage and enforcement before changing scanner setup or adding
+a merge queue. CodeQL publishes security analysis; the existing test workflows
+retain their read-only tokens.
+
+The [security policy](../SECURITY.md) defines alert ownership, response targets
+and the manual fallback for failed automatic updates.
 
 Isolation and installed-package jobs retain logs and evidence for 14 days,
 including generated PDFs and their hashes. Passing automated PDF checks leaves
