@@ -21,7 +21,7 @@ export function AsciiPlayground() {
           onChange={(event) => setPlayExpression(event.target.value)}
           aria-label="ASCII variable input"
           spellCheck={false}
-          className="h-[48px] w-full border border-gray-300 bg-white px-3 font-mono text-[14px] text-gray-950 outline-none transition-colors placeholder:text-gray-400 focus:border-gray-950"
+          className="h-[48px] w-full border border-gray-300 bg-white px-3 font-mono text-[14px] text-gray-950 outline-hidden transition-colors placeholder:text-gray-400 focus:border-gray-950"
           placeholder="M_cr"
         />
 
