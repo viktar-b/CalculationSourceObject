@@ -22,14 +22,14 @@
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "typescript": "^5",
     "tailwindcss": "^4.3.3",
     "postcss": "8.5.28",
     "@biomejs/biome": "1.9.4",
-    "vitest": "^4.1.11",
+    "vitest": "^5.0.0",
     "@tailwindcss/postcss": "^4.3.3"
   }
 }
