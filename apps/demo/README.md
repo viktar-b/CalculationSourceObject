@@ -25,7 +25,12 @@ Supply optional data directories when starting or building the app:
 
 - `CSO_GALLERY_DIRECTORY`: CSO `.json` files. Files beginning with `_` or `.`
   are auxiliary files and are ignored. Every selected document is validated.
-- `CSO_PREPARED_DIRECTORY`: validated `.prepared.json` files.
+- `CSO_EXAMPLES_DIRECTORY`: validated `.prepared.json` files for Examples.
+- `CSO_PREPARED_DIRECTORY`: validated `.prepared.json` files for Preservation.
+
+An explicit `CSO_GALLERY_DIRECTORY` selects the mathematical viewer for Examples,
+including when it is an empty string. Otherwise Examples reads prepared documents
+from `CSO_EXAMPLES_DIRECTORY`.
 
 Without these inputs the gallery and prepared-document viewer show empty states.
 The statically generated pages read these directories at build time; rebuild
@@ -33,17 +38,33 @@ after changing production data. The loaders accept any supplied directory and
 reject invalid documents. The app owns no engineering catalog and its source,
 configuration and tests contain no paths into the workspace examples or fixtures.
 
-From the repository root, `npm run dev` uses the [launcher](../../scripts/demo.ts).
-It defaults to a temporary gallery containing the CSO from the synthetic
-[protocol fixture](../../tests/fixtures/contract-cases/README.md), plus the
-[prepared presentation fixtures](../../tests/integration/fixtures/demo-preservation/README.md).
-These are not captured Python executions of the maintained two-panel example.
-Their titles and metadata identify them as synthetic. The launcher preserves
-explicit directory overrides; an empty value selects the corresponding empty state.
-The maintained engineering calculation stays in its [own example](../../examples/two-panel/README.md).
+From the repository root, `npm run dev` and `npm run build:demo` use the
+[launcher](../../scripts/demo.ts). Examples defaults to the maintained
+[two-panel calculation](../../examples/two-panel/README.md) at a shared width of
+2 m. Root [preparation](../../scripts/prepare-demo-examples.ts) copies the source
+to a temporary directory and generates its bindings. It reuses CLI execution,
+reference verification and asset capture, then prepares the document from that
+same execution. Source consistency and matching independent reference agreement
+must pass. Stale references stop generation and are never silently rebound.
 
-The Examples viewer is a mathematical projection and omits figures and standalone
-prose. Preservation displays supplied prepared documents with their ordered content.
+This path needs the installed Python wheel selected by `PYTHON`. Follow
+[development setup](../../docs/development.md#setup). It does not produce a PDF
+or require Chromium. Generated data and receipts stay in temporary directories
+and are removed when the launcher exits. `generated/` directories are ignored;
+there is no committed snapshot or refresh command. Each build regenerates from
+the current source. Restart development after changing the example.
+
+[Vercel configuration](../../vercel.json) installs the current Python package
+into a virtual environment before building. The hosted build therefore has the
+same generation prerequisite as local development.
+
+Preservation retains its synthetic
+[presentation cases](../../tests/integration/fixtures/demo-preservation/README.md).
+The launcher preserves explicit directory overrides; empty values select empty
+states. An explicit Examples or CSO gallery directory skips canonical generation.
+
+Prepared documents display ordered formulas, prose and figures. An explicit CSO
+gallery is a mathematical projection and omits figures and standalone prose.
 Both viewers offer development browser printing through `printFormulaSheet`.
 For verified PDF publication and evidence, use [cso pdf](../cso-cli/README.md).
 It verifies one captured execution and prepares the document from that same
