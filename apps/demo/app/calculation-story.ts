@@ -63,26 +63,3 @@ export const sourceSnippet = `{
     }}
   ]}, ...]
 }`;
-
-export const pipelineSteps = [
-  {
-    title: 'Annotated Python',
-    body: 'Author constrained Python with shared input metadata, formulas and public results.',
-  },
-  {
-    title: 'Capture and execute',
-    body: 'Capture source bytes and execution observations. Produce a CalculationSourceObject plus evidence.',
-  },
-  {
-    title: 'verifyExecution',
-    body: 'Core evaluates documented formulas and compares runtime observations to check source-to-document consistency.',
-  },
-  {
-    title: 'Optional independent references',
-    body: 'Compare with separately established expected values bound to the source, function and inputs. Report agreement separately.',
-  },
-  {
-    title: 'Prepare and display',
-    body: 'Use prepareExecutionDocument and PreparedFormulaSheet for ordered documents, or FormulaSheet for mathematical rows.',
-  },
-] as const;

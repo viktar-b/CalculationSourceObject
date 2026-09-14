@@ -1,358 +1,192 @@
-import { CodePanel } from '../CodePanel.tsx';
+import Link from 'next/link';
 import { SiteNav } from '../SiteNav.tsx';
-import {
-  pipelineSteps,
-  pythonSnippet,
-  sourceSnippet,
-} from '../calculation-story.ts';
 
 export const dynamic = 'force-static';
 export const revalidate = false;
 
-const contentsLinks = [
-  ['Motivation', '#motivation'],
-  ['Authoring layer', '#authoring-layer'],
-  ['Source object', '#source-object'],
-  ['FormulaSheet', '#formulasheet'],
-  ['Prepared documents', '#prepared-documents'],
-  ['Printing and checks', '#printing'],
-  ['Python code generation', '#python-codegen'],
-  ['MathML', '#mathml'],
+const workflowSteps = [
+  {
+    id: 'write',
+    title: 'Agent writes',
+    summary: 'Turn your requirements into a calculation.',
+    detailTitle: 'Start with the engineering problem',
+    paragraphs: [
+      'You give the agent the problem, inputs, units and assumptions. The agent writes an annotated calculation in Python, with named quantities, formulas, explanations and results.',
+      'The calculation source contains the steps that will appear in the document. When you change a formula, the agent updates that source.',
+    ],
+    output: 'A calculation source you can inspect and change.',
+  },
+  {
+    id: 'verify',
+    title: 'Agent verifies',
+    summary: 'Check that the documented formulas match the calculated results.',
+    detailTitle: 'Check the calculation before making the document',
+    paragraphs: [
+      'The agent runs the calculation for your inputs. The verifier evaluates the documented formulas and compares their values with the Python results. This is source-to-document consistency. The agent investigates failed checks and fixes the source before continuing.',
+      'If you have an independent numerical reference case, the agent can also compare against its expected results. A consistency check alone does not establish that the engineering method fits your problem.',
+    ],
+    output:
+      'A check report that states what passed, failed or was not checked.',
+  },
+  {
+    id: 'compile',
+    title: 'Agent compiles',
+    summary:
+      'Assemble the calculation and its results into a complete document.',
+    detailTitle: 'Build the document from the calculation',
+    paragraphs: [
+      'Here, compile means assemble the calculation document. The agent uses the calculation source and its results to build the document, with inputs, formulas, substitutions, units, explanations and figures in source order.',
+      'This happens before the document appears on screen or goes to print. PDF generation includes this step.',
+    ],
+    output: 'A document that shows how the calculation reaches its results.',
+  },
+  {
+    id: 'print',
+    title: 'Agent prints',
+    summary: 'Create a PDF and check that every page is readable.',
+    detailTitle: 'Make the PDF for review',
+    paragraphs: [
+      'The agent uses the PDF command to verify the calculation, compile the document and save it as a PDF. By default, the command also saves the check report and supporting records with the output.',
+      'Before handing it over, the agent must inspect every page for missing content, unreadable formulas, clipped figures and poor page breaks. You can read the PDF on screen or print a paper copy.',
+    ],
+    output: 'A PDF and its check records, ready for human review.',
+  },
+  {
+    id: 'review',
+    title: 'Human reviews',
+    summary:
+      'Decide whether the assumptions, method and results fit the problem.',
+    detailTitle: 'Review the engineering work',
+    paragraphs: [
+      'An engineer reads the document and checks the inputs, assumptions, method, units and results against the actual problem. The formulas and explanations make the reasoning available for that review.',
+      'If something needs to change, send it back to the agent. The agent updates the source, repeats the checks and makes a new PDF for review. Record your review against the PDF version you checked.',
+    ],
+    output: 'A human review decision, with any changes needed.',
+  },
+  {
+    id: 'export',
+    title: 'Export',
+    summary: 'Reuse the reviewed calculation in C# and other languages.',
+    detailTitle: 'Use the calculation in other software',
+    paragraphs: [
+      'Planned exports would turn the reviewed calculation into code for C#, TypeScript and other languages. This would let you use the calculation in another application.',
+      'C# and TypeScript export are not available yet. Python code generation is available now. Exported code still needs execution and checks in its target application.',
+    ],
+    output: 'Code for use in other applications.',
+  },
 ] as const;
-
-const formulaSheetSnippet = `import {
-  parseCalculationSourceJson,
-  createSheetFromCalculationSourceObject,
-} from '@viktar-b/cso-core';
-import { FormulaSheet } from '@viktar-b/cso-react';
-import '@viktar-b/cso-react/style.css';
-
-export function CalculationSheet({ json }: { json: unknown }) {
-  const source = parseCalculationSourceJson(json);
-  const calculation = createSheetFromCalculationSourceObject(source, {
-    id: 'calculation-sheet',
-    label: source.title,
-  });
-  return <FormulaSheet sheet={calculation.sheet} />;
-}`;
-
-const preparedDocumentSnippet = `import {
-  type ExecutionPayload,
-  type ResolvedAsset,
-  verifyExecution,
-} from '@viktar-b/cso-core';
-import {
-  prepareExecutionDocument,
-  PreparedFormulaSheet,
-} from '@viktar-b/cso-react';
-import '@viktar-b/cso-react/style.css';
-
-// The host supplies captured execution and validated assets.
-export function ExecutionDocument({ execution, assets }: {
-  execution: ExecutionPayload;
-  assets: readonly ResolvedAsset[];
-}) {
-  const report = verifyExecution({ execution });
-  if (!report.ok) throw new Error('Execution verification failed');
-  const document = prepareExecutionDocument({ execution, assets });
-  return <PreparedFormulaSheet document={document} />;
-}`;
-
-const pythonCodegenSnippet = `import {
-  type SheetDocument,
-  createPythonFromSheetDocument,
-} from '@viktar-b/cso-core';
-
-export function generatePython(sheet: SheetDocument) {
-  return createPythonFromSheetDocument(sheet);
-}`;
-
-const mathmlSnippet = `<math display="block">
-  <mrow>
-    <msub>
-      <mi>A</mi>
-      <mi>rect</mi>
-    </msub>
-    <mo>=</mo>
-    <msub><mi>w</mi><mi>pan</mi></msub>
-    <msub><mi>h</mi><mi>pan</mi></msub>
-  </mrow>
-</math>`;
-
-const SectionHeading = ({
-  eyebrow,
-  title,
-  body,
-}: {
-  readonly eyebrow: string;
-  readonly title: string;
-  readonly body: string;
-}) => (
-  <div>
-    <p className="font-['Plus_Jakarta_Sans'] text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-      {eyebrow}
-    </p>
-    <h2 className="mt-2 font-['Plus_Jakarta_Sans'] text-[24px] font-semibold leading-tight text-gray-950">
-      {title}
-    </h2>
-    <p className="mt-3 max-w-[820px] font-['Plus_Jakarta_Sans'] text-[14px] leading-6 text-gray-600">
-      {body}
-    </p>
-  </div>
-);
 
 export default function DocsPage() {
   return (
     <main className="min-h-screen bg-[#f6f5f1] text-gray-950">
       <SiteNav active="docs" />
-      <div className="mx-auto flex max-w-[1560px] flex-col gap-7 px-4 py-6 min-md:px-8 min-md:py-8">
-        <header className="grid gap-5 border-b border-gray-300 pb-6 min-xl:grid-cols-[minmax(0,1fr)_440px] min-xl:items-end">
-          <div>
-            <p className="font-['Plus_Jakarta_Sans'] text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-              Developer docs
-            </p>
-            <h1 className="mt-3 max-w-[920px] font-['Plus_Jakarta_Sans'] text-[34px] font-semibold leading-tight text-gray-950 min-md:text-[44px]">
-              From constrained Python to reviewable documents
-            </h1>
-            <p className="mt-4 max-w-[860px] font-['Plus_Jakarta_Sans'] text-[15px] leading-7 text-gray-600">
-              Capture source and execution observations, check documented
-              formulas, then prepare a document for review. Source-to-document
-              consistency, independent numerical agreement and visual inspection
-              each answer a different question. Human engineering approval
-              remains separate.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-3 border border-gray-300 bg-white">
-            {[
-              ['Input', 'Python'],
-              ['Contract', 'CSO'],
-              ['Display', 'MathML'],
-            ].map(([label, value]) => (
-              <div
-                key={label}
-                className="border-r border-gray-300 px-4 py-3 last:border-r-0"
-              >
-                <p className="font-['Plus_Jakarta_Sans'] text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-                  {label}
-                </p>
-                <p className="mt-1 font-mono text-[22px] text-gray-950">
-                  {value}
-                </p>
-              </div>
-            ))}
-          </div>
+      <div className="mx-auto max-w-[1320px] px-4 py-6 min-md:px-8 min-md:py-10">
+        <header className="max-w-[880px]">
+          <p className="font-['Plus_Jakarta_Sans'] text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+            How to use CalculationSourceObject
+          </p>
+          <h1 className="mt-3 font-['Plus_Jakarta_Sans'] text-[34px] font-semibold leading-tight min-md:text-[44px]">
+            An agent writes the calculation. You review the work.
+          </h1>
+          <p className="mt-4 max-w-[760px] text-[16px] leading-7 text-gray-600">
+            Use CalculationSourceObject with your coding agent. The agent writes
+            and checks the calculation, builds the document and makes a PDF. You
+            can then read the inputs, formulas, assumptions and results, and
+            decide whether the calculation is suitable.
+          </p>
         </header>
 
-        <section
-          aria-label="Architecture pipeline"
-          className="grid border border-gray-300 bg-white min-xl:grid-cols-5"
-        >
-          {pipelineSteps.map((step, index) => (
-            <div
-              key={step.title}
-              className="relative border-b border-gray-300 px-4 py-4 last:border-b-0 min-xl:border-r min-xl:border-b-0 min-xl:last:border-r-0"
-            >
-              <p className="font-mono text-[11px] uppercase text-gray-500">
-                Step {index + 1}
-              </p>
-              <h2 className="mt-2 font-['Plus_Jakarta_Sans'] text-[17px] font-semibold text-gray-950">
-                {step.title}
-              </h2>
-              <p className="mt-2 font-['Plus_Jakarta_Sans'] text-[13px] leading-5 text-gray-600">
-                {step.body}
-              </p>
-              {index < pipelineSteps.length - 1 && (
-                <span
-                  aria-hidden="true"
-                  className="absolute right-3 top-4 hidden font-mono text-[18px] text-gray-300 min-xl:block"
+        <nav aria-label="Calculation workflow" className="mt-8">
+          <ol className="grid grid-cols-3 gap-px border border-gray-300 bg-gray-300 max-md:grid-cols-1 min-xl:grid-cols-6">
+            {workflowSteps.map((step, index) => (
+              <li key={step.id} className="bg-white">
+                <a
+                  href={`#${step.id}`}
+                  className="block h-full p-4 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-gray-950"
                 >
-                  →
-                </span>
-              )}
-            </div>
-          ))}
-        </section>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-[11px] text-gray-500">
+                      {index + 1}
+                    </span>
+                    {step.id === 'export' ? (
+                      <span className="border border-gray-300 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600">
+                        Planned
+                      </span>
+                    ) : (
+                      <span aria-hidden="true" className="text-gray-400">
+                        →
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-3 font-['Plus_Jakarta_Sans'] text-[16px] font-semibold">
+                    {step.title}
+                  </p>
+                  <p className="mt-2 text-[13px] leading-5 text-gray-600">
+                    {step.summary}
+                  </p>
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
 
-        <div className="grid gap-5 min-xl:grid-cols-[260px_minmax(0,1fr)]">
-          <aside className="min-xl:sticky min-xl:top-6 min-xl:self-start">
-            <nav className="border border-gray-300 bg-white">
-              <div className="border-b border-gray-300 px-4 py-3">
-                <h2 className="font-['Plus_Jakarta_Sans'] text-[13px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-                  Contents
+        <div className="mt-8 border border-gray-300 bg-white">
+          {workflowSteps.map((step, index) => (
+            <section
+              id={step.id}
+              key={step.id}
+              aria-labelledby={`${step.id}-heading`}
+              className="grid scroll-mt-6 gap-5 border-b border-gray-300 px-5 py-7 last:border-b-0 min-md:grid-cols-[200px_minmax(0,1fr)] min-md:gap-8 min-md:px-8 min-md:py-8"
+            >
+              <div>
+                <p className="font-mono text-[12px] text-gray-500">
+                  Step {index + 1}
+                  {step.id === 'export' && ' · Planned'}
+                </p>
+                <h2
+                  id={`${step.id}-heading`}
+                  className="mt-2 font-['Plus_Jakarta_Sans'] text-[23px] font-semibold leading-tight"
+                >
+                  {step.title}
                 </h2>
               </div>
-              <div className="divide-y divide-gray-200">
-                {contentsLinks.map(([label, href]) => (
-                  <a
-                    key={href}
-                    href={href}
-                    className="block px-4 py-3 font-['Plus_Jakarta_Sans'] text-[13px] font-semibold text-gray-700 hover:bg-gray-50 hover:text-gray-950"
+              <div className="max-w-[740px]">
+                <h3 className="font-['Plus_Jakarta_Sans'] text-[18px] font-semibold leading-6">
+                  {step.detailTitle}
+                </h3>
+                {step.paragraphs.map((paragraph) => (
+                  <p
+                    key={paragraph}
+                    className="mt-3 text-[15px] leading-7 text-gray-600"
                   >
-                    {label}
-                  </a>
-                ))}
-              </div>
-            </nav>
-          </aside>
-
-          <div className="grid min-w-0 gap-5">
-            <section
-              id="motivation"
-              className="scroll-mt-6 border border-gray-300 bg-white px-4 py-5 min-md:px-6"
-            >
-              <SectionHeading
-                eyebrow="Motivation"
-                title="Keep calculations inspectable"
-                body="A CalculationSourceObject records formulas, symbols, units, explanations, ordered content and source metadata. FormulaSheet is its reviewable mathematical presentation, not the complete calculation source."
-              />
-            </section>
-
-            <section
-              id="authoring-layer"
-              className="grid scroll-mt-6 gap-4 min-lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"
-            >
-              <div className="border border-gray-300 bg-white px-4 py-5 min-md:px-6">
-                <SectionHeading
-                  eyebrow="Authoring layer"
-                  title="Calculation inputs carry reusable metadata"
-                  body="Signature annotations define inputs. Shared Annotated aliases keep their metadata reusable. This panel-area fragment uses the maintained two-panel notation: pan means panel and rect means rectangle. It is illustration-only, not a captured execution or the full maintained calculation."
-                />
-              </div>
-              <CodePanel
-                title="Annotated Python illustration"
-                language="python"
-              >
-                {pythonSnippet}
-              </CodePanel>
-            </section>
-
-            <section
-              id="source-object"
-              className="grid scroll-mt-6 gap-4 min-lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"
-            >
-              <div className="border border-gray-300 bg-white px-4 py-5 min-md:px-6">
-                <SectionHeading
-                  eyebrow="Source object"
-                  title="Capture and execute produce CSO plus evidence"
-                  body="The captured execution pairs a CalculationSourceObject with source hashes, input bindings, assignment observations and public outputs. Core verifyExecution checks source-to-document consistency; execution success alone is not a verification pass. Legacy export and dev-export remain unverified development paths. The adjacent JSON is a formula fragment with illustrative values, not a complete CSO or execution record."
-                />
-              </div>
-              <CodePanel title="CSO fragment" language="json">
-                {sourceSnippet}
-              </CodePanel>
-            </section>
-
-            <section
-              id="formulasheet"
-              className="grid scroll-mt-6 gap-4 min-lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"
-            >
-              <div className="border border-gray-300 bg-white px-4 py-5 min-md:px-6">
-                <SectionHeading
-                  eyebrow="FormulaSheet"
-                  title="The source object becomes a review sheet"
-                  body="FormulaSheet receives a sheet model derived from CalculationSourceObject. Its columns show descriptions, symbols, values, units and comments, with formula and substitution details. This mathematical projection omits figures and standalone prose; rendering does not verify supplied values."
-                />
-              </div>
-              <CodePanel title="Mathematical sheet rendering" language="tsx">
-                {formulaSheetSnippet}
-              </CodePanel>
-            </section>
-
-            <section
-              id="prepared-documents"
-              className="grid scroll-mt-6 gap-4 min-lg:grid-cols-2"
-            >
-              <div className="border border-gray-300 bg-white px-4 py-5 min-md:px-6">
-                <SectionHeading
-                  eyebrow="Prepared documents"
-                  title="Preserve ordered engineering content"
-                  body="prepareExecutionDocument binds supplied execution and captured assets to a PreparedDocument. PreparedFormulaSheet displays its ordered inputs, formulas, prose, figures and results. The host captures assets; React does not fetch files or execute Python. The example checks consistency without supplying an independent reference case, so it establishes no independent agreement."
-                />
-              </div>
-              <CodePanel title="Prepare a supplied execution" language="tsx">
-                {preparedDocumentSnippet}
-              </CodePanel>
-            </section>
-
-            <section
-              id="printing"
-              className="scroll-mt-6 border border-gray-300 bg-white px-4 py-5 min-md:px-6"
-            >
-              <SectionHeading
-                eyebrow="Printing and checks"
-                title="Browser print and verified PDF publication"
-                body="printFormulaSheet is development browser printing. Its boolean result means the print request was accepted; deferred failures use onError. It does not run verification or publish CLI evidence. cso pdf verifies a captured execution and uses that same execution for document preparation and PDF publication, with evidence by default."
-              />
-              <p className="mt-4 text-[14px] leading-6 text-gray-600">
-                Optional independent references compare separately established
-                expected values bound to the source, function and resolved
-                inputs. No matching case means not applicable, not a pass.
-                Document preservation accounts for every input, formula,
-                explanation, figure, unit and result. Inspect every PDF page for
-                missing content, notation, clipping and pagination, and bind
-                findings to the exact PDF bytes. Generation leaves inspection
-                pending and establishes no human engineering approval.
-              </p>
-            </section>
-
-            <section
-              id="python-codegen"
-              className="grid scroll-mt-6 gap-4 min-lg:grid-cols-2"
-            >
-              <div className="border border-gray-300 bg-white px-4 py-5 min-md:px-6">
-                <SectionHeading
-                  eyebrow="Python code generation"
-                  title="Generate source from a validated sheet"
-                  body="Core createPythonFromSheetDocument orders assignments by dependency and generates Python. It does not execute or verify the generated code. C# and TypeScript export and package-manager hosting remain planned."
-                />
-              </div>
-              <CodePanel title="Core code generation" language="tsx">
-                {pythonCodegenSnippet}
-              </CodePanel>
-            </section>
-
-            <section
-              id="mathml"
-              className="grid scroll-mt-6 gap-4 min-lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"
-            >
-              <div className="border border-gray-300 bg-white px-4 py-5 min-md:px-6">
-                <SectionHeading
-                  eyebrow="MathML notation"
-                  title="FormulaSheet renders notation with native MathML"
-                  body="Glyphs and units pass through the ASCII math parser, value-tree functions pass through structured renderers, and the row output uses MathML elements for notation that remains inspectable in HTML."
-                />
-                <div className="mt-5 border border-gray-300 bg-[#f6f5f1] px-4 py-5">
-                  <p className="font-['Plus_Jakarta_Sans'] text-[12px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-                    Rendered notation
+                    {paragraph}
                   </p>
-                  <div className="mt-4 overflow-x-auto bg-white px-4 py-5">
-                    <math display="block" className="text-[30px]">
-                      <mrow>
-                        <msub>
-                          <mi>A</mi>
-                          <mi>rect</mi>
-                        </msub>
-                        <mo>=</mo>
-                        <msub>
-                          <mi>w</mi>
-                          <mi>pan</mi>
-                        </msub>
-                        <msub>
-                          <mi>h</mi>
-                          <mi>pan</mi>
-                        </msub>
-                      </mrow>
-                    </math>
-                  </div>
-                </div>
+                ))}
+                <p className="mt-5 border-l-2 border-gray-300 pl-4 text-[14px] leading-6 text-gray-800">
+                  <span className="font-semibold">
+                    {step.id === 'export' ? 'Planned output: ' : 'You get: '}
+                  </span>
+                  {step.output}
+                </p>
               </div>
-              <CodePanel title="MathML output" language="html">
-                {mathmlSnippet}
-              </CodePanel>
             </section>
-          </div>
+          ))}
         </div>
+
+        <footer className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 text-[14px]">
+          <Link
+            href="/examples"
+            className="font-semibold underline underline-offset-4 hover:text-gray-600"
+          >
+            Browse example sheets
+          </Link>
+          <Link
+            href="/"
+            className="text-gray-600 underline underline-offset-4 hover:text-gray-950"
+          >
+            Read about the calculation source
+          </Link>
+        </footer>
       </div>
     </main>
   );
