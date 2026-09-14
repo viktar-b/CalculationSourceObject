@@ -26,7 +26,6 @@ Supply optional data directories when starting or building the app:
 - `CSO_GALLERY_DIRECTORY`: CSO `.json` files. Files beginning with `_` or `.`
   are auxiliary files and are ignored. Every selected document is validated.
 - `CSO_EXAMPLES_DIRECTORY`: validated `.prepared.json` files for Examples.
-- `CSO_PREPARED_DIRECTORY`: validated `.prepared.json` files for Preservation.
 
 An explicit `CSO_GALLERY_DIRECTORY` selects the mathematical viewer for Examples,
 including when it is an empty string. Otherwise Examples reads prepared documents
@@ -58,8 +57,6 @@ the current source. Restart development after changing the example.
 into a virtual environment before building. The hosted build therefore has the
 same generation prerequisite as local development.
 
-Preservation retains its synthetic
-[presentation cases](../../tests/integration/fixtures/demo-preservation/README.md).
 The launcher preserves explicit directory overrides; empty values select empty
 states. An explicit Examples or CSO gallery directory skips canonical generation.
 

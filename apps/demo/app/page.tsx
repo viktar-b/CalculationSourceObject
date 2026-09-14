@@ -288,11 +288,6 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <p className="mt-3 text-center text-[12px] leading-5 text-gray-500">
-              Browser print is for development; cso pdf verifies captured
-              execution. Python export generates code without executing or
-              verifying it.
-            </p>
           </section>
         </header>
 

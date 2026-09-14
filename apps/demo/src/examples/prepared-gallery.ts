@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { PreparedDocumentSchema } from '@viktar-b/cso-core';
 
 export const loadPreparedDocuments = (
-  directory = process.env.CSO_PREPARED_DIRECTORY,
+  directory: string,
 ) => {
   if (!directory) return [];
   return readdirSync(directory)

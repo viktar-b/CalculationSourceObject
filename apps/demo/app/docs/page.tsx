@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { SiteNav } from '../SiteNav.tsx';
 
 export const dynamic = 'force-static';
@@ -97,14 +96,17 @@ export default function DocsPage() {
         </header>
 
         <nav aria-label="Calculation workflow" className="mt-8">
-          <ol className="grid grid-cols-3 gap-px border border-gray-300 bg-gray-300 max-md:grid-cols-1 min-xl:grid-cols-6">
+          <ol className="grid grid-cols-1 border-l border-t border-gray-300 min-md:grid-cols-3 min-xl:grid-cols-6">
             {workflowSteps.map((step, index) => (
-              <li key={step.id} className="bg-white">
+              <li
+                key={step.id}
+                className="min-w-0 border-b border-r border-gray-300 bg-white"
+              >
                 <a
                   href={`#${step.id}`}
                   className="block h-full p-4 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-gray-950"
                 >
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex h-6 items-center justify-between gap-2">
                     <span className="font-mono text-[11px] text-gray-500">
                       {index + 1}
                     </span>
@@ -172,21 +174,6 @@ export default function DocsPage() {
             </section>
           ))}
         </div>
-
-        <footer className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 text-[14px]">
-          <Link
-            href="/examples"
-            className="font-semibold underline underline-offset-4 hover:text-gray-600"
-          >
-            Browse example sheets
-          </Link>
-          <Link
-            href="/"
-            className="text-gray-600 underline underline-offset-4 hover:text-gray-950"
-          >
-            Read about the calculation source
-          </Link>
-        </footer>
       </div>
     </main>
   );
