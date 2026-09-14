@@ -41,7 +41,7 @@ const safeIdPart = (value: string, fallback: string): string => {
   const safe = value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/^-|-$/g, '');
   return safe || fallback;
 };
 

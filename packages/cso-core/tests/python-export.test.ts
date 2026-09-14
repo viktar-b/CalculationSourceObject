@@ -51,6 +51,20 @@ const beamDocument = {
 };
 
 describe('Python export', () => {
+  test('normalizes long separator runs in public identifiers', () => {
+    const separators = '_'.repeat(100_000);
+    const calculation = createCalculationFromValueTreeJson(beamDocument, {
+      id: `--Beam${separators}Document--`,
+      label: 'Beam',
+    });
+    const code = createPythonFromCalculation(calculation, {
+      functionName: `__Calculate${separators}Beam__`,
+    });
+
+    expect(calculation.sheet.id).toBe('beam-document-sheet');
+    expect(code).toContain('def calculate_beam() -> dict[str, object]:');
+  });
+
   test('exports Python from the central calculation object', () => {
     const calculation = createCalculationFromValueTreeJson(beamDocument, {
       id: 'beam',
