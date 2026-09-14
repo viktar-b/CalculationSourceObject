@@ -1,5 +1,7 @@
-import { supportedValueFunctionIds } from '../sheet-model/functions.ts';
 import { z } from 'zod';
+import { glyphIdentity } from '../contracts/glyphs.ts';
+import { parseNotation } from '../notation/parse.ts';
+import { supportedValueFunctionIds } from '../sheet-model/functions.ts';
 
 const IdSchema = z.string().min(1);
 const LegacyJsonObjectSchema = z.record(z.string(), z.unknown());
@@ -206,7 +208,25 @@ export const CalculationSourceSymbolSchema = z
     metadata: JsonObjectSchema.optional(),
     valueTree: CalculationSourceValueTreeSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((symbol, ctx) => {
+    for (const field of ['glyph', 'unit'] as const) {
+      const value = symbol[field];
+      if (field === 'unit' && (value === undefined || value === '')) continue;
+      const parsed = parseNotation(value ?? '');
+      if (!parsed.ok) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [field],
+          message: `Invalid ${field} notation at offset ${parsed.diagnostic.offset}: ${parsed.diagnostic.message}`,
+          params: {
+            diagnosticCode: 'INVALID_NOTATION',
+            symbolId: symbol.id,
+          },
+        });
+      }
+    }
+  });
 
 export const CalculationSourcePreservedEntitySchema = z
   .object({
@@ -519,6 +539,61 @@ const addDuplicateSymbolIssues = (
   }
 };
 
+const addDuplicateGlyphIssues = (
+  document: CalculationSourceObjectForRefinement,
+  ctx: z.RefinementCtx,
+): void => {
+  const seen = new Map<string, string>();
+  const definitions = [
+    ...document.sections.flatMap((section, sectionIndex) =>
+      section.items.flatMap((item, itemIndex) =>
+        item.kind === 'symbol'
+          ? [
+              {
+                symbol: item.symbol,
+                path: [
+                  'sections',
+                  sectionIndex,
+                  'items',
+                  itemIndex,
+                  'symbol',
+                  'glyph',
+                ],
+              },
+            ]
+          : [],
+      ),
+    ),
+    ...(document.detachedItems ?? []).flatMap((item, itemIndex) =>
+      item.kind === 'symbol'
+        ? [
+            {
+              symbol: item.symbol,
+              path: ['detachedItems', itemIndex, 'symbol', 'glyph'],
+            },
+          ]
+        : [],
+    ),
+  ];
+
+  for (const { symbol, path } of definitions) {
+    const identity = glyphIdentity(symbol.glyph);
+    const previous = seen.get(identity);
+    if (previous !== undefined && previous !== symbol.id) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `Distinct quantities ${previous} and ${symbol.id} share glyph ${symbol.glyph}`,
+        path,
+        params: {
+          diagnosticCode: 'DUPLICATE_GLYPH',
+          symbolId: symbol.id,
+        },
+      });
+    }
+    seen.set(identity, symbol.id);
+  }
+};
+
 const addDuplicateDetachedItemIssues = (
   document: CalculationSourceObjectForRefinement,
   ctx: z.RefinementCtx,
@@ -552,6 +627,7 @@ const addDocumentReferenceIssues = (
   addDuplicateSectionIssues(document, ctx);
   addDuplicateRootSectionIssues(document, ctx);
   addDuplicateSymbolIssues(document, ctx);
+  addDuplicateGlyphIssues(document, ctx);
   addDuplicateDetachedItemIssues(document, ctx);
   addRootSectionIssues(document, sectionIds, ctx);
   addSectionItemReferenceIssues(document, sectionIds, symbolIds, ctx);

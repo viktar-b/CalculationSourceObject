@@ -591,7 +591,7 @@ describe('prepared document contract', () => {
   it('validates dependency-only execution symbol namespaces without requiring a display placement', () => {
     const symbol = {
       id: '["symbol","root/材料","面積"]',
-      glyph: 'A',
+      glyph: 'A_{dep}',
       valueTree: {
         rootKey: 'n1',
         nodes: [

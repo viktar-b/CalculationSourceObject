@@ -301,15 +301,26 @@ export const collectCsoSymbols = (
 export const contractIssuesToDiagnostics = (
   issues: readonly z.core.$ZodIssue[],
 ): Diagnostic[] =>
-  issues.map((issue) => ({
-    code:
-      issue.code === 'custom' &&
-      typeof issue.params?.diagnosticCode === 'string'
-        ? issue.params.diagnosticCode
-        : `SCHEMA_${issue.code.toUpperCase()}`,
-    message: `${issue.path.map(String).join('.') || '$'}: ${issue.message}`,
-    stage: 'contract',
-  }));
+  issues.map((issue) => {
+    const params = issue.code === 'custom' ? issue.params : undefined;
+    return {
+      code:
+        typeof params?.diagnosticCode === 'string'
+          ? params.diagnosticCode
+          : `SCHEMA_${issue.code.toUpperCase()}`,
+      message: `${issue.path.map(String).join('.') || '$'}: ${issue.message}`,
+      stage: 'contract',
+      ...(typeof params?.symbolId === 'string'
+        ? { symbolId: params.symbolId }
+        : {}),
+      ...(typeof params?.nodeKey === 'string'
+        ? { nodeKey: params.nodeKey }
+        : {}),
+      ...(typeof params?.invocationId === 'string'
+        ? { invocationId: params.invocationId }
+        : {}),
+    };
+  });
 export type SourceManifestEntry = z.infer<typeof SourceManifestEntrySchema>;
 export type SourceSpan = z.infer<typeof SourceSpanSchema>;
 export type NodeAddress = z.infer<typeof NodeAddressSchema>;

@@ -11,6 +11,7 @@ from typing import Any
 from .annotations import Annotation, symbol_annotation
 from .definitions import Definitions
 from .exporter import derived_section_id
+from .notation import parse_notation
 from .source import (
     Capture,
     Invocation,
@@ -68,6 +69,25 @@ class Planner:
             "invocationId": inv.id,
             "location": span(inv.module.id, node),
         }
+
+    def validate_symbol_notation(
+        self, inv: Invocation, node: ast.AST, symbol_id: str, spec: Json
+    ) -> None:
+        for field in ("glyph", "unit"):
+            source = spec[field]
+            if field == "unit" and source == "":
+                continue
+            parsed = parse_notation(source)
+            if not parsed.ok:
+                diagnostic = parsed.diagnostic
+                self.error(
+                    inv,
+                    node,
+                    "INVALID_NOTATION",
+                    f"Invalid {field} notation ({diagnostic.code}) at offset "
+                    f"{diagnostic.offset}: {diagnostic.message}",
+                    symbolId=symbol_id,
+                )
 
     def plan(
         self,
@@ -278,6 +298,10 @@ class Planner:
             binding_record = next(
                 b for b in record["inputBindings"] if b["parameterName"] == name
             )
+            if spec is not None:
+                self.validate_symbol_notation(
+                    inv, param, identity("symbol", inv.id, name), spec
+                )
             if binding_record["kind"] == "callerSymbol":
                 inherited = self.reference(parent, provided[name])
                 if spec is not None and spec["unit"] != inherited.cso["unit"]:
@@ -678,6 +702,7 @@ class Planner:
                 name = node.target.id
                 local = spec.get("id", name)
                 sid = identity("symbol", inv.id, local)
+                self.validate_symbol_notation(inv, node, sid, spec)
                 if sid in ids:
                     self.error(
                         inv, node, "DUPLICATE_IDENTITY", f"Duplicate symbol ID {local}"

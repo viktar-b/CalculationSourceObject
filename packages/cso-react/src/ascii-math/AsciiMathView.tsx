@@ -1,38 +1,35 @@
+import { parseNotation } from '@viktar-b/cso-core';
 import type { MathMathMLAttributes } from '../mathml/attributes.ts';
 import type { ReactElement } from 'react';
-import { glyphFromAsciiMathString } from './glyph/fromAsciiMathString.ts';
-import { AsciiGlyphMathmlView } from './glyphMathmlViews.tsx';
+import { NotationMathmlView } from './NotationMathmlView.tsx';
 
 interface AsciiMathViewProps extends MathMathMLAttributes {
   readonly expression: string;
+  readonly identifierMathVariant?: 'normal';
   readonly optional?: boolean;
 }
 
 export const AsciiMathView = ({
   expression,
+  identifierMathVariant,
   optional,
   ...mathProps
 }: AsciiMathViewProps): ReactElement => {
-  if (!expression) {
+  const parsed = parseNotation(expression);
+
+  if (!parsed.ok) {
     return (
       <mi mathcolor="red" {...mathProps}>
-        {optional ? '' : '?'}
+        {optional && expression.length === 0 ? '' : '?'}
       </mi>
     );
   }
 
-  try {
-    return (
-      <AsciiGlyphMathmlView
-        glyph={glyphFromAsciiMathString(expression)}
-        {...mathProps}
-      />
-    );
-  } catch {
-    return (
-      <mi mathcolor="red" {...mathProps}>
-        {optional ? '' : '?'}
-      </mi>
-    );
-  }
+  return (
+    <NotationMathmlView
+      expression={parsed.value}
+      identifierMathVariant={identifierMathVariant}
+      {...mathProps}
+    />
+  );
 };

@@ -7,6 +7,7 @@ import {
   InvocationSchema,
   SymbolDefinitionSchema,
 } from '../src/contracts/execution.ts';
+import { scopedGlyph } from '../src/contracts/glyphs.ts';
 import { verifyExecution } from '../src/verification/verify.ts';
 
 const span = (moduleId: string, line: number) => ({
@@ -26,10 +27,13 @@ const required = <T>(value: T | undefined): T => {
 };
 const symbolsFor = (invocationId: string, value = 2) => {
   const length = symbolId(invocationId, 'length');
+  const scope = invocationId.split('/').slice(1).join(',');
+  const glyph = (base: string) =>
+    scope === '' ? base : scopedGlyph(base, scope);
   return [
     {
       id: length,
-      glyph: 'x',
+      glyph: glyph('x'),
       unit: 'm',
       valueTree: {
         rootKey: 'n1',
@@ -41,7 +45,7 @@ const symbolsFor = (invocationId: string, value = 2) => {
     },
     {
       id: symbolId(invocationId, 'area'),
-      glyph: 'A',
+      glyph: glyph('A'),
       unit: 'm^2',
       valueTree: {
         rootKey: 'n2',

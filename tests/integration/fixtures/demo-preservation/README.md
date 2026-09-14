@@ -7,6 +7,11 @@ Their source hashes and execution-shaped metadata describe fixtures, not
 captured Python execution. `synthetic-pagination.prepared.json` adds text,
 repeated placements and a long formula to exercise pagination.
 
+The two panel presentations retain their custom text, figure, assets and
+historical review while source-owned symbols are rebound from the matching
+protocol records. The integration fixture test validates every prepared
+document and checks those symbol and execution bindings.
+
 The files are independent of the maintained [two-panel example](../../../../examples/two-panel/README.md).
 They do not establish source-to-document consistency for that example,
 independent numerical agreement, PDF inspection or human engineering approval.

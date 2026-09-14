@@ -1,6 +1,14 @@
+import { parseNotation } from '@viktar-b/cso-core';
+import type { NotationDiagnostic } from '@viktar-b/cso-core';
+import { expectedNotationSemantics } from './semantic-expectations.ts';
+import { notationSemantic } from './semantics.ts';
+
 export type AsciiMathReviewStatus = 'supported' | 'literal' | 'error';
+export type AsciiMathShowcaseConsumer = 'notation' | 'optional-unit';
+export type AsciiMathObservedStatus = 'rendered' | 'error';
 
 export type AsciiMathShowcaseExample = {
+  readonly consumer: AsciiMathShowcaseConsumer;
   readonly label: string;
   readonly expression: string;
   readonly note: string;
@@ -27,6 +35,7 @@ const supported = (
   review,
   note: expected,
   status: 'supported',
+  consumer: 'notation',
 });
 
 const literal = (
@@ -41,6 +50,7 @@ const literal = (
   review,
   note: expected,
   status: 'literal',
+  consumer: 'notation',
 });
 
 const errorCase = (
@@ -55,6 +65,37 @@ const errorCase = (
   review,
   note: expected,
   status: 'error',
+  consumer: 'notation',
+});
+
+const optionalUnitErrorCase = (
+  label: string,
+  expression: string,
+  expected: string,
+  review: string,
+): AsciiMathShowcaseExample => ({
+  ...errorCase(label, expression, expected, review),
+  consumer: 'optional-unit',
+});
+
+const supportedUnit = (
+  label: string,
+  expression: string,
+  expected: string,
+  review: string,
+): AsciiMathShowcaseExample => ({
+  ...supported(label, expression, expected, review),
+  consumer: 'optional-unit',
+});
+
+const literalUnit = (
+  label: string,
+  expression: string,
+  expected: string,
+  review: string,
+): AsciiMathShowcaseExample => ({
+  ...literal(label, expression, expected, review),
+  consumer: 'optional-unit',
 });
 
 export const asciiMathShowcaseGroups: readonly AsciiMathShowcaseGroup[] = [
@@ -350,11 +391,11 @@ export const asciiMathShowcaseGroups: readonly AsciiMathShowcaseGroup[] = [
         'Invisible outer group around a fraction numerator',
         'Nested group and fraction rendering',
       ),
-      literal(
+      supported(
         'Leading slash',
         '/a',
-        'Slash is literal text followed by variable',
-        'No unary fraction syntax',
+        'Slash operator followed by a variable',
+        'Leading slash is an operator, not unary fraction syntax',
       ),
       errorCase(
         'Missing denominator',
@@ -629,38 +670,117 @@ export const asciiMathShowcaseGroups: readonly AsciiMathShowcaseGroup[] = [
     description:
       'Common unit strings that use the same parser as variable glyphs.',
     examples: [
-      supported('Length', 'mm', 'Plain unit word', 'Base unit display'),
-      supported('Area', 'mm^2', 'Unit with power', 'Area unit display'),
-      supported('Volume', 'm^3', 'Unit with power', 'Volume unit display'),
-      supported(
+      supportedUnit('Length', 'mm', 'Plain unit word', 'Base unit display'),
+      supportedUnit('Area', 'mm^2', 'Unit with power', 'Area unit display'),
+      supportedUnit('Volume', 'm^3', 'Unit with power', 'Volume unit display'),
+      supportedUnit(
         'Stress',
         'N/mm^2',
         'Fractional compound unit',
         'Stress unit display',
       ),
-      supported(
+      supportedUnit(
         'Moment',
         'kN*m',
         'Unit product with operator token',
         'Moment unit display',
       ),
-      supported(
+      supportedUnit(
         'Acceleration',
         'm/s^2',
         'Fractional powered unit',
         'Acceleration unit display',
       ),
-      literal(
+      literalUnit(
         'Percent unit',
         '%',
         'Percent character renders literally',
         'Percent fallback',
       ),
-      literal(
+      literalUnit(
         'Degree abbreviation',
         'degC',
         'Plain text abbreviation; no degree-symbol alias',
         'Temperature unit fallback',
+      ),
+      optionalUnitErrorCase(
+        'Malformed sheet unit',
+        'N/',
+        'FormulaSheet optional unit cell renders a red question mark',
+        'Malformed supplied units remain visible',
+      ),
+    ],
+  },
+  {
+    title: 'Regression Guards',
+    description:
+      'Cases that previously lost token boundaries, scalar roles, or complete Unicode characters.',
+    examples: [
+      supported(
+        'Slash alias after operand',
+        'a // b',
+        'Division alias remains an operator after another token',
+        'Longest punctuation alias matching',
+      ),
+      supported(
+        'Angle alias after operand',
+        'a /_ b',
+        'Angle alias remains an operator after another token',
+        'Fraction boundary handling',
+      ),
+      supported(
+        'Triangle alias after operand',
+        'a /_\\ b',
+        'Triangle alias remains one operator after another token',
+        'Longest geometry alias matching',
+      ),
+      supported(
+        'Conjunction alias after operand',
+        'a ^^ b',
+        'Conjunction alias remains an operator after another token',
+        'Superscript boundary handling',
+      ),
+      supported(
+        'Bottom alias after operand',
+        'x _|_ y',
+        'Bottom alias remains an operator after another token',
+        'Subscript boundary handling',
+      ),
+      supported(
+        'Word beginning ox',
+        'oxygen',
+        'One variable word',
+        'Alias prefixes do not split words',
+      ),
+      supported(
+        'Word beginning oo',
+        'ooops',
+        'One variable word',
+        'Alias prefixes do not split words',
+      ),
+      supported(
+        'Word beginning xx',
+        'xxValue',
+        'One variable word',
+        'Alias prefixes do not split words',
+      ),
+      literal(
+        'Unsupported command with alias prefix',
+        '\\ox',
+        'One literal command identifier',
+        'Unsupported command text stays intact',
+      ),
+      supported(
+        'Scalar roles',
+        '123 + sum "x"',
+        'Number, operators, and quoted text keep separate MathML roles',
+        'MathML token semantics',
+      ),
+      supported(
+        'Supplementary Unicode scalar',
+        '𝛼',
+        'One complete mathematical alpha character',
+        'Unicode scalar preservation',
       ),
     ],
   },
@@ -762,3 +882,76 @@ export const asciiMathShowcaseGroups: readonly AsciiMathShowcaseGroup[] = [
     ],
   },
 ];
+
+export type AsciiMathObservedOutcome =
+  | { readonly status: 'rendered'; readonly semantic: string }
+  | { readonly status: 'error'; readonly diagnostic: NotationDiagnostic };
+
+export type AsciiMathShowcaseObservation = {
+  readonly example: AsciiMathShowcaseExample;
+  readonly expectedSemantic: string | undefined;
+  readonly expectedStatus: AsciiMathObservedStatus;
+  readonly observed: AsciiMathObservedOutcome;
+  readonly matchesExpectation: boolean;
+};
+
+export const observeAsciiMathExample = (
+  example: AsciiMathShowcaseExample,
+): AsciiMathShowcaseObservation => {
+  const parsed = parseNotation(example.expression);
+  const expectedStatus: AsciiMathObservedStatus =
+    example.status === 'error' ? 'error' : 'rendered';
+  const expectedSemantic = expectedNotationSemantics.get(example.expression);
+  const observed: AsciiMathObservedOutcome = parsed.ok
+    ? { status: 'rendered', semantic: notationSemantic(parsed.value) }
+    : { status: 'error', diagnostic: parsed.diagnostic };
+  const matchesExpectation =
+    expectedStatus === 'error'
+      ? observed.status === 'error'
+      : observed.status === 'rendered' &&
+        expectedSemantic !== undefined &&
+        observed.semantic === expectedSemantic;
+
+  return {
+    example,
+    expectedSemantic,
+    expectedStatus,
+    observed,
+    matchesExpectation,
+  };
+};
+
+export const asciiMathObservedGroups = asciiMathShowcaseGroups.map((group) => ({
+  ...group,
+  examples: group.examples.map(observeAsciiMathExample),
+}));
+
+const observations = asciiMathObservedGroups.flatMap((group) => group.examples);
+
+export const asciiMathShowcaseSummary = {
+  total: observations.length,
+  authored: {
+    supported: observations.filter(
+      ({ example }) => example.status === 'supported',
+    ).length,
+    literal: observations.filter(({ example }) => example.status === 'literal')
+      .length,
+    error: observations.filter(({ example }) => example.status === 'error')
+      .length,
+  },
+  observed: {
+    rendered: observations.filter(
+      ({ observed }) => observed.status === 'rendered',
+    ).length,
+    error: observations.filter(({ observed }) => observed.status === 'error')
+      .length,
+  },
+  semanticChecks: observations.filter(
+    ({ expectedSemantic }) => expectedSemantic !== undefined,
+  ).length,
+  matches: observations.filter(({ matchesExpectation }) => matchesExpectation)
+    .length,
+  mismatches: observations.filter(
+    ({ matchesExpectation }) => !matchesExpectation,
+  ).length,
+};

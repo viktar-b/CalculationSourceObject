@@ -95,6 +95,28 @@ for (const width of [2, 1]) {
 }
 run('negative-zero', ['signed-zero.cso.py', '--function', 'signed_zero', '--input', 'x=-0.0', '--reference', 'negative-zero-reference.json']);
 
+const notationSource = (glyph, unit) => `from typing import Annotated
+from cso_python import CalculationResults, calculation, section, symbol
+
+@calculation(id="notation", title="Notation")
+@section(id="root", title="Notation")
+def notation() -> CalculationResults:
+    force: Annotated[float, symbol(glyph=${JSON.stringify(glyph)}, description="Force", unit=${JSON.stringify(unit)})] = 1.0
+    return {"force": force}
+`;
+for (const [name, glyph, unit, field] of [
+  ['malformed-glyph-notation', 'w_{pan', 'N', 'glyph'],
+  ['malformed-unit-notation', 'F', 'N/', 'unit'],
+]) {
+  const source = `${name}.cso.py`;
+  writeFileSync(source, notationSource(glyph, unit));
+  const report = run(name, [source, '--function', 'notation'], 1);
+  const diagnostic = report.diagnostics.find(item => item.code === 'INVALID_NOTATION');
+  assert(diagnostic, `${name}: missing INVALID_NOTATION diagnostic`);
+  assert.equal(diagnostic.symbolId, '["symbol","root","force"]');
+  assert.match(diagnostic.message, new RegExp(field));
+}
+
 const geometry = 'examples/two-panel/geometry.cso.py'; const geometryBytes = readFileSync(geometry);
 try {
   writeFileSync(geometry, geometryBytes.toString().replace('"area": area', '"area": 999'));

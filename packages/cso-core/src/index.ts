@@ -128,6 +128,16 @@ export {
 export { assertNever } from './shared/assertNever.ts';
 export { formatNumerical } from './shared/formatNumerical.ts';
 
+export { notationIdentity } from './notation/identity.ts';
+export { parseNotation } from './notation/parse.ts';
+export type {
+  NotationDiagnostic,
+  NotationExpression,
+  NotationNode,
+  NotationParseDiagnosticCode,
+  NotationParseResult,
+} from './notation/types.ts';
+
 export {
   type Comparison,
   type DiagnosticStage,

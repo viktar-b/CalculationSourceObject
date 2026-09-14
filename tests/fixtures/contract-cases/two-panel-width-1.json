@@ -476,7 +476,7 @@
               "kind": "symbol",
               "symbol": {
                 "id": "[\"symbol\",\"root/panel_a\",\"width\"]",
-                "glyph": "width",
+                "glyph": "width_{pa}",
                 "glyphPlaintext": "width",
                 "unit": "m",
                 "description": "width",
@@ -522,7 +522,7 @@
               "kind": "symbol",
               "symbol": {
                 "id": "[\"symbol\",\"root/panel_a\",\"height\"]",
-                "glyph": "height",
+                "glyph": "height_{pa}",
                 "glyphPlaintext": "height",
                 "unit": "m",
                 "description": "height",
@@ -568,7 +568,7 @@
               "kind": "symbol",
               "symbol": {
                 "id": "[\"symbol\",\"root/panel_a\",\"area\"]",
-                "glyph": "area",
+                "glyph": "area_{pa}",
                 "glyphPlaintext": "area",
                 "unit": "m^2",
                 "description": "area",
@@ -635,7 +635,7 @@
               "kind": "symbol",
               "symbol": {
                 "id": "[\"symbol\",\"root/panel_a\",\"perimeter\"]",
-                "glyph": "perimeter",
+                "glyph": "perimeter_{pa}",
                 "glyphPlaintext": "perimeter",
                 "unit": "m",
                 "description": "perimeter",
@@ -750,7 +750,7 @@
               "kind": "symbol",
               "symbol": {
                 "id": "[\"symbol\",\"root/panel_b\",\"width\"]",
-                "glyph": "width",
+                "glyph": "width_{pb}",
                 "glyphPlaintext": "width",
                 "unit": "m",
                 "description": "width",
@@ -796,7 +796,7 @@
               "kind": "symbol",
               "symbol": {
                 "id": "[\"symbol\",\"root/panel_b\",\"height\"]",
-                "glyph": "height",
+                "glyph": "height_{pb}",
                 "glyphPlaintext": "height",
                 "unit": "m",
                 "description": "height",
@@ -842,7 +842,7 @@
               "kind": "symbol",
               "symbol": {
                 "id": "[\"symbol\",\"root/panel_b\",\"area\"]",
-                "glyph": "area",
+                "glyph": "area_{pb}",
                 "glyphPlaintext": "area",
                 "unit": "m^2",
                 "description": "area",
@@ -909,7 +909,7 @@
               "kind": "symbol",
               "symbol": {
                 "id": "[\"symbol\",\"root/panel_b\",\"perimeter\"]",
-                "glyph": "perimeter",
+                "glyph": "perimeter_{pb}",
                 "glyphPlaintext": "perimeter",
                 "unit": "m",
                 "description": "perimeter",
@@ -1024,7 +1024,7 @@
               "kind": "symbol",
               "symbol": {
                 "id": "[\"symbol\",\"root/material\",\"area\"]",
-                "glyph": "area",
+                "glyph": "area_{material}",
                 "glyphPlaintext": "area",
                 "unit": "m^2",
                 "description": "area",
@@ -1070,7 +1070,7 @@
               "kind": "symbol",
               "symbol": {
                 "id": "[\"symbol\",\"root/material\",\"thickness\"]",
-                "glyph": "thickness",
+                "glyph": "thickness_{material}",
                 "glyphPlaintext": "thickness",
                 "unit": "m",
                 "description": "thickness",
@@ -1116,7 +1116,7 @@
               "kind": "symbol",
               "symbol": {
                 "id": "[\"symbol\",\"root/material\",\"density\"]",
-                "glyph": "density",
+                "glyph": "density_{material}",
                 "glyphPlaintext": "density",
                 "unit": "kg/m^3",
                 "description": "density",
@@ -1162,7 +1162,7 @@
               "kind": "symbol",
               "symbol": {
                 "id": "[\"symbol\",\"root/material\",\"volume\"]",
-                "glyph": "volume",
+                "glyph": "volume_{material}",
                 "glyphPlaintext": "volume",
                 "unit": "m^3",
                 "description": "volume",
@@ -1229,7 +1229,7 @@
               "kind": "symbol",
               "symbol": {
                 "id": "[\"symbol\",\"root/material\",\"mass\"]",
-                "glyph": "mass",
+                "glyph": "mass_{material}",
                 "glyphPlaintext": "mass",
                 "unit": "kg",
                 "description": "mass",

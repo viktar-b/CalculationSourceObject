@@ -1,0 +1,293 @@
+{
+  "parseCases": [
+    {
+      "name": "word alias",
+      "source": "times",
+      "expected": {
+        "ok": true,
+        "value": [{ "kind": "operator", "value": "×" }]
+      }
+    },
+    {
+      "name": "longest punctuation aliases",
+      "source": "a /_\\ b // c ^^ d",
+      "expected": {
+        "ok": true,
+        "value": [
+          { "kind": "identifier", "value": "a" },
+          { "kind": "operator", "value": "△" },
+          { "kind": "identifier", "value": "b" },
+          { "kind": "operator", "value": "/" },
+          { "kind": "identifier", "value": "c" },
+          { "kind": "operator", "value": "∧" },
+          { "kind": "identifier", "value": "d" }
+        ]
+      }
+    },
+    {
+      "name": "alias prefixes stay inside words",
+      "source": "ooops oxygen xxValue !index",
+      "expected": {
+        "ok": true,
+        "value": [
+          { "kind": "identifier", "value": "ooops" },
+          { "kind": "identifier", "value": "oxygen" },
+          { "kind": "identifier", "value": "xxValue" },
+          { "kind": "text", "value": "!" },
+          { "kind": "identifier", "value": "index" }
+        ]
+      }
+    },
+    {
+      "name": "named backslash and Unicode aliases",
+      "source": "alpha \\alpha α",
+      "expected": {
+        "ok": true,
+        "value": [
+          { "kind": "identifier", "value": "α" },
+          { "kind": "identifier", "value": "α" },
+          { "kind": "identifier", "value": "α" }
+        ]
+      }
+    },
+    {
+      "name": "supplementary Unicode scalar",
+      "source": "𝛽",
+      "expected": {
+        "ok": true,
+        "value": [{ "kind": "identifier", "value": "𝛽" }]
+      }
+    },
+    {
+      "name": "direct Greek variant bases",
+      "source": "ϴ ϵ ϰ ϱ ϖ",
+      "expected": {
+        "ok": true,
+        "value": [
+          { "kind": "identifier", "value": "ϴ" },
+          { "kind": "identifier", "value": "ϵ" },
+          { "kind": "identifier", "value": "ϰ" },
+          { "kind": "identifier", "value": "ϱ" },
+          { "kind": "identifier", "value": "ϖ" }
+        ]
+      }
+    },
+    {
+      "name": "script with transparent group",
+      "source": "A_{rect}",
+      "expected": {
+        "ok": true,
+        "value": [
+          {
+            "kind": "subscript",
+            "base": { "kind": "identifier", "value": "A" },
+            "subscript": {
+              "kind": "group",
+              "fence": "none",
+              "body": [{ "kind": "identifier", "value": "rect" }]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "isolated surrogate",
+      "source": "\ud800",
+      "expected": { "ok": false, "code": "INVALID_UNICODE", "offset": 0 }
+    },
+    {
+      "name": "unmatched curly closer",
+      "source": "A}",
+      "expected": {
+        "ok": false,
+        "code": "UNEXPECTED_CLOSING_GROUP",
+        "offset": 1
+      }
+    },
+    {
+      "name": "unmatched round closer",
+      "source": "A)",
+      "expected": {
+        "ok": false,
+        "code": "UNEXPECTED_CLOSING_GROUP",
+        "offset": 1
+      }
+    },
+    {
+      "name": "unmatched square closer",
+      "source": "A]",
+      "expected": {
+        "ok": false,
+        "code": "UNEXPECTED_CLOSING_GROUP",
+        "offset": 1
+      }
+    },
+    {
+      "name": "unmatched fraction denominator closer",
+      "source": "a/]",
+      "expected": {
+        "ok": false,
+        "code": "UNEXPECTED_CLOSING_GROUP",
+        "offset": 2
+      }
+    },
+    {
+      "name": "missing fraction denominator",
+      "source": "a/",
+      "expected": {
+        "ok": false,
+        "code": "MISSING_FRACTION_DENOMINATOR",
+        "offset": 2
+      }
+    },
+    {
+      "name": "mismatched group closer",
+      "source": "{a]}",
+      "expected": {
+        "ok": false,
+        "code": "UNEXPECTED_CLOSING_GROUP",
+        "offset": 2
+      }
+    },
+    {
+      "name": "scalar offset after supplementary Unicode",
+      "source": "𝛼{missing",
+      "expected": { "ok": false, "code": "UNCLOSED_GROUP", "offset": 1 }
+    }
+  ],
+  "identityPairs": [
+    {
+      "name": "multiplication aliases",
+      "left": "times",
+      "right": "xx",
+      "equal": true
+    },
+    {
+      "name": "empty-set aliases",
+      "left": "emptyset",
+      "right": "O/",
+      "equal": true
+    },
+    {
+      "name": "longest triangle alias",
+      "left": "triangle",
+      "right": "/_\\",
+      "equal": true
+    },
+    {
+      "name": "backslash Greek alias",
+      "left": "alpha",
+      "right": "\\alpha",
+      "equal": true
+    },
+    {
+      "name": "upright subscript text",
+      "left": "A_{rect}",
+      "right": "A_{\"rect\"}",
+      "equal": true
+    },
+    {
+      "name": "compact subscript group",
+      "left": "A_rect",
+      "right": "A_{rect}",
+      "equal": true
+    },
+    {
+      "name": "recursive transparent groups",
+      "left": "{a {b c}}",
+      "right": "{a b c}",
+      "equal": true
+    },
+    {
+      "name": "italic Latin presentation",
+      "left": "x",
+      "right": "𝑥",
+      "equal": true
+    },
+    {
+      "name": "Planck h presentation",
+      "left": "h",
+      "right": "ℎ",
+      "equal": true
+    },
+    {
+      "name": "italic Greek presentation",
+      "left": "β",
+      "right": "𝛽",
+      "equal": true
+    },
+    {
+      "name": "variant theta presentation",
+      "left": "ϑ",
+      "right": "𝜗",
+      "equal": true
+    },
+    {
+      "name": "uppercase theta and variant presentation",
+      "left": "Θ",
+      "right": "𝛳",
+      "equal": false
+    },
+    {
+      "name": "theta and variant theta presentation",
+      "left": "θ",
+      "right": "𝜗",
+      "equal": false
+    },
+    {
+      "name": "infinity prefix is a word",
+      "left": "ooops",
+      "right": "oo ps",
+      "equal": false
+    },
+    {
+      "name": "product prefix is a word",
+      "left": "oxygen",
+      "right": "ox ygen",
+      "equal": false
+    },
+    {
+      "name": "multiplication prefix is a word",
+      "left": "xxValue",
+      "right": "xx Value",
+      "equal": false
+    },
+    {
+      "name": "membership prefix is a word",
+      "left": "!index",
+      "right": "notin dex",
+      "equal": false
+    },
+    {
+      "name": "quoted and italic x",
+      "left": "\"x\"",
+      "right": "x",
+      "equal": false
+    },
+    {
+      "name": "quoted alias text",
+      "left": "\"alpha\"",
+      "right": "\"α\"",
+      "equal": false
+    },
+    { "name": "bold and italic x", "left": "x", "right": "𝐱", "equal": false },
+    {
+      "name": "real-number symbol and R",
+      "left": "R",
+      "right": "ℝ",
+      "equal": false
+    },
+    {
+      "name": "quoted mathematical x",
+      "left": "\"𝑥\"",
+      "right": "\"x\"",
+      "equal": false
+    },
+    {
+      "name": "fraction grouping",
+      "left": "{a+b}/c",
+      "right": "a+b/c",
+      "equal": false
+    }
+  ]
+}

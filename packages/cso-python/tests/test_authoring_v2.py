@@ -366,7 +366,16 @@ def wrapper(w: Amount, h: Increment) -> CalculationResults:
         self.add_hidden_assignment()
         path = self.root / "defaulted_step.cso.py"
         original = path.read_text()
-        for first, second in [("R_ab", "R_{ab}"), (r"\rho", "ρ"), ("R_a", " R_{a} ")]:
+        pairs = [
+            ("R_ab", "R_{ab}"),
+            (r"\rho", "ρ"),
+            ("R_a", " R_{a} "),
+            ("times", "xx"),
+            ("emptyset", "O/"),
+            ("A_{rect}", 'A_{"rect"}'),
+            ("alpha", "𝛼"),
+        ]
+        for first, second in pairs:
             with self.subTest(first=first, second=second):
                 path.write_text(
                     original.replace('glyph="R"', f"glyph={first!r}").replace(
