@@ -23,10 +23,11 @@ Rebuild and reinstall the wheel after Python source changes. Exporting `PYTHON`
 selects the installed interpreter for the CLI and test runners. A source/editable
 install does not prove wheel contents or behavior outside the checkout.
 
-Use `npm run dev` for the demo. The [launcher](../scripts/demo.ts) defaults to
-synthetic protocol and presentation fixtures, not captured executions of the
-maintained engineering example. The [demo guide](../apps/demo/README.md) owns
-data-directory configuration, empty states and standalone builds.
+Use `npm run dev` for the demo. The [launcher](../scripts/demo.ts) prepares the
+maintained two-panel width-2 example from a verified execution. Demo generation
+needs the installed Python wheel but does not render a PDF or need Chromium.
+The [demo guide](../apps/demo/README.md) owns data-directory configuration,
+empty states and standalone builds.
 Deployment settings live in [vercel.json](../vercel.json); its build context is
 the repository root. A local build does not establish a hosted deployment result.
 

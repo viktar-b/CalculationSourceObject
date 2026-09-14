@@ -33,7 +33,8 @@ still serves older single-file sources. Development output is not verification.
   It receives captured assets; it does not execute calculations or fetch files.
 - CLI owns process and filesystem access, reports, asset policy and PDF publication.
 - Demo consumes packages and explicit data directories through its
-  [workspace launcher](../scripts/demo.ts).
+  [workspace launcher](../scripts/demo.ts). Root [example preparation](../scripts/prepare-demo-examples.ts)
+  reuses CLI verification and asset capture to supply the canonical prepared document.
 
 See [ADR 0001](adr/0001-package-ownership-and-cso-handoff.md) for the dependency
 decision and [ADR 0002](adr/0002-evidence-and-engineering-presentation.md) for

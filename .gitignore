@@ -23,6 +23,7 @@ build/
 .ipynb_checkpoints/
 
 # CSO generated artifacts
+generated/
 output/
 artifacts/
 *.evidence/
