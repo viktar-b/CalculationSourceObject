@@ -100,18 +100,12 @@ const restoreContentFields = (
 });
 
 type Issues = Parameters<typeof contractIssuesToDiagnostics>[0];
-const parseContent = <T>(
-  schema: {
-    safeParse(
-      value: unknown,
-    ):
-      | { success: true; data: T }
-      | { success: false; error: { issues: Issues } };
-  },
-  value: unknown,
-): T => {
-  if (schema === HistoricalReviewSchema)
-    assertDocumentJson(value, '/historicalReview');
+type ContentParser<T> = {
+  safeParse(
+    value: unknown,
+  ): { success: true; data: T } | { success: false; error: { issues: Issues } };
+};
+const parseContent = <T>(schema: ContentParser<T>, value: unknown): T => {
   const parsed = schema.safeParse(value);
   if (!parsed.success) {
     throw new DocumentPreparationError(
@@ -122,6 +116,10 @@ const parseContent = <T>(
     );
   }
   return parsed.data;
+};
+const parseHistoricalReview = (value: unknown): HistoricalReview => {
+  assertDocumentJson(value, '/historicalReview');
+  return parseContent(HistoricalReviewSchema, value);
 };
 const parseDocument = (candidate: unknown): PreparedDocument =>
   parseContent(PreparedDocumentSchema, candidate);
@@ -346,7 +344,17 @@ const symbolMetadataHistory = (
   return { definitions, symbolHistory, referencedSymbolHistory };
 };
 
-const itemContextSource = (
+const consumedContentFields = (
+  item: CalculationSourceSectionItem,
+  executionContext: boolean,
+): readonly string[] => {
+  if (item.kind === 'text') return ['content', 'metadata'];
+  if (executionContext)
+    return ['assetId', 'caption', 'alt', 'width', 'metadata'];
+  return ['originalUrl', 'width', 'metadata'];
+};
+
+const retainItemContextSource = (
   item: CalculationSourceSectionItem,
   executionContext = false,
 ) => {
@@ -359,12 +367,7 @@ const itemContextSource = (
         : undefined;
   const hasContentMetadata =
     content !== undefined && Object.hasOwn(content, 'metadata');
-  const consumed =
-    item.kind === 'text'
-      ? ['content', 'metadata']
-      : executionContext
-        ? ['assetId', 'caption', 'alt', 'width', 'metadata']
-        : ['originalUrl', 'width', 'metadata'];
+  const consumed = consumedContentFields(item, executionContext);
   const additionalFields = content
     ? Object.fromEntries(
         Object.entries(content).filter(([key]) => !consumed.includes(key)),
@@ -389,7 +392,7 @@ const itemMetadataHistory = (
 ) =>
   reachableSections(cso).flatMap((section) =>
     section.items.flatMap((item, index) => {
-      const contextSource = itemContextSource(item, executionContext);
+      const contextSource = retainItemContextSource(item, executionContext);
       return contextSource
         ? [
             {
@@ -403,7 +406,7 @@ const itemMetadataHistory = (
     }),
   );
 
-const executionItemContext = (
+const resolveExecutionPlacementProvenance = (
   execution: ExecutionPayload,
   item: CalculationSourceSectionItem,
 ) => {
@@ -428,7 +431,30 @@ const executionItemContext = (
   const metadata =
     item.metadata ??
     (item.kind === 'symbol' ? item.symbol.metadata : undefined);
-  return { metadata, definition, targetSection, targetInvocation };
+  const definitionInvocation =
+    definition &&
+    execution.invocations.find((invocation) =>
+      invocation.symbols.includes(definition),
+    );
+  const targetCallSite =
+    targetInvocation && 'callSite' in targetInvocation
+      ? targetInvocation.callSite
+      : undefined;
+  const definitionLocation =
+    item.kind === 'symbol' ? definition?.definitionLocation : undefined;
+  // Identity follows the target; location follows the authored placement.
+  // A symbol reference must not inherit its definition's location.
+  return {
+    localId:
+      targetSection?.metadata?.localId ??
+      definition?.localId ??
+      metadata?.localId,
+    invocationId:
+      targetSection?.metadata?.invocationId ??
+      definitionInvocation?.id ??
+      metadata?.invocationId,
+    location: metadata?.location ?? targetCallSite ?? definitionLocation,
+  };
 };
 
 export interface PrepareExecutionDocumentOptions {
@@ -476,30 +502,12 @@ export const prepareExecutionDocument = (
     location: section.metadata?.location,
     metadata: retainedMetadata(section.metadata, true),
     items: section.items.map((item, index) => {
-      const { metadata, definition, targetSection, targetInvocation } =
-        executionItemContext(execution, item);
       return {
         ...itemFields(item),
         context: [],
-        contextSource: itemContextSource(item, true),
+        contextSource: retainItemContextSource(item, true),
         sourcePlacementId: placementId(section.id, index),
-        localId:
-          targetSection?.metadata?.localId ??
-          definition?.localId ??
-          metadata?.localId,
-        invocationId:
-          targetSection?.metadata?.invocationId ??
-          (definition &&
-            execution.invocations.find((invocation) =>
-              invocation.symbols.includes(definition),
-            )?.id) ??
-          metadata?.invocationId,
-        location:
-          metadata?.location ??
-          (targetInvocation && 'callSite' in targetInvocation
-            ? targetInvocation.callSite
-            : undefined) ??
-          (item.kind === 'symbol' ? definition?.definitionLocation : undefined),
+        ...resolveExecutionPlacementProvenance(execution, item),
       };
     }),
   }));
@@ -538,7 +546,7 @@ export const prepareExecutionDocument = (
     detachedSymbols: definitions.filter((symbol) => !displayed.has(symbol.id)),
     assets,
     historicalReviews: [
-      parseContent(HistoricalReviewSchema, {
+      parseHistoricalReview({
         scope: 'historical',
         originalSource: {
           id: execution.entry.moduleId,
@@ -625,7 +633,7 @@ const legacyFigure = (
     id: item.id,
     sourcePlacementId,
     context: [],
-    contextSource: itemContextSource(item),
+    contextSource: retainItemContextSource(item),
     figure: {
       assetId: asset.asset.id,
       caption: entry.additions?.caption ?? '',
@@ -662,7 +670,7 @@ export const prepareLegacyDocument = (
           ...itemFields(item),
           sourcePlacementId,
           context: [],
-          contextSource: itemContextSource(item),
+          contextSource: retainItemContextSource(item),
         });
       }),
     }),
@@ -683,7 +691,7 @@ export const prepareLegacyDocument = (
   const placementHistory = itemHistory.filter(
     (item) => item.kind !== 'text' && item.kind !== 'figure',
   );
-  const historical = parseContent(HistoricalReviewSchema, {
+  const historical = parseHistoricalReview({
     scope: 'historical',
     originalSource: {
       id: options.fixtureId,
