@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "npm run build:demo",
+  "buildCommand": "python3.12 -m venv .venv && .venv/bin/python -m pip install --no-deps --force-reinstall ./packages/cso-python && PYTHON=\"$PWD/.venv/bin/python\" npm run build:demo",
   "outputDirectory": "apps/demo/.next"
 }
