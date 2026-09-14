@@ -30,16 +30,16 @@
     "@viktar-b/cso-core": "0.1.0",
     "@viktar-b/cso-react": "0.1.0",
     "playwright": "^1.63.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
     "tsup": "^8.5.1",
     "typescript": "^5",
     "vitest": "^4.1.11",
     "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
     "@biomejs/biome": "1.9.4"
   }
 }
