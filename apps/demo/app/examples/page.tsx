@@ -1,4 +1,4 @@
-import { createSheetExamples } from '../../src/examples/sheet-gallery.ts';
+import { loadExamples } from '../../src/examples/gallery.ts';
 import { SiteNav } from '../SiteNav.tsx';
 import { ExamplesClient } from './ExamplesClient.tsx';
 
@@ -6,7 +6,7 @@ export const dynamic = 'force-static';
 export const revalidate = false;
 
 export default function ExamplesPage() {
-  const examples = createSheetExamples();
+  const examples = loadExamples();
 
   return (
     <main className="min-h-screen bg-[#f6f5f1] text-gray-950">
@@ -18,10 +18,8 @@ export default function ExamplesPage() {
               Examples
             </h1>
             <p className="mt-3 max-w-[760px] font-['Plus_Jakarta_Sans'] text-[14px] leading-6 text-gray-600">
-              Inspect supplied CalculationSourceObject data rendered by
-              FormulaSheet. The workspace launcher defaults to a synthetic
-              protocol fixture, not a captured execution of the maintained
-              two-panel calculation.
+              Review calculation inputs, formulas and results. Prepared
+              documents include source assumptions, notation and diagrams.
             </p>
           </div>
         </header>
