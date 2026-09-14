@@ -163,6 +163,21 @@ const render = (document: ReturnType<typeof prepare>) =>
   renderToStaticMarkup(createElement(PreparedFormulaSheet, { document }));
 
 describe('prepared engineering context', () => {
+  test('can omit source details without changing the calculation body', () => {
+    const document = prepare();
+    const full = render(document);
+    const compact = renderToStaticMarkup(
+      createElement(PreparedFormulaSheet, {
+        document,
+        showSourceDetails: false,
+      }),
+    );
+    expect(full).toContain('Development preservation rendering.');
+    expect(compact).not.toContain('Development preservation rendering.');
+    expect(compact.slice(compact.indexOf('</header>'))).toBe(
+      full.slice(full.indexOf('</header>')),
+    );
+  });
   test('places shared definitions, local context and transitive unplaced operands together', () => {
     const cso = source();
     const before = structuredClone(cso);

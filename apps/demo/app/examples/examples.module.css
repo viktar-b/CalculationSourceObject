@@ -1,0 +1,154 @@
+.examples {
+  min-width: 0;
+  padding-bottom: 24px;
+}
+
+.examplePicker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+
+.examplePicker select {
+  min-width: 0;
+  max-width: 100%;
+  padding: 8px;
+  border: 1px solid #c9cfcb;
+  background: white;
+}
+
+.projectionNote {
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: #68736e;
+}
+
+.viewTabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #c7ccce;
+  margin-bottom: 16px;
+}
+
+.viewTabs button {
+  padding: 12px 20px;
+  border-bottom: 2px solid transparent;
+  font-size: 13px;
+  color: #536068;
+  cursor: pointer;
+}
+
+.viewTabs button[aria-pressed="true"] {
+  border-color: #142b28;
+  color: #142b28;
+  font-weight: 650;
+  background: #e7ede8;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.sourcePane,
+.documentPane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid #c9cfcb;
+  background: white;
+}
+
+.paneHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #dde1dd;
+  background: #f9faf8;
+  color: #243c32;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.paneHeader label {
+  flex-shrink: 0;
+}
+
+.paneHeader select {
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px;
+  font: 12px ui-monospace, monospace;
+  color: #172c27;
+}
+
+.codeScroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.codeScroll pre {
+  width: max-content;
+  min-width: 100%;
+  overflow: visible;
+}
+
+.documentScroll {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.documentScroll [data-prepared-document] {
+  width: 100%;
+  padding: 24px;
+}
+
+.examples :focus-visible {
+  outline: 2px solid #407f61;
+  outline-offset: 3px;
+}
+
+@media (max-width: 1023px) {
+  .workspace[data-view="document"] .sourcePane,
+  .workspace.withSource[data-view="python"] .documentPane {
+    display: none;
+  }
+
+  .sourcePane {
+    height: 70dvh;
+    min-height: 360px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .viewTabs {
+    display: none;
+  }
+
+  .withSource {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.13fr);
+  }
+
+  .withSource .sourcePane,
+  .withSource .documentPane {
+    height: max(440px, calc(100dvh - 300px));
+  }
+}
+
+@media (max-width: 600px) {
+  .documentScroll [data-prepared-document] {
+    padding: 18px;
+  }
+
+  .paneHeader {
+    flex-wrap: wrap;
+  }
+}

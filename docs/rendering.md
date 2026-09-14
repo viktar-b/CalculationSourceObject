@@ -32,6 +32,12 @@ substitutions, units, explanations, diagrams, assumptions, qualifications and
 results. Full source/audit data stays in machine-readable evidence. Internal
 records and historical reviews do not become an automatic printed appendix.
 
+`PreparedFormulaSheet` accepts `showSourceDetails={false}` to omit the header's
+source-status and function/input summary. Its default is `true`. This affects
+only the header; input rows and all calculation content remain unchanged.
+Examples uses this option beside its Python viewer. CLI/PDF rendering keeps
+the default.
+
 [Context preparation](../packages/cso-react/src/prepare-context.ts) selects
 which source fields have a presentation role. Preserve unmapped extensions,
 own-key identities, empty/falsy values and ordered metadata in evidence. Map

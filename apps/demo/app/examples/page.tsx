@@ -18,8 +18,8 @@ export default function ExamplesPage() {
               Examples
             </h1>
             <p className="mt-3 max-w-[760px] font-['Plus_Jakarta_Sans'] text-[14px] leading-6 text-gray-600">
-              Review calculation inputs, formulas and results. Prepared
-              documents include source assumptions, notation and diagrams.
+              Read the Python alongside the calculation's inputs, formulas and
+              results.
             </p>
           </div>
         </header>

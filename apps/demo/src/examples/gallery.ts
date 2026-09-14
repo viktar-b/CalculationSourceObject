@@ -1,5 +1,7 @@
 import type { PreparedDocument } from '@viktar-b/cso-core';
-import { loadPreparedDocuments } from './prepared-gallery.ts';
+import { join } from 'node:path';
+import { loadPreparedDocumentEntries } from './prepared-gallery.ts';
+import { loadPythonSource, type PythonSourceFile } from './python-source.ts';
 import { createSheetExamples, type SheetExample } from './sheet-gallery.ts';
 
 type PreparedGalleryExample = {
@@ -7,6 +9,7 @@ type PreparedGalleryExample = {
   readonly id: string;
   readonly label: string;
   readonly document: PreparedDocument;
+  readonly pythonFiles: readonly PythonSourceFile[];
 };
 
 type SheetGalleryExample = SheetExample & {
@@ -14,6 +17,7 @@ type SheetGalleryExample = SheetExample & {
 };
 
 export type GalleryExample = PreparedGalleryExample | SheetGalleryExample;
+const preparedSuffix = /\.prepared\.json$/;
 
 export const loadExamples = ({
   galleryDirectory = process.env.CSO_GALLERY_DIRECTORY,
@@ -28,12 +32,19 @@ export const loadExamples = ({
       kind: 'sheet',
     }));
   }
-  return loadPreparedDocuments(examplesDirectory ?? '').map(
-    (document, index) => ({
+  return loadPreparedDocumentEntries(examplesDirectory ?? '').map(
+    ({ name, document }, index) => ({
       kind: 'prepared',
       id: `prepared-${index}`,
       label: document.title || 'Untitled calculation',
       document,
+      pythonFiles: loadPythonSource({
+        path: join(
+          examplesDirectory ?? '',
+          name.replace(preparedSuffix, '.source.json'),
+        ),
+        document,
+      }),
     }),
   );
 };

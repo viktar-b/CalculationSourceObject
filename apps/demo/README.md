@@ -25,7 +25,8 @@ Supply optional data directories when starting or building the app:
 
 - `CSO_GALLERY_DIRECTORY`: CSO `.json` files. Files beginning with `_` or `.`
   are auxiliary files and are ignored. Every selected document is validated.
-- `CSO_EXAMPLES_DIRECTORY`: validated `.prepared.json` files for Examples.
+- `CSO_EXAMPLES_DIRECTORY`: validated `.prepared.json` files for Examples,
+  with optional matching `.source.json` files containing their original Python.
 
 An explicit `CSO_GALLERY_DIRECTORY` selects the mathematical viewer for Examples,
 including when it is an empty string. Otherwise Examples reads prepared documents
@@ -60,9 +61,26 @@ same generation prerequisite as local development.
 The launcher preserves explicit directory overrides; empty values select empty
 states. An explicit Examples or CSO gallery directory skips canonical generation.
 
-Prepared documents display ordered formulas, prose and figures. An explicit CSO
-gallery is a mathematical projection and omits figures and standalone prose.
-Both viewers offer development browser printing through `printFormulaSheet`.
+Examples shows Python and the calculation side by side from 1024 px, with
+Calculation/Python tabs below that width. A file selector exposes the entry and
+its local dependencies. Execution summaries, hashes, copy/download controls and
+printing controls are omitted. The document retains its input rows, units,
+formulas, prose and figures.
+An explicit CSO gallery is a mathematical projection and omits figures and
+standalone prose.
+
+To attach Python to `name.prepared.json`, supply `name.source.json` in the same
+directory. The app-owned [source schema](src/examples/python-source.ts) defines
+its version, execution binding and UTF-8 file contents. The loader checks every
+file hash, the complete source closure and the document's execution binding.
+A missing companion keeps the document-only view; an invalid or mismatched
+companion fails loading. The root preparation script captures these files from
+the temporary source used for the verified execution. Rebuild after source
+changes. No engineering source snapshot is committed to the app.
+
+The responsive layout was selected from the prototype retained on branch
+`codex/prototype-examples-python` at commit `e1265e4`.
+
 For verified PDF publication and evidence, use [cso pdf](../cso-cli/README.md).
 It verifies one captured execution and prepares the document from that same
 execution. Independent references are optional; inspecting every PDF page is a
