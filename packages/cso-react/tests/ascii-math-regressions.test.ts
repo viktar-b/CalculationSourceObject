@@ -1,5 +1,5 @@
-import { AsciiMathView, FormulaSheet } from '@viktar-b/cso-react';
 import type { SheetDocument } from '@viktar-b/cso-core';
+import { AsciiMathView, FormulaSheet } from '@viktar-b/cso-react';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
@@ -50,12 +50,35 @@ describe('ASCII notation regressions', () => {
     expect(html).toContain('<mtext>x</mtext>');
   });
 
+  test('renders fractions, groups, visible fences, and scripts', () => {
+    const fraction = renderNotation('{height+width}/{2}');
+    const scripts = renderNotation('A_{rect} mm^{2} x_1^2');
+    const fences = renderNotation('(a+b) [c+d]');
+
+    expect(fraction).toContain('<mfrac>');
+    expect(fraction).not.toContain('fence="true">{');
+    expect(scripts).toContain('<msub>');
+    expect(scripts).toContain('<msup>');
+    expect(scripts).toContain('<msubsup>');
+    expect(fences).toContain('<mo fence="true">(</mo>');
+    expect(fences).toContain('<mo fence="true">)</mo>');
+    expect(fences).toContain('<mo fence="true">[</mo>');
+    expect(fences).toContain('<mo fence="true">]</mo>');
+  });
+
+  test('renders transparent groups with the same operator context as their identity', () => {
+    expect(renderNotation('{+}a')).toBe(renderNotation('+a'));
+    expect(renderNotation('a{+}')).toBe(renderNotation('a+'));
+    expect(renderNotation('{a {b c}}')).toBe(renderNotation('{a b c}'));
+  });
+
   test('keeps supplementary Unicode scalars intact', () => {
     expect(renderNotation('𝛼')).toContain('<mi>𝛼</mi>');
   });
 
   test('shows an error for malformed supplied notation but permits an absent optional value', () => {
     expect(textContent(renderNotation('N/', true))).toBe('?');
+    expect(textContent(renderNotation('   ', true))).toBe('?');
     expect(textContent(renderNotation('', true))).toBe('');
   });
 

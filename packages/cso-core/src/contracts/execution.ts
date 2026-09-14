@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { AuthoringEvidenceSchema } from './authoring.ts';
-import { glyphIdentity, scopedGlyph } from './glyphs.ts';
+import { scopedGlyph } from './glyphs.ts';
 import { CalculationSourceObjectSchema } from '../calculation-source/object-schema.ts';
 import {
   AssetRecordSchema,
@@ -559,21 +559,9 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
       collectCsoSymbols(execution.cso).map((symbol) => [symbol.id, symbol]),
     );
     if (execution.authoring) {
-      const glyphs = new Map<string, string>();
       for (const symbol of csoSymbols.values()) {
         const path = csoSymbolPaths.get(symbol.id) ?? ['cso'];
         const glyph = symbol.glyph;
-        const key = glyphIdentity(glyph);
-        const previous = glyphs.get(key);
-        if (previous !== undefined && previous !== symbol.id) {
-          issue(
-            'DUPLICATE_GLYPH',
-            [...path, 'glyph'],
-            `Distinct quantities ${previous} and ${symbol.id} share glyph ${glyph}`,
-            { symbolId: symbol.id },
-          );
-        }
-        glyphs.set(key, symbol.id);
         const authored = symbol.metadata?.authoredGlyph;
         const scope = symbol.metadata?.glyphScope;
         if (authored !== undefined || scope !== undefined) {

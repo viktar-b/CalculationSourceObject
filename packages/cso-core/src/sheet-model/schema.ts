@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { glyphIdentity } from '../contracts/glyphs.ts';
+import { parseNotation } from '../notation/parse.ts';
 import { supportedValueFunctionIds } from './functions.ts';
 
 const IdSchema = z.string().min(1);
@@ -62,7 +64,25 @@ export const SheetSymbolSchema = z
     comment: z.string().optional(),
     valueTree: SheetValueTreeSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((symbol, ctx) => {
+    for (const field of ['glyph', 'unit'] as const) {
+      const value = symbol[field];
+      if (field === 'unit' && (value === undefined || value === '')) continue;
+      const parsed = parseNotation(value ?? '');
+      if (!parsed.ok) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [field],
+          message: `Invalid ${field} notation at offset ${parsed.diagnostic.offset}: ${parsed.diagnostic.message}`,
+          params: {
+            diagnosticCode: 'INVALID_NOTATION',
+            symbolId: symbol.id,
+          },
+        });
+      }
+    }
+  });
 
 export const SheetSectionItemSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('section'), id: IdSchema }).strict(),
@@ -374,6 +394,24 @@ const addSheetReferenceIssues = (
   addRootSectionIssue(sheet, sectionIds, ctx);
   addSectionItemIssues(sheet, sectionIds, symbolIds, ctx);
   addSymbolReferenceIssues(sheet, symbolIds, ctx);
+
+  const glyphs = new Map<string, string>();
+  for (const [symbolIndex, symbol] of sheet.symbols.entries()) {
+    const identity = glyphIdentity(symbol.glyph);
+    const previous = glyphs.get(identity);
+    if (previous !== undefined && previous !== symbol.id) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `Distinct quantities ${previous} and ${symbol.id} share glyph ${symbol.glyph}`,
+        path: ['symbols', symbolIndex, 'glyph'],
+        params: {
+          diagnosticCode: 'DUPLICATE_GLYPH',
+          symbolId: symbol.id,
+        },
+      });
+    }
+    glyphs.set(identity, symbol.id);
+  }
 };
 
 export const SheetDocumentSchema = SheetDocumentBaseSchema.superRefine(

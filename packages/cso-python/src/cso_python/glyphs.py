@@ -1,77 +1,14 @@
 """Give distinct invocation quantities unambiguous document notation."""
 
-import json
 import re
-import unicodedata
 
+from .notation import source_notation_identity
 from .source import Invocation, SourceError, Symbol
-
-GREEK = dict(
-    zip(
-        [
-            "alpha",
-            "beta",
-            "gamma",
-            "delta",
-            "epsilon",
-            "varepsilon",
-            "zeta",
-            "eta",
-            "theta",
-            "vartheta",
-            "iota",
-            "kappa",
-            "lambda",
-            "mu",
-            "nu",
-            "xi",
-            "pi",
-            "rho",
-            "sigma",
-            "tau",
-            "upsilon",
-            "phi",
-            "varphi",
-            "chi",
-            "psi",
-            "omega",
-            "Gamma",
-            "Delta",
-            "Theta",
-            "Lambda",
-            "Xi",
-            "Pi",
-            "Sigma",
-            "Phi",
-            "Psi",
-            "Omega",
-        ],
-        "αβγδεɛζηθϑικλμνξπρστυϕφχψωΓΔΘΛΞΠΣΦΨΩ",
-    )
-)
 
 
 def glyph_identity(glyph: str) -> str:
-    """Normalize common equivalent spellings without flattening script structure."""
-    value = unicodedata.normalize("NFKC", glyph)
-    tokens = [
-        unicodedata.normalize("NFKC", GREEK.get(token.lstrip("\\"), token))
-        for token in re.findall(r"\\?[A-Za-z]+|[0-9]+|[^\s]", value)
-    ]
-    # Braces around a single token are invisible. Keep all other grouping and
-    # token boundaries: A_ab and A_a b have different script structure.
-    index = 0
-    while index + 2 < len(tokens):
-        if (
-            tokens[index] == "{"
-            and tokens[index + 2] == "}"
-            and tokens[index + 1] not in {"{", "}"}
-        ):
-            tokens[index : index + 3] = [tokens[index + 1]]
-            index = max(0, index - 1)
-        else:
-            index += 1
-    return json.dumps(tokens, ensure_ascii=False, separators=(",", ":"))
+    """Return the canonical display identity used for duplicate detection."""
+    return source_notation_identity(glyph)
 
 
 def scoped_glyph(glyph: str, scope: str) -> str:

@@ -34,7 +34,9 @@ export interface MathMLTokenAttributes extends MathMLGlobalAttributes {
 }
 
 // Identifier attributes (for mi)
-export interface IdentifierMathMLAttributes extends MathMLTokenAttributes {}
+export interface IdentifierMathMLAttributes extends MathMLTokenAttributes {
+  mathvariant?: 'normal' | undefined;
+}
 
 // Operator attributes (for mo)
 export interface OperatorMathMLAttributes extends MathMLTokenAttributes {

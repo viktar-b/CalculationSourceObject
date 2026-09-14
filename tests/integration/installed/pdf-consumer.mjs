@@ -174,4 +174,3 @@ finally { rmSync(svg); writeFileSync(svg, svgBytes); rmSync(outside); }
 
 writeFileSync('pdf-results.json', JSON.stringify({ ok: true, cases, artifacts, outputs, dataRetention: 'passed', engineeringPresentation: { automatic: 'passed', visualInspection: 'pending' } }, null, 2));
 process.stdout.write(`PASS ${cases.length} installed PDF cases; ${outputs.length} PDFs require every-page inspection.\n`);
-

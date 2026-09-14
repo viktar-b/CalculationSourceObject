@@ -15,6 +15,10 @@ export const UnitMathBlock = ({
   optional,
 }: IProps): ReactElement => (
   <math {...defaultMathBlockProps} {...mathProps}>
-    <AsciiMathView expression={unit} optional={optional} />
+    <AsciiMathView
+      expression={unit}
+      identifierMathVariant="normal"
+      optional={optional}
+    />
   </math>
 );

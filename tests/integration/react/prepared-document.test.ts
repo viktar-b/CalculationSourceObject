@@ -685,4 +685,85 @@ describe('Prepared document rendering and preservation', () => {
       expect(JSON.parse(JSON.stringify(document))).toEqual(document);
     },
   );
+  test.each(['execution-v1', 'legacy-cso'] as const)(
+    'rejects display-colliding symbol definitions through %s preparation',
+    (mode) => {
+      const payload = execution('single-success');
+      expect(payload.authoring).toBeUndefined();
+      const definitions = payload.cso.sections[0]?.items.filter(
+        (item) => item.kind === 'symbol',
+      );
+      const first = definitions?.[0];
+      const second = definitions?.[1];
+      if (first?.kind !== 'symbol' || second?.kind !== 'symbol') {
+        throw new Error('Expected two symbol definitions');
+      }
+      first.symbol.glyph = 'times';
+      second.symbol.glyph = 'xx';
+
+      let caught: unknown;
+      try {
+        if (mode === 'legacy-cso') {
+          prepareLegacyDocument({
+            cso: payload.cso,
+            fixtureId: 'notation-v1',
+            fixtureSha256: payload.entry.sourceHash,
+            assets: [],
+            manifest: { manifestVersion: '1', entries: [] },
+          });
+        } else {
+          prepareExecutionDocument({ execution: payload, assets: [] });
+        }
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(DocumentPreparationError);
+      if (!(caught instanceof DocumentPreparationError)) {
+        throw new Error('Expected document preparation failure');
+      }
+      expect(caught.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'DUPLICATE_GLYPH',
+            symbolId: second.symbol.id,
+          }),
+        ]),
+      );
+    },
+  );
+  test('rejects a display collision in a directly supplied prepared document', () => {
+    const document = prepareExecutionDocument({
+      execution: execution('single-success'),
+      assets: [],
+    });
+    const definitions = document.sections.flatMap((section) =>
+      section.items.filter((item) => item.kind === 'symbol'),
+    );
+    const first = definitions[0];
+    const second = definitions[1];
+    if (first?.kind !== 'symbol' || second?.kind !== 'symbol') {
+      throw new Error('Expected two prepared symbol definitions');
+    }
+    first.symbol.glyph = 'times';
+    second.symbol.glyph = 'xx';
+
+    const result = PreparedDocumentSchema.safeParse(document);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            params: expect.objectContaining({
+              diagnosticCode: 'DUPLICATE_GLYPH',
+              symbolId: second.symbol.id,
+            }),
+          }),
+        ]),
+      );
+    }
+    expect(() =>
+      renderToStaticMarkup(createElement(PreparedFormulaSheet, { document })),
+    ).toThrow();
+  });
 });

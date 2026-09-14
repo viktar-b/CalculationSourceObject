@@ -14,6 +14,7 @@ to React for document preparation, then publishes the PDF and evidence.
 | Observe assignments and public returns from captured code | [Execution](../packages/cso-python/src/cso_python/execution.py) | [authoring protocol integration](../tests/integration/authoring-v2.test.ts) |
 | Generate editor types without executing calculations | [bindings](../packages/cso-python/src/cso_python/bindings.py), [handles](../packages/cso-python/src/cso_python/handles.py) | [authoring tests](../packages/cso-python/tests/test_authoring_v2.py) |
 | Parse cross-language evidence | [execution schema](../packages/cso-core/src/contracts/execution.ts), [authoring schema](../packages/cso-core/src/contracts/authoring.ts) | [execution contract tests](../packages/cso-core/tests/execution-contract.test.ts) |
+| Parse notation and derive display identity | [notation parser](../packages/cso-core/src/notation/parse.ts), [display identity](../packages/cso-core/src/notation/identity.ts) | [notation tests](../packages/cso-core/tests/notation.test.ts) |
 | Compare formulas, observations, outputs and references | [verifyExecution](../packages/cso-core/src/verification/verify.ts), [evaluator](../packages/cso-core/src/verification/evaluate.ts), [numeric policy](../packages/cso-core/src/verification/numeric.ts) | [verifier cases](../tests/fixtures/verifier-cases/check.mjs), [numeric tests](../packages/cso-core/tests/verifier-numeric.test.ts) |
 | Prepare ordered content bound to that execution | [prepareExecutionDocument](../packages/cso-react/src/prepare-document.ts), [document schemas](../packages/cso-core/src/contracts/document.ts) | [prepared-document tests](../tests/integration/react/prepared-document.test.ts) |
 | Select engineering context, operand details and retained-source pointers | [context preparation](../packages/cso-react/src/prepare-context.ts) | [context tests](../packages/cso-react/tests/prepared-context.test.ts) |
@@ -26,9 +27,9 @@ still serves older single-file sources. Development output is not verification.
 ## Ownership
 
 - Python owns source parsing, execution, generated handles and authoring rules.
-- Core owns public schemas, reference identity, formula evaluation and conversion.
+- Core owns public schemas, reference identity, notation parsing, formula evaluation and conversion.
   It needs no Python, React, browser or filesystem access to verify supplied data.
-- React owns preparation, mathematical notation and engineering presentation.
+- React owns preparation, MathML rendering and engineering presentation.
   It receives captured assets; it does not execute calculations or fetch files.
 - CLI owns process and filesystem access, reports, asset policy and PDF publication.
 - Demo consumes packages and explicit data directories through its

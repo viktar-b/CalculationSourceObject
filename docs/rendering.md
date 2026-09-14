@@ -67,15 +67,24 @@ alt text. Authored widths remain preferred CSS pixel sizes constrained to the pa
 
 ## Notation
 
-Glyphs and units use the small [ASCII parser](../packages/cso-react/src/ascii-math/parser/parseAsciiMath.ts).
-Braces group subscripts, superscripts and fractions: `A_{rect}`, `mm^{2}`,
-`{height+width}/{2}`. Parentheses and brackets are literal text. Greek names
-may be plain or backslash-prefixed, such as `rho` and `\rho`. Other command-like
-words render as text; `\frac` and `\sqrt` are not glyph commands.
+Glyphs and units use the pure [core notation parser](../packages/cso-core/src/notation/parse.ts).
+Braces form transparent groups for subscripts, superscripts and fractions:
+`A_{rect}`, `mm^{2}`, `{height+width}/{2}`. Parentheses and brackets form
+visible fenced groups. Greek names may be plain or backslash-prefixed, such as
+`rho` and `\rho`. Other backslash commands remain literal tokens; `\frac` and
+`\sqrt` are not glyph commands.
 
-The [alias table](../packages/cso-react/src/ascii-math/glyph/known-symbols.ts)
-lists supported names. [Parser tests](../packages/cso-react/tests/asciimath-parser.test.ts)
-and [glyph tests](../packages/cso-react/tests/glyph-parser.test.ts) show edge cases.
+The [alias table](../packages/cso-core/src/notation/aliases.ts) lists supported
+names. The typed tree preserves identifiers, numbers, operators and quoted text
+for the [React MathML adapter](../packages/cso-react/src/ascii-math/NotationMathmlView.tsx).
+Unknown unquoted Unicode scalars remain intact as upright literal text. The
+explicit Greek and mathematical italic identifier sets avoid differences between
+runtime Unicode versions. Malformed nonempty notation is a contract error for
+documents and verified output; the interactive view renders `?` as feedback.
+Input, node and nesting limits return diagnostics instead of overflowing the
+renderer. [Core notation tests](../packages/cso-core/tests/notation.test.ts) and
+[React rendering tests](../packages/cso-react/tests/ascii-math-regressions.test.ts)
+show the grammar and output roles.
 Apply the [authoring naming rules](authoring.md#names-and-notation) to new variables.
 
 Formula structure comes from value-tree functions. [Function specs](../packages/cso-core/src/sheet-model/functions.ts)
