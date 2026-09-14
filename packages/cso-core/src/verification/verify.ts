@@ -269,28 +269,19 @@ const definitionContext = (
   return { symbolId };
 };
 
-const issueContext = (
-  issue: z.core.$ZodIssue,
-  input: unknown,
-  referenceExecution?: ExecutionPayload,
-): Partial<
+type IssueDiagnosticContext = Partial<
   Pick<
     Diagnostic,
     'symbolId' | 'nodeKey' | 'invocationId' | 'location' | 'valueDisplay'
   >
-> => {
-  const context: Partial<
-    Pick<
-      Diagnostic,
-      'symbolId' | 'nodeKey' | 'invocationId' | 'location' | 'valueDisplay'
-    >
-  > = {};
-  const issueSymbolId = diagnosticSymbolId(
-    issue.code === 'custom' ? issue.params?.symbolId : undefined,
-  );
-  if (issueSymbolId !== undefined) {
-    Object.assign(context, definitionContext(input, issueSymbolId));
-  }
+>;
+
+const applyReferenceIssueContext = (
+  context: IssueDiagnosticContext,
+  issue: z.core.$ZodIssue,
+  input: unknown,
+  referenceExecution?: ExecutionPayload,
+): void => {
   const collection = issue.path[0];
   const index = issue.path[1];
   if (
@@ -328,6 +319,15 @@ const issueContext = (
       Object.assign(context, definitionContext(execution, context.symbolId));
     }
   }
+};
+
+const applyInvocationIssueContext = (
+  context: IssueDiagnosticContext,
+  issue: z.core.$ZodIssue,
+  input: unknown,
+): void => {
+  const collection = issue.path[0];
+  const index = issue.path[1];
   if (collection === 'invocations' && typeof index === 'number') {
     const invocation = valueAtPath(input, [collection, index]);
     context.invocationId = diagnosticSymbolId(stringProperty(invocation, 'id'));
@@ -361,6 +361,15 @@ const issueContext = (
       context.location = callSite.data;
     }
   }
+};
+
+const applyObservationIssueContext = (
+  context: IssueDiagnosticContext,
+  issue: z.core.$ZodIssue,
+  input: unknown,
+): void => {
+  const collection = issue.path[0];
+  const index = issue.path[1];
   if (
     (collection === 'observations' || collection === 'operationObservations') &&
     typeof index === 'number'
@@ -383,7 +392,13 @@ const issueContext = (
       context.location = location.data;
     }
   }
+};
 
+const applyValueTreeIssueContext = (
+  context: IssueDiagnosticContext,
+  issue: z.core.$ZodIssue,
+  input: unknown,
+): void => {
   const valueTreeIndex = issue.path.indexOf('valueTree');
   if (valueTreeIndex >= 0) {
     const symbol = valueAtPath(input, issue.path.slice(0, valueTreeIndex));
@@ -413,6 +428,24 @@ const issueContext = (
       context.location = symbolLocation.data;
     }
   }
+};
+
+const issueContext = (
+  issue: z.core.$ZodIssue,
+  input: unknown,
+  referenceExecution?: ExecutionPayload,
+): IssueDiagnosticContext => {
+  const context: IssueDiagnosticContext = {};
+  const issueSymbolId = diagnosticSymbolId(
+    issue.code === 'custom' ? issue.params?.symbolId : undefined,
+  );
+  if (issueSymbolId !== undefined) {
+    Object.assign(context, definitionContext(input, issueSymbolId));
+  }
+  applyReferenceIssueContext(context, issue, input, referenceExecution);
+  applyInvocationIssueContext(context, issue, input);
+  applyObservationIssueContext(context, issue, input);
+  applyValueTreeIssueContext(context, issue, input);
 
   if (issue.path.at(-1) === 'value') {
     context.valueDisplay = displayForBoundaryValue(
@@ -460,7 +493,7 @@ const issueCode = (issue: z.core.$ZodIssue, input: unknown): string => {
   return `SCHEMA_${issue.code.toUpperCase()}`;
 };
 
-const issueContexts = (
+const expandMissingBindingContexts = (
   issue: z.core.$ZodIssue,
   input: unknown,
   referenceExecution?: ExecutionPayload,
@@ -513,13 +546,15 @@ const issuesToDiagnostics = ({
   readonly stage: Diagnostic['stage'];
 }): Diagnostic[] =>
   issues.flatMap((issue) =>
-    issueContexts(issue, input, referenceExecution).map((context) => ({
-      code: issueCode(issue, input),
-      message: `${issue.path.map(String).join('.') || '$'}: ${issue.message}`,
-      stage,
-      check,
-      ...context,
-    })),
+    expandMissingBindingContexts(issue, input, referenceExecution).map(
+      (context) => ({
+        code: issueCode(issue, input),
+        message: `${issue.path.map(String).join('.') || '$'}: ${issue.message}`,
+        stage,
+        check,
+        ...context,
+      }),
+    ),
   );
 
 const callChainFields = (
@@ -887,6 +922,232 @@ const observationFor = (execution: ExecutionPayload, symbolId: string) =>
     (observation) => observation.symbolId === symbolId,
   );
 
+interface DefinitionCheckContext {
+  readonly check: ConsistencyCheckName;
+  readonly evaluator: FormulaEvaluator;
+  readonly graph: FormulaGraph;
+  readonly observation: ReturnType<typeof observationFor>;
+  readonly evaluated: EvaluationResult;
+  readonly state: CategoryState;
+}
+type SourceValueDefinition = Extract<
+  SymbolDefinition,
+  { kind: 'input' | 'constant' }
+>;
+
+const resolveDefinitionSourceValue = ({
+  definition,
+  invocation,
+  evaluator,
+  check,
+  state,
+  bindingChecks,
+  usedBindings,
+}: {
+  readonly definition: SourceValueDefinition;
+  readonly invocation: Invocation;
+  readonly evaluator: FormulaEvaluator;
+  readonly check: ConsistencyCheckName;
+  readonly state: CategoryState;
+  readonly bindingChecks: ReadonlyMap<string, BindingCheck>;
+  readonly usedBindings: Set<string>;
+}): { expected: EvaluationResult; passed: boolean } => {
+  let passed = true;
+  let expected: EvaluationResult;
+  if (definition.kind === 'constant') {
+    expected = validatedEvaluation(definition.literal.value);
+  } else if (definition.givenSource.kind === 'literal') {
+    expected = validatedEvaluation(definition.givenSource.value);
+  } else {
+    const key = JSON.stringify([
+      invocation.id,
+      definition.givenSource.parameterName,
+    ]);
+    usedBindings.add(key);
+    const binding = bindingChecks.get(key);
+    if (binding === undefined) {
+      expected = {
+        ok: false,
+        diagnostics: [
+          definitionDiagnostic({
+            check,
+            code: 'MISSING_INPUT_BINDING',
+            message: `Input '${definition.givenSource.parameterName}' has no binding.`,
+            definition,
+            evaluator,
+            invocation,
+          }),
+        ],
+      };
+    } else {
+      expected = binding.expected;
+      passed &&= binding.passed;
+      state.diagnostics.push(
+        ...binding.diagnostics.map((diagnostic) => ({
+          ...diagnostic,
+          symbolId: diagnostic.symbolId ?? definition.symbolId,
+        })),
+      );
+    }
+  }
+
+  return { expected, passed };
+};
+
+const verifyFormulaDefinition = ({
+  definition,
+  check,
+  evaluator,
+  graph,
+  observation,
+  evaluated,
+  state,
+}: DefinitionCheckContext & {
+  readonly definition: Extract<SymbolDefinition, { kind: 'formula' }>;
+}): boolean => {
+  const invocation = graph.invocation;
+  let passed = true;
+  const root = graph.nodes.get(graph.symbol.valueTree.rootKey);
+  if (root?.mode === 'LITERAL') {
+    passed = false;
+    state.diagnostics.push(
+      definitionDiagnostic({
+        check,
+        code: 'OMITTED_FORMULA',
+        message:
+          'A formula definition cannot use a bare literal as its documented formula.',
+        definition,
+        evaluator,
+        invocation,
+      }),
+    );
+  }
+  if (!evaluated.ok) {
+    passed = false;
+    state.diagnostics.push(...checkedDiagnostics(evaluated.diagnostics, check));
+  } else if (observation !== undefined) {
+    const compared = compare({
+      actual: observation.value,
+      expected: evaluated.value,
+      check,
+      code: 'FORMULA_MISMATCH',
+      message:
+        'Python runtime result differs from the documented formula evaluation.',
+      definition,
+      evaluator,
+      invocation,
+    });
+    passed &&= compared.passed;
+    state.diagnostics.push(...compared.diagnostics);
+  }
+  return passed;
+};
+
+const verifySourceValueDefinition = ({
+  definition,
+  check,
+  evaluator,
+  graph,
+  observation,
+  evaluated,
+  state,
+  bindingChecks,
+  usedBindings,
+}: DefinitionCheckContext & {
+  readonly definition: SourceValueDefinition;
+  readonly bindingChecks: ReadonlyMap<string, BindingCheck>;
+  readonly usedBindings: Set<string>;
+}): boolean => {
+  const invocation = graph.invocation;
+  let passed = true;
+  const root = graph.nodes.get(graph.symbol.valueTree.rootKey);
+  const source =
+    definition.kind === 'input' ? definition.givenSource : undefined;
+  const sourceBinding =
+    source?.kind === 'parameter'
+      ? invocation.inputBindings.find(
+          (binding) => binding.parameterName === source.parameterName,
+        )
+      : undefined;
+  const matchesCallerReference =
+    root?.mode === 'SYMBOL' &&
+    sourceBinding?.kind === 'callerSymbol' &&
+    root.symbol?.id === sourceBinding.source.symbolId;
+  if (root?.mode !== 'LITERAL' && !matchesCallerReference) {
+    passed = false;
+    state.diagnostics.push(
+      definitionDiagnostic({
+        check,
+        code: 'SOURCE_VALUE_GRAPH_MISMATCH',
+        message:
+          'An input or source literal must use a literal root or the exact bound caller-symbol reference; another graph adds steps absent from its source definition.',
+        definition,
+        evaluator,
+        invocation,
+      }),
+    );
+  }
+  const sourceValue = resolveDefinitionSourceValue({
+    definition,
+    invocation,
+    evaluator,
+    check,
+    state,
+    bindingChecks,
+    usedBindings,
+  });
+  const expected = sourceValue.expected;
+  passed &&= sourceValue.passed;
+
+  if (!expected.ok) {
+    passed = false;
+    state.diagnostics.push(...checkedDiagnostics(expected.diagnostics, check));
+  } else {
+    if (!evaluated.ok) {
+      passed = false;
+      state.diagnostics.push(
+        ...checkedDiagnostics(evaluated.diagnostics, check),
+      );
+    } else {
+      const graphComparison = compare({
+        actual: evaluated.value,
+        expected: expected.value,
+        check,
+        code:
+          definition.kind === 'input' ? 'INPUT_MISMATCH' : 'CONSTANT_MISMATCH',
+        message:
+          definition.kind === 'input'
+            ? 'Documented input graph differs from its parsed source value.'
+            : 'Documented constant graph differs from its parsed source literal.',
+        definition,
+        evaluator,
+        invocation,
+      });
+      passed &&= graphComparison.passed;
+      state.diagnostics.push(...graphComparison.diagnostics);
+    }
+    if (observation !== undefined) {
+      const runtimeComparison = compare({
+        actual: observation.value,
+        expected: expected.value,
+        check,
+        code:
+          definition.kind === 'input' ? 'INPUT_MISMATCH' : 'CONSTANT_MISMATCH',
+        message:
+          definition.kind === 'input'
+            ? 'Python input result differs from its independent source value.'
+            : 'Python constant result differs from its parsed source literal.',
+        definition,
+        evaluator,
+        invocation,
+      });
+      passed &&= runtimeComparison.passed;
+      state.diagnostics.push(...runtimeComparison.diagnostics);
+    }
+  }
+  return passed;
+};
+
 const verifyDefinitions = ({
   evaluator,
   execution,
@@ -943,159 +1204,27 @@ const verifyDefinitions = ({
         }),
       );
     } else if (definition.kind === 'formula') {
-      const root = graph.nodes.get(graph.symbol.valueTree.rootKey);
-      if (root?.mode === 'LITERAL') {
-        passed = false;
-        state.diagnostics.push(
-          definitionDiagnostic({
-            check,
-            code: 'OMITTED_FORMULA',
-            message:
-              'A formula definition cannot use a bare literal as its documented formula.',
-            definition,
-            evaluator,
-            invocation,
-          }),
-        );
-      }
-      if (!evaluated.ok) {
-        passed = false;
-        state.diagnostics.push(
-          ...checkedDiagnostics(evaluated.diagnostics, check),
-        );
-      } else if (observation !== undefined) {
-        const compared = compare({
-          actual: observation.value,
-          expected: evaluated.value,
-          check,
-          code: 'FORMULA_MISMATCH',
-          message:
-            'Python runtime result differs from the documented formula evaluation.',
-          definition,
-          evaluator,
-          invocation,
-        });
-        passed &&= compared.passed;
-        state.diagnostics.push(...compared.diagnostics);
-      }
+      passed = verifyFormulaDefinition({
+        definition,
+        check,
+        evaluator,
+        graph,
+        observation,
+        evaluated,
+        state,
+      });
     } else {
-      const root = graph.nodes.get(graph.symbol.valueTree.rootKey);
-      const source =
-        definition.kind === 'input' ? definition.givenSource : undefined;
-      const sourceBinding =
-        source?.kind === 'parameter'
-          ? invocation.inputBindings.find(
-              (binding) => binding.parameterName === source.parameterName,
-            )
-          : undefined;
-      const matchesCallerReference =
-        root?.mode === 'SYMBOL' &&
-        sourceBinding?.kind === 'callerSymbol' &&
-        root.symbol?.id === sourceBinding.source.symbolId;
-      if (root?.mode !== 'LITERAL' && !matchesCallerReference) {
-        passed = false;
-        state.diagnostics.push(
-          definitionDiagnostic({
-            check,
-            code: 'SOURCE_VALUE_GRAPH_MISMATCH',
-            message:
-              'An input or source literal must use a literal root or the exact bound caller-symbol reference; another graph adds steps absent from its source definition.',
-            definition,
-            evaluator,
-            invocation,
-          }),
-        );
-      }
-      let expected: EvaluationResult;
-      if (definition.kind === 'constant') {
-        expected = validatedEvaluation(definition.literal.value);
-      } else if (definition.givenSource.kind === 'literal') {
-        expected = validatedEvaluation(definition.givenSource.value);
-      } else {
-        const key = JSON.stringify([
-          invocation.id,
-          definition.givenSource.parameterName,
-        ]);
-        usedBindings.add(key);
-        const binding = bindingChecks.get(key);
-        if (binding === undefined) {
-          expected = {
-            ok: false,
-            diagnostics: [
-              definitionDiagnostic({
-                check,
-                code: 'MISSING_INPUT_BINDING',
-                message: `Input '${definition.givenSource.parameterName}' has no binding.`,
-                definition,
-                evaluator,
-                invocation,
-              }),
-            ],
-          };
-        } else {
-          expected = binding.expected;
-          passed &&= binding.passed;
-          state.diagnostics.push(
-            ...binding.diagnostics.map((diagnostic) => ({
-              ...diagnostic,
-              symbolId: diagnostic.symbolId ?? definition.symbolId,
-            })),
-          );
-        }
-      }
-
-      if (!expected.ok) {
-        passed = false;
-        state.diagnostics.push(
-          ...checkedDiagnostics(expected.diagnostics, check),
-        );
-      } else {
-        if (!evaluated.ok) {
-          passed = false;
-          state.diagnostics.push(
-            ...checkedDiagnostics(evaluated.diagnostics, check),
-          );
-        } else {
-          const graphComparison = compare({
-            actual: evaluated.value,
-            expected: expected.value,
-            check,
-            code:
-              definition.kind === 'input'
-                ? 'INPUT_MISMATCH'
-                : 'CONSTANT_MISMATCH',
-            message:
-              definition.kind === 'input'
-                ? 'Documented input graph differs from its parsed source value.'
-                : 'Documented constant graph differs from its parsed source literal.',
-            definition,
-            evaluator,
-            invocation,
-          });
-          passed &&= graphComparison.passed;
-          state.diagnostics.push(...graphComparison.diagnostics);
-        }
-        if (observation !== undefined) {
-          const runtimeComparison = compare({
-            actual: observation.value,
-            expected: expected.value,
-            check,
-            code:
-              definition.kind === 'input'
-                ? 'INPUT_MISMATCH'
-                : 'CONSTANT_MISMATCH',
-            message:
-              definition.kind === 'input'
-                ? 'Python input result differs from its independent source value.'
-                : 'Python constant result differs from its parsed source literal.',
-            definition,
-            evaluator,
-            invocation,
-          });
-          passed &&= runtimeComparison.passed;
-          state.diagnostics.push(...runtimeComparison.diagnostics);
-        }
-      }
+      passed = verifySourceValueDefinition({
+        definition,
+        check,
+        evaluator,
+        graph,
+        observation,
+        evaluated,
+        state,
+        bindingChecks,
+        usedBindings,
+      });
     }
 
     if (observation === undefined) {
