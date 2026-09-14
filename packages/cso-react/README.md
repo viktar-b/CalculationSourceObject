@@ -15,6 +15,9 @@ export function CalculationSheet({ source }: { source: unknown }) {
 }
 ```
 
+The stylesheet uses Tailwind CSS 4 and requires Safari 16.4+, Chrome 111+,
+or Firefox 128+. These are the [Tailwind browser requirements](https://tailwindcss.com/docs/upgrade-guide#browser-requirements).
+
 For prose, figures and ordered content, use `prepareExecutionDocument` followed
 by `PreparedFormulaSheet`. Supply the execution and captured `ResolvedAsset`
 records. Preparation validates their binding without filesystem access or

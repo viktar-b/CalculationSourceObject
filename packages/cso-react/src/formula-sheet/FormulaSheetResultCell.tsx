@@ -18,7 +18,7 @@ export const FormulaSheetResultCell = ({
   return (
     <FormulaSheetValueCell>
       {isSheetLiteralEmpty(literal) ? (
-        <span className="rounded bg-orange-500 px-1.5 py-0 text-black opacity-70">
+        <span className="rounded-sm bg-orange-500 px-1.5 py-0 text-black opacity-70">
           NaN
         </span>
       ) : (

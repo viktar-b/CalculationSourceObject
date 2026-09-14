@@ -25,7 +25,7 @@ export const FormulaSheet = ({ sheet }: FormulaSheetProps): ReactElement => {
   return (
     <article
       data-formula-sheet="true"
-      className="flex min-h-[297mm] w-[210mm] min-w-[210mm] max-w-none flex-col items-stretch border border-gray-300 bg-white p-[5mm] [&_*:focus-visible]:outline-none"
+      className="flex min-h-[297mm] w-[210mm] min-w-[210mm] max-w-none flex-col items-stretch border border-gray-300 bg-white p-[5mm] [&_*:focus-visible]:outline-hidden"
     >
       <FormulaSheetHeader />
 
