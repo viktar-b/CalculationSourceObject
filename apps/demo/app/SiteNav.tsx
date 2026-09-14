@@ -10,7 +10,7 @@ type SiteNavItem = {
 export function SiteNav({
   active,
 }: {
-  readonly active: 'home' | 'docs' | 'examples' | 'preservation' | 'ascii';
+  readonly active: 'home' | 'docs' | 'examples' | 'ascii';
 }) {
   const items: readonly SiteNavItem[] = [
     { href: '/', label: 'Concept', active: active === 'home' },

@@ -34,10 +34,7 @@ export function ExamplesClient({
         {selectedExample.kind === 'sheet'
           ? 'This gallery is a mathematical projection. Figures and standalone prose are omitted here. '
           : 'This gallery displays the prepared calculation document. '}
-        <a className="underline" href="/preservation">
-          Open preservation cases
-        </a>
-        . Browser printing is for development; use cso pdf for verified PDF
+        Browser printing is for development; use cso pdf for verified PDF
         publication with evidence.
       </p>
       {printError && (

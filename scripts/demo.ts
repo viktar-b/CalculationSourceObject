@@ -32,17 +32,7 @@ try {
     {
       cwd: root,
       stdio: 'inherit',
-      env: {
-        ...environment,
-        CSO_PREPARED_DIRECTORY:
-          environment.CSO_PREPARED_DIRECTORY ??
-          fileURLToPath(
-            new URL(
-              '../tests/integration/fixtures/demo-preservation',
-              import.meta.url,
-            ),
-          ),
-      },
+      env: environment,
     },
   );
   if (result.error) {

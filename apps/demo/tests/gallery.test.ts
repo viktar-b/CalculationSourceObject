@@ -36,12 +36,8 @@ describe('host-supplied calculation data', () => {
   test('uses Examples documents unless a CSO gallery override is supplied', () => {
     const examplesDirectory = mkdtempSync(join(tmpdir(), 'cso-examples-'));
     const galleryDirectory = mkdtempSync(join(tmpdir(), 'cso-gallery-'));
-    const preservationDirectory = mkdtempSync(
-      join(tmpdir(), 'cso-preservation-'),
-    );
     const originalExamplesDirectory = process.env.CSO_EXAMPLES_DIRECTORY;
     const originalGalleryDirectory = process.env.CSO_GALLERY_DIRECTORY;
-    const originalPreparedDirectory = process.env.CSO_PREPARED_DIRECTORY;
     try {
       const source = CalculationSourceObjectSchema.parse({
         schemaVersion: '1.0.0',
@@ -62,16 +58,11 @@ describe('host-supplied calculation data', () => {
         JSON.stringify(document),
       );
       writeFileSync(
-        join(preservationDirectory, 'preservation.prepared.json'),
-        JSON.stringify(document),
-      );
-      writeFileSync(
         join(galleryDirectory, 'sheet.json'),
         JSON.stringify({ ...source, title: 'Sheet input display' }),
       );
       Reflect.deleteProperty(process.env, 'CSO_EXAMPLES_DIRECTORY');
       Reflect.deleteProperty(process.env, 'CSO_GALLERY_DIRECTORY');
-      process.env.CSO_PREPARED_DIRECTORY = preservationDirectory;
       expect(loadExamples()).toEqual([]);
       expect(
         loadExamples({ examplesDirectory }).map(({ kind, label }) => ({
@@ -98,14 +89,8 @@ describe('host-supplied calculation data', () => {
       } else {
         process.env.CSO_GALLERY_DIRECTORY = originalGalleryDirectory;
       }
-      if (originalPreparedDirectory === undefined) {
-        Reflect.deleteProperty(process.env, 'CSO_PREPARED_DIRECTORY');
-      } else {
-        process.env.CSO_PREPARED_DIRECTORY = originalPreparedDirectory;
-      }
       rmSync(examplesDirectory, { recursive: true, force: true });
       rmSync(galleryDirectory, { recursive: true, force: true });
-      rmSync(preservationDirectory, { recursive: true, force: true });
     }
   });
 });
