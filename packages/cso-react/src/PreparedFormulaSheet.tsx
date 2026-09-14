@@ -13,6 +13,7 @@ import { FormulaSheetSymbolRow } from './formula-sheet/FormulaSheetSymbolRow.tsx
 
 export interface PreparedFormulaSheetProps {
   readonly document: PreparedDocument;
+  readonly showSourceDetails?: boolean;
 }
 
 // SheetDocument supplies only the existing mathematical notation renderer.
@@ -58,6 +59,7 @@ const requiredItem = <T,>(items: ReadonlyMap<string, T>, id: string): T => {
 
 export const PreparedFormulaSheet = ({
   document: input,
+  showSourceDetails = true,
 }: PreparedFormulaSheetProps): ReactElement => {
   const document = PreparedDocumentSchema.parse(input);
   const sheet = mathSheet(document);
@@ -184,12 +186,14 @@ export const PreparedFormulaSheet = ({
     >
       <header className="cso-document-header">
         <h1>{document.title}</h1>
-        <p>
-          {document.source.kind === 'legacy'
-            ? 'Development preservation rendering. Numerical agreement has not been verified.'
-            : 'Execution-bound document. Numerical verification is reported separately.'}
-        </p>
-        {document.source.kind === 'execution' && (
+        {showSourceDetails && (
+          <p>
+            {document.source.kind === 'legacy'
+              ? 'Development preservation rendering. Numerical agreement has not been verified.'
+              : 'Execution-bound document. Numerical verification is reported separately.'}
+          </p>
+        )}
+        {showSourceDetails && document.source.kind === 'execution' && (
           <p>
             Function {document.source.function}. Inputs{' '}
             {Object.entries(document.source.resolvedInputs)

@@ -17,6 +17,7 @@ import {
 } from '@viktar-b/cso-core';
 import { expect, test } from 'vitest';
 import { loadPreparedDocuments } from '../../apps/demo/src/examples/prepared-gallery.ts';
+import { loadExamples } from '../../apps/demo/src/examples/gallery.ts';
 import { prepareDemoExamples } from '../../scripts/prepare-demo-examples.ts';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
@@ -54,6 +55,27 @@ test('prepares the canonical width-2 document with its execution and verificatio
     );
     if (!execution.ok) {
       throw new Error('Canonical execution failed');
+    }
+
+    const gallery = loadExamples({ examplesDirectory: preparedDirectory });
+    const example = gallery[0];
+    if (!example || example.kind !== 'prepared') {
+      throw new Error('Missing prepared example');
+    }
+    expect(example.pythonFiles[0]?.moduleId).toBe(
+      execution.execution.entry.moduleId,
+    );
+    expect(example.pythonFiles).toHaveLength(6);
+    expect(example.pythonFiles.map(({ moduleId }) => moduleId)).not.toContain(
+      '_cso_bindings/__init__.py',
+    );
+    expect(
+      execution.execution.sourceManifest.map(({ moduleId }) => moduleId),
+    ).toContain('_cso_bindings/__init__.py');
+    for (const file of example.pythonFiles) {
+      expect(file.code).toBe(
+        readFileSync(join(directory, 'source', file.moduleId), 'utf8'),
+      );
     }
 
     expect(verification.ok).toBe(true);

@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { prepareExecutionDocument } from '@viktar-b/cso-react';
@@ -7,6 +7,7 @@ import { bindingsCommand } from '../apps/cso-cli/src/bindings.ts';
 import { stringifyJson } from '../apps/cso-cli/src/json.ts';
 import { executeAndVerify } from '../apps/cso-cli/src/verification.ts';
 import type { VerifiedOptions } from '../apps/cso-cli/src/verified-arguments.ts';
+import { PythonSourceBundleSchema } from '../apps/demo/src/examples/python-source.ts';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const excludedDirectories = new Set([
@@ -70,6 +71,22 @@ export function prepareDemoExamples({
     execution: result.capture.execution,
     assets: captureAssets(sourcePath, result.capture.execution),
   });
+  const { entry, sourceManifest, sourceClosureHash } = result.capture.execution;
+  const pythonSource = PythonSourceBundleSchema.parse({
+    version: '1',
+    binding: {
+      entryModuleId: entry.moduleId,
+      entrySourceHash: entry.sourceHash,
+      sourceClosureHash,
+      function: entry.function,
+      resolvedInputs: entry.resolvedInputs,
+    },
+    files: sourceManifest.map((file) => ({
+      ...file,
+      code: readFileSync(join(source, file.moduleId), 'utf8'),
+    })),
+  });
+  writeJson(join(prepared, `${id}.source.json`), pythonSource);
   writeJson(join(prepared, `${id}.prepared.json`), document);
   writeFileSync(
     join(receipts, `${id}.execution.json`),

@@ -22,6 +22,10 @@ Code PRs are reviewed case by case. Link an issue when one exists. Say what
 changed and how you checked it. Expect requests to rebase or rewrite while the
 prototype moves.
 
+Use `<type>(<scope>): <description>` for PR titles, for example
+`feat(demo): show original Python alongside calculation examples`. Choose the
+type and scope to match the change, such as `fix(demo)` for a demo bug fix.
+
 ## Local setup
 
 Follow [docs/development.md](docs/development.md).
