@@ -21,6 +21,23 @@ class CalculationHandle:
         self._input_names: frozenset[str] | None = None
         self._lock = threading.Lock()
 
+    def __getstate__(self):
+        state = object.__getstate__(self)
+        attributes = state[0] if isinstance(state, tuple) else state
+        attributes = attributes.copy()
+        for name in ("_execution", "_input_names", "_lock"):
+            attributes.pop(name, None)
+        return (attributes, state[1]) if isinstance(state, tuple) else attributes
+
+    def __setstate__(self, state):
+        attributes, slots = state if isinstance(state, tuple) else (state, {})
+        self.__dict__.update(attributes)
+        for name, value in slots.items():
+            setattr(self, name, value)
+        self._execution = None
+        self._input_names = None
+        self._lock = threading.Lock()
+
     def _definition(self) -> Definition:
         capture = Capture(self.path)
         definition = Definitions(capture).get(self.path, self.function)

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import builtins
+import multiprocessing
 import os
+import pickle
 import runpy
 import shutil
 import sys
@@ -9,13 +11,27 @@ import tempfile
 import threading
 import time
 import unittest
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
 from cso_python.bindings import generate
 from cso_python.execution import Execution
+from cso_python.handles import CalculationHandle
 from cso_python.source import SourceError
+
+
+def run_handle(payload):
+    handle, inputs = payload
+    return handle(**inputs)
+
+
+class LabeledCalculationHandle(CalculationHandle):
+    __slots__ = ("label",)
+
+    def __init__(self, path: Path, label: str):
+        super().__init__(path, "adjust", None)
+        self.label = label
 
 
 class CalculationHandleReuseTest(unittest.TestCase):
@@ -289,6 +305,63 @@ def calculate(amount: Annotated[float, symbol(glyph="Q_{in}", description="Input
             [{"adjusted": value + 3, "original": value} for value in range(8)],
         )
         self.assertEqual(maximum, 1)
+
+    def test_cold_and_warm_handles_survive_pickle_roundtrips(self):
+        cold = self.handle("defaulted_step", "adjust")
+        restored_cold = pickle.loads(pickle.dumps(cold))
+        self.assertEqual(restored_cold(amount=2), {"adjusted": 5, "original": 2})
+
+        warm = self.handle("defaulted_step", "adjust")
+        self.assertEqual(warm(amount=2), {"adjusted": 5, "original": 2})
+        execution = warm._execution
+        serialized_warm = pickle.dumps(warm)
+        self.assertIs(warm._execution, execution)
+        restored_warm = pickle.loads(serialized_warm)
+        self.assertEqual(restored_warm(amount=5), {"adjusted": 8, "original": 5})
+
+        labeled = LabeledCalculationHandle(cold.path, "worker")
+        self.assertEqual(labeled(amount=3), {"adjusted": 6, "original": 3})
+        restored_labeled = pickle.loads(pickle.dumps(labeled))
+        self.assertEqual(restored_labeled.label, "worker")
+        self.assertEqual(
+            restored_labeled(amount=6), {"adjusted": 9, "original": 6}
+        )
+
+    def test_restored_handle_reads_current_source_and_checks_fingerprint(self):
+        handle = self.handle("defaulted_step", "adjust")
+        self.assertEqual(handle(amount=2), {"adjusted": 5, "original": 2})
+        serialized = pickle.dumps(handle)
+        self.edit("defaulted_step.cso.py", "amount + increment", "amount * increment")
+        restored = pickle.loads(serialized)
+        self.assertEqual(restored(amount=2), {"adjusted": 6, "original": 2})
+
+        serialized = pickle.dumps(restored)
+        self.edit("metadata.py", 'description="Amount"', 'description="Changed"')
+        restored = pickle.loads(serialized)
+        with self.assertRaises(SourceError) as raised:
+            restored(amount=2)
+        self.assertEqual(raised.exception.diagnostic["code"], "STALE_BINDINGS")
+
+    def test_handles_run_in_a_spawned_process_pool(self):
+        cold = self.handle("defaulted_step", "adjust")
+        warm = self.handle("defaulted_step", "adjust")
+        self.assertEqual(warm(amount=2), {"adjusted": 5, "original": 2})
+
+        context = multiprocessing.get_context("spawn")
+        with ProcessPoolExecutor(max_workers=1, mp_context=context) as executor:
+            results = list(
+                executor.map(
+                    run_handle,
+                    [(cold, {"amount": 4}), (warm, {"amount": 7})],
+                )
+            )
+        self.assertEqual(
+            results,
+            [
+                {"adjusted": 7, "original": 4},
+                {"adjusted": 10, "original": 7},
+            ],
+        )
 
 
 if __name__ == "__main__":
