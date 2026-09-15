@@ -69,6 +69,20 @@ class Execution:
         self.observations: list[Json] = []
         self.modules: dict[Path, Json] = {}
 
+    def unchanged(self) -> bool:
+        return self.planner.unchanged()
+
+    def run_root(self, inputs: Json) -> Json:
+        supplied = {name: number(value, stage="usage") for name, value in inputs.items()}
+        self.observations.clear()
+        for invocation in self.planner.invocations:
+            invocation.record["resolvedInputs"] = {}
+            for symbol in invocation.symbols.values():
+                symbol.cso["valueTree"].pop("result", None)
+            for output in invocation.output_records:
+                output.pop("value", None)
+        return self.run(self.root, supplied)
+
     def instrument(self, module):
         selected = {
             inv.function.name
@@ -196,6 +210,18 @@ class Execution:
             )
             for name, param in invocation.parameters.items()
         }
+        for binding in invocation.record["inputBindings"]:
+            name = binding["parameterName"]
+            if binding["kind"] == "entrySupplied":
+                binding["value"] = invocation.record["resolvedInputs"][name]
+            symbol = invocation.parameter_symbols[name]
+            if (
+                any(candidate is symbol for candidate in invocation.symbols.values())
+                and symbol.cso["valueTree"]["nodes"][0]["mode"] == "LITERAL"
+            ):
+                symbol.cso["valueTree"]["nodes"][0]["literal"]["value"] = (
+                    invocation.record["resolvedInputs"][name]
+                )
         token = ACTIVE.set((self, invocation, iter(invocation.calls.values())))
         try:
             module = invocation.module
