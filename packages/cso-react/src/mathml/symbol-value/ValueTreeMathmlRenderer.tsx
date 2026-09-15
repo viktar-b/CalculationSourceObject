@@ -9,21 +9,21 @@ import { renderSpecialValueFunction } from '../function-renderers.tsx';
 import {
   getFunctionBinaryOperatorById,
   getFunctionSpec,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import {
   emptyLiteral,
   isSheetLiteralEmpty,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import {
   getSymbolById,
   getValueNodeByKey,
   getValueNodeByKeyOrUndefined,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import type {
   SheetDocument,
   SheetValueNode,
   SheetValueTree,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import type { ReactElement } from 'react';
 import {
   SymbolValueBinaryOperatorMathmlView,

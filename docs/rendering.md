@@ -101,7 +101,7 @@ tests; rendering support alone is not numerical support.
 
 ## Printing and inspection
 
-Import `@viktar-b/cso-react/style.css` once. Browser `printFormulaSheet` accepts
+Import `@cs-object/react/style.css` once. Browser `printFormulaSheet` accepts
 a sheet target and waits for cloned images. Its boolean result means the request
 was accepted; `onError` reports deferred failures. See the [print implementation](../packages/cso-react/src/formula-sheet/print.ts)
 and [browser tests](../tests/integration/formula-sheet-print-browser.test.ts).

@@ -1,5 +1,5 @@
-import { assertNever } from '@viktar-b/cso-core';
-import type { NotationExpression, NotationNode } from '@viktar-b/cso-core';
+import { assertNever } from '@cs-object/core';
+import type { NotationExpression, NotationNode } from '@cs-object/core';
 
 const nodeSemantic = (node: NotationNode): string => {
   switch (node.kind) {

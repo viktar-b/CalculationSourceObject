@@ -4,7 +4,7 @@ import {
   BoundPreparedDocumentSchema,
   ExecutionResponseSchema,
   PreparedDocumentSchema,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 

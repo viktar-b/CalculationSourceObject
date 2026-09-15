@@ -1,4 +1,4 @@
-# @viktar-b/cso-react
+# @cs-object/react
 
 React renders supplied calculation data as mathematical sheets or complete
 engineering documents. It does not execute Python or evaluate formulas.
@@ -6,9 +6,9 @@ engineering documents. It does not execute Python or evaluate formulas.
 Import the stylesheet once. For a validated mathematical sheet:
 
 ```tsx
-import '@viktar-b/cso-react/style.css';
-import { FormulaSheet } from '@viktar-b/cso-react';
-import { SheetDocumentSchema } from '@viktar-b/cso-core';
+import '@cs-object/react/style.css';
+import { FormulaSheet } from '@cs-object/react';
+import { SheetDocumentSchema } from '@cs-object/core';
 
 export function CalculationSheet({ source }: { source: unknown }) {
   return <FormulaSheet sheet={SheetDocumentSchema.parse(source)} />;

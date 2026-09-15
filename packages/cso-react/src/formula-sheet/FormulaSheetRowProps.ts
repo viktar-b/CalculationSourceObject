@@ -1,4 +1,4 @@
-import type { SheetDocument } from '@viktar-b/cso-core';
+import type { SheetDocument } from '@cs-object/core';
 
 export interface FormulaSheetRowProps<TItem> {
   readonly sheet: SheetDocument;

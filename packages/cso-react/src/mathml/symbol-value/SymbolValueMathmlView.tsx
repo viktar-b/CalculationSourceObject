@@ -1,4 +1,4 @@
-import type { SheetDocument, SheetValueTree } from '@viktar-b/cso-core';
+import type { SheetDocument, SheetValueTree } from '@cs-object/core';
 import type { ReactElement } from 'react';
 import {
   type SymbolValueViewOptions,

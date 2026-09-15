@@ -13,10 +13,10 @@
   "scripts": {
     "dev": "npm run build:lib && tsx scripts/demo.ts dev",
     "build": "npm run build:cli && tsx scripts/demo.ts build",
-    "build:cli": "npm run build:lib && npm run build --workspace @viktar-b/cso-cli",
+    "build:cli": "npm run build:lib && npm run build --workspace @cs-object/cli",
     "build:demo": "npm run build:lib && tsx scripts/demo.ts build",
-    "build:lib": "npm run build --workspace @viktar-b/cso-core && npm run build --workspace @viktar-b/cso-react",
-    "build:css": "npm run build:css --workspace @viktar-b/cso-react",
+    "build:lib": "npm run build --workspace @cs-object/core && npm run build --workspace @cs-object/react",
+    "build:css": "npm run build:css --workspace @cs-object/react",
     "test": "npm run test:projects && npm run test:python && npm run test:integration",
     "test:packages": "npm run build:cli && tsx tests/integration/installed/acceptance.ts",
     "typecheck": "npm run build:lib && tsc --noEmit --pretty false && npm run typecheck --workspaces",
@@ -45,8 +45,8 @@
     "tsx": "^4.23.13",
     "typescript": "^5",
     "vitest": "^5.0.0",
-    "@viktar-b/cso-core": "0.1.0",
-    "@viktar-b/cso-react": "0.1.0",
+    "@cs-object/core": "0.1.0",
+    "@cs-object/react": "0.1.0",
     "zod": "^4.6.2"
   }
 }

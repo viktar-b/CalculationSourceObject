@@ -25,7 +25,7 @@ try {
       'run',
       mode,
       '--workspace',
-      '@viktar-b/cso-demo',
+      '@cs-object/demo',
       '--',
       ...process.argv.slice(3),
     ],

@@ -1,6 +1,6 @@
 'use client';
 
-import { FormulaSheet, PreparedFormulaSheet } from '@viktar-b/cso-react';
+import { FormulaSheet, PreparedFormulaSheet } from '@cs-object/react';
 import { useId, useState } from 'react';
 import type { GalleryExample } from '../../src/examples/gallery.ts';
 import { CodeBlock } from '../CodePanel.tsx';

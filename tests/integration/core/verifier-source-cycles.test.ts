@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import type { CalculationSourceSymbol } from '@viktar-b/cso-core';
-import type { CalculationSourceObject } from '@viktar-b/cso-core';
+import type { CalculationSourceSymbol } from '@cs-object/core';
+import type { CalculationSourceObject } from '@cs-object/core';
 const collectCsoSymbols = (cso: CalculationSourceObject) => cso.sections.flatMap(section => section.items.flatMap(item => item.kind === 'symbol' ? [item.symbol] : []));
 import {
   type ExecutionPayload,
@@ -9,9 +9,9 @@ import {
   ExecutionResponseSchema,
   type Invocation,
   type SymbolDefinition,
-} from '@viktar-b/cso-core';
-import { VerificationReportSchema } from '@viktar-b/cso-core';
-import { verifyExecution } from '@viktar-b/cso-core';
+} from '@cs-object/core';
+import { VerificationReportSchema } from '@cs-object/core';
+import { verifyExecution } from '@cs-object/core';
 
 const fixtureUrl = new URL(
   '../../fixtures/contract-cases/single-success.json',

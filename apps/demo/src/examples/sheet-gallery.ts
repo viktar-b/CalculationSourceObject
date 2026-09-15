@@ -5,7 +5,7 @@ import {
   type ValueTreeSheetDiagnostics,
   createSheetFromCalculationSourceObject,
   parseCalculationSourceJson,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 
 export interface SheetExample {
   readonly id: string;

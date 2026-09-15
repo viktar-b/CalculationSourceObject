@@ -1,7 +1,7 @@
 import { GlyphMathBlock } from '../mathml/GlyphMathBlock.tsx';
 import { UnitMathBlock } from '../mathml/UnitMathBlock.tsx';
-import { getValueNodeByKey } from '@viktar-b/cso-core';
-import type { SheetSymbol } from '@viktar-b/cso-core';
+import { getValueNodeByKey } from '@cs-object/core';
+import type { SheetSymbol } from '@cs-object/core';
 import type { ReactElement } from 'react';
 import { FormulaSheetCommentCell } from './cells/FormulaSheetCommentCell.tsx';
 import { FormulaSheetDescriptionCell } from './cells/FormulaSheetDescriptionCell.tsx';

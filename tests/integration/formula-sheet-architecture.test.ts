@@ -6,9 +6,9 @@ import { describe, expect, test } from 'vitest';
 const repoRoot = new URL('../..', import.meta.url).pathname;
 const sourceExtensionPattern = /\.tsx?$/;
 const coreExternalPattern = /^(?:zod(?:\/|$)|@noble\/hashes\/sha2\.js$)/;
-const reactExternalPattern = /^(?:react(?:\/.*)?|@viktar-b\/cso-core)$/;
+const reactExternalPattern = /^(?:react(?:\/.*)?|@cs-object\/core)$/;
 const privateLibrarySourcePattern =
-  /^(?:packages\/cso-(?:core|react)\/src\/|@viktar-b\/cso-(?:core|react)\/src\/)/;
+  /^(?:packages\/cso-(?:core|react)\/src\/|@cs-object\/(?:core|react)\/src\/)/;
 
 const collectSourceFiles = (directory: string): string[] =>
   readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {

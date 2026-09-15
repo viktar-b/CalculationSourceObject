@@ -1,5 +1,5 @@
-import { assertNever } from '@viktar-b/cso-core';
-import type { NotationExpression, NotationNode } from '@viktar-b/cso-core';
+import { assertNever } from '@cs-object/core';
+import type { NotationExpression, NotationNode } from '@cs-object/core';
 import type { ReactElement } from 'react';
 import type { MathMathMLAttributes } from '../mathml/attributes.ts';
 import { MATHML_FONT_SIZE } from '../mathml/constants.ts';

@@ -4,11 +4,11 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, cpSync, symlinkSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
-import { CommandReportSchema, ExecutionResponseSchema, VerificationReportSchema, BoundPreparedDocumentSchema } from '@viktar-b/cso-core';
+import { CommandReportSchema, ExecutionResponseSchema, VerificationReportSchema, BoundPreparedDocumentSchema } from '@cs-object/core';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const json = path => JSON.parse(readFileSync(path, 'utf8'));
-const cli = resolve('node_modules/@viktar-b/cso-cli/dist/cli.js');
+const cli = resolve('node_modules/@cs-object/cli/dist/cli.js');
 const realPython = process.env.PYTHON;
 const wrapper = resolve('pdf-python-observer.mjs');
 mkdirSync('pdf-output', { recursive: true });

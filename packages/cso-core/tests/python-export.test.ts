@@ -4,7 +4,7 @@ import {
   createPythonFromSheetDocument,
   createPythonFromValueTreeJson,
   createSheetFromValueTreeJson,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import { describe, expect, test } from 'vitest';
 
 const beamDocument = {

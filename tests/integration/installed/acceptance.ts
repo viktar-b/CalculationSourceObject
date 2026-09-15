@@ -88,7 +88,7 @@ function consumer(name: string, dependencies: string[]): string {
       typeof lock.packages === 'object',
   );
   for (const [path, metadata] of Object.entries(lock.packages)) {
-    if (path.includes('node_modules/@viktar-b/cso-')) {
+    if (path.includes('node_modules/@cs-object/')) {
       assert(
         metadata &&
           typeof metadata === 'object' &&
@@ -105,9 +105,9 @@ function consumer(name: string, dependencies: string[]): string {
       );
     }
   }
-  for (const name of ['cso-core', 'cso-react', 'cso-cli']) {
-    const directoryPath = join(directory, 'node_modules/@viktar-b', name);
-    if (dependencies.some((dependency) => dependency.includes(name)))
+  for (const name of ['core', 'react', 'cli']) {
+    const directoryPath = join(directory, 'node_modules/@cs-object', name);
+    if (dependencies.some((dependency) => dependency.includes(`cs-object-${name}-`)))
       assert(!lstatSync(directoryPath).isSymbolicLink());
   }
   return directory;
@@ -144,9 +144,9 @@ try {
   ]) {
     run(join(repo, directory), 'npm', ['pack', '--pack-destination', archives]);
   }
-  const core = uniqueArchive('viktar-b-cso-core-', '.tgz');
-  const react = uniqueArchive('viktar-b-cso-react-', '.tgz');
-  const cli = uniqueArchive('viktar-b-cso-cli-', '.tgz');
+  const core = uniqueArchive('cs-object-core-', '.tgz');
+  const react = uniqueArchive('cs-object-react-', '.tgz');
+  const cli = uniqueArchive('cs-object-cli-', '.tgz');
   for (const archive of [core, react, cli]) {
     const files = run(root, 'tar', ['-tzf', archive]).trim().split('\n');
     assert(files.includes('package/README.md'));
@@ -288,7 +288,7 @@ try {
     wheel,
   ]);
   copyFileSync(rectangle, join(full, 'rectangle input.cso.py'));
-  const entry = join(full, 'node_modules/@viktar-b/cso-cli/dist/cli.js');
+  const entry = join(full, 'node_modules/@cs-object/cli/dist/cli.js');
   assert(
     run(full, join(full, 'node_modules/.bin/cso'), ['--help']).includes(
       'Usage: cso',

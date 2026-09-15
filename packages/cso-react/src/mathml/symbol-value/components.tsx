@@ -8,10 +8,10 @@
 import { AsciiMathView } from '../../ascii-math/AsciiMathView.tsx';
 import type { MathMLGlobalAttributes } from '../attributes.ts';
 import { MATHML_FONT_SIZE } from '../constants.ts';
-import type { SheetBinaryOperator } from '@viktar-b/cso-core';
-import type { SheetLiteral } from '@viktar-b/cso-core';
-import { assertNever } from '@viktar-b/cso-core';
-import { formatNumerical } from '@viktar-b/cso-core';
+import type { SheetBinaryOperator } from '@cs-object/core';
+import type { SheetLiteral } from '@cs-object/core';
+import { assertNever } from '@cs-object/core';
+import { formatNumerical } from '@cs-object/core';
 import { isValidElement, type ReactElement, type ReactNode } from 'react';
 
 interface SymbolValueBinaryOperatorMathmlViewProps {

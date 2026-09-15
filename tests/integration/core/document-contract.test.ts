@@ -2,18 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import orderedContent from '../../fixtures/contract-cases/ordered-content.json';
 import repeatedExecution from '../../fixtures/contract-cases/repeated-nested-success.json';
-import { CalculationSourceObjectSchema } from '@viktar-b/cso-core';
+import { CalculationSourceObjectSchema } from '@cs-object/core';
 import {
   BoundPreparedDocumentSchema,
   HistoricalReviewSchema,
   LegacyAssetManifestSchema,
   PreparedDocumentSchema,
   ResolvedAssetSchema,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import {
   ExecutionPayloadSchema,
   ExecutionResponseSchema,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 
 const fixture = () =>
   PreparedDocumentSchema.parse(structuredClone(orderedContent));

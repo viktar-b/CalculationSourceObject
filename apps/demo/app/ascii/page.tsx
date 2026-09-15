@@ -1,4 +1,4 @@
-import { AsciiMathView } from '@viktar-b/cso-react';
+import { AsciiMathView } from '@cs-object/react';
 import {
   asciiMathObservedGroups,
   asciiMathShowcaseSummary,

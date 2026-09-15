@@ -5,7 +5,7 @@ import {
   type PreparedContextField,
   type PreparedContextValue,
   type PreparedDocument,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import { activeSymbolIds } from './active-symbols.ts';
 
 type Value = HistoricalReview['originalFields'][string];

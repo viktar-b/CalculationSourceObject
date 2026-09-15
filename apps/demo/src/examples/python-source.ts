@@ -9,7 +9,7 @@ import {
   executionBindingKey,
   sourceClosureHash,
   type PreparedDocument,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import { z } from 'zod';
 
 export const PythonSourceBundleSchema = z

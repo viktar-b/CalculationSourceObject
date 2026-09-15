@@ -1,5 +1,5 @@
-import type { SheetDocument } from '@viktar-b/cso-core';
-import { FormulaSheet } from '@viktar-b/cso-react';
+import type { SheetDocument } from '@cs-object/core';
+import { FormulaSheet } from '@cs-object/react';
 import React, { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';

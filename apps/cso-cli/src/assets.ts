@@ -5,8 +5,8 @@ import {
   ResolvedAssetSchema,
   type ExecutionPayload,
   type ResolvedAsset,
-} from '@viktar-b/cso-core';
-import { DocumentPreparationError } from '@viktar-b/cso-react';
+} from '@cs-object/core';
+import { DocumentPreparationError } from '@cs-object/react';
 
 export const sha256 = (bytes: Uint8Array): string =>
   createHash('sha256').update(bytes).digest('hex');

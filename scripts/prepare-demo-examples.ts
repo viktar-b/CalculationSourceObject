@@ -1,7 +1,7 @@
 import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { prepareExecutionDocument } from '@viktar-b/cso-react';
+import { prepareExecutionDocument } from '@cs-object/react';
 import { captureAssets } from '../apps/cso-cli/src/assets.ts';
 import { bindingsCommand } from '../apps/cso-cli/src/bindings.ts';
 import { stringifyJson } from '../apps/cso-cli/src/json.ts';
