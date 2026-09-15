@@ -137,7 +137,7 @@ const reactDirectory = createConsumer('react', [
   '@types/react-dom@18.3.7',
   '@types/node@20.19.43',
   'typescript@5.9.3',
-  'esbuild@0.25.12',
+  'esbuild@0.28.2',
 ]);
 write(
   reactDirectory,
