@@ -1,4 +1,4 @@
-import { createSheetFromCalculationSourceJson } from '@viktar-b/cso-core';
+import { createSheetFromCalculationSourceJson } from '@cs-object/core';
 import { describe, expect, test } from 'vitest';
 
 describe('calculation source object', () => {

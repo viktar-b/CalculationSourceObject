@@ -3,13 +3,13 @@ import { createRequire } from 'node:module';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { chromium } from 'playwright';
-import { PreparedFormulaSheet } from '@viktar-b/cso-react';
-import type { PreparedDocument } from '@viktar-b/cso-core';
+import { PreparedFormulaSheet } from '@cs-object/react';
+import type { PreparedDocument } from '@cs-object/core';
 import type { PresentationMapping } from './evidence.ts';
 
 function buildPreparedPdfHtml(preparedDocument: PreparedDocument): string {
   const css = readFileSync(
-    createRequire(import.meta.url).resolve('@viktar-b/cso-react/style.css'),
+    createRequire(import.meta.url).resolve('@cs-object/react/style.css'),
     'utf8',
   );
   const markup = renderToStaticMarkup(

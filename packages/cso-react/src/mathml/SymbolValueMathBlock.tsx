@@ -3,7 +3,7 @@ import type { MathMathMLAttributes } from './attributes.ts';
 import { MATHML_FONT_SIZE } from './constants.ts';
 import { defaultMathBlockProps } from './props.ts';
 import { SymbolValueMathmlView } from './symbol-value/SymbolValueMathmlView.tsx';
-import type { SheetDocument, SheetSymbol } from '@viktar-b/cso-core';
+import type { SheetDocument, SheetSymbol } from '@cs-object/core';
 import type { HTMLAttributes, ReactElement } from 'react';
 
 interface IProps {

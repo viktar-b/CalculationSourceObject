@@ -5,5 +5,5 @@ export default defineConfig({
   format: ['esm', 'cjs'],
   dts: true,
   clean: true,
-  external: ['react', 'react/jsx-runtime', '@viktar-b/cso-core'],
+  external: ['react', 'react/jsx-runtime', '@cs-object/core'],
 });

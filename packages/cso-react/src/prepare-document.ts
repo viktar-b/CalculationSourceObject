@@ -19,7 +19,7 @@ import {
   type ResolvedAsset,
   ResolvedAssetSchema,
   contractIssuesToDiagnostics,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 
 import { activeSymbolIds } from './active-symbols.ts';
 import { prepareDocumentContext } from './prepare-context.ts';

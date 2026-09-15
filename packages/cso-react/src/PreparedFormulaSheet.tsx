@@ -5,7 +5,7 @@ import {
   type PreparedDocumentSection,
   type SheetDocument,
   createSheetFromCalculationSourceObject,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import type { ReactElement } from 'react';
 import { GlyphMathBlock } from './mathml/GlyphMathBlock.tsx';
 import { EngineeringMetadata } from './EngineeringMetadata.tsx';

@@ -9,8 +9,8 @@ export default defineConfig({
   // Keep the development renderer in its own lazy chunk so verify needs only core.
   splitting: true,
   external: [
-    '@viktar-b/cso-core',
-    '@viktar-b/cso-react',
+    '@cs-object/core',
+    '@cs-object/react',
     'react',
     'react-dom/server',
     'playwright',

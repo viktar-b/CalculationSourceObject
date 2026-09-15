@@ -14,7 +14,7 @@ import { isDeepStrictEqual } from 'node:util';
 import {
   BoundPreparedDocumentSchema,
   type PreparedDocument,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import { sha256 } from './assets.ts';
 import { stringifyJson } from './json.ts';
 import { parseStrictJson } from './strict-json.ts';

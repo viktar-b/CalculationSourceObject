@@ -1,8 +1,8 @@
 import {
   isSheetLiteralEmpty,
   sheetLiteralToDisplayString,
-} from '@viktar-b/cso-core';
-import type { SheetLiteral } from '@viktar-b/cso-core';
+} from '@cs-object/core';
+import type { SheetLiteral } from '@cs-object/core';
 import type { ReactElement } from 'react';
 import { FormulaSheetValueCell } from './cells/FormulaSheetValueCell.tsx';
 

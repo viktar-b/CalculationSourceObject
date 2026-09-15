@@ -1,6 +1,6 @@
 import {
   safeParseCalculationSourceJson,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import { describe, expect, test } from 'vitest';
 
 type MutableSourceLiteral = Record<string, unknown>;

@@ -5,7 +5,7 @@ import {
   contractIssuesToDiagnostics,
   type ExecutionResponse,
   type Diagnostic,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import { parseStrictJson } from './strict-json.ts';
 import type { VerifiedOptions } from './verified-arguments.ts';
 

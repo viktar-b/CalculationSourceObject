@@ -7,8 +7,8 @@ preservation and visual inspection are separate checks. Rendering and printing
 do not establish human engineering approval. See the [domain terms](../../CONTEXT.md)
 and [rendering guide](../../docs/rendering.md) for the owning definitions.
 
-The app consumes public exports from `@viktar-b/cso-core` and
-`@viktar-b/cso-react`. It builds and tests with its own files and declared
+The app consumes public exports from `@cs-object/core` and
+`@cs-object/react`. It builds and tests with its own files and declared
 dependencies. Install the local package archives together using
 [consumer setup](../../docs/development.md#local-package-consumers), then run
 these commands from this app directory:

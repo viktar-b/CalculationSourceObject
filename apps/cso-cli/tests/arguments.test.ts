@@ -3,7 +3,7 @@ import { parseCliArgs } from '../src/arguments.ts';
 import { usageReport } from '../src/reports.ts';
 import {
   CommandReportSchema,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 
 const base = [
   '--source',

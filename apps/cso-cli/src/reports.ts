@@ -1,4 +1,4 @@
-import { CommandReportSchema, type CommandReport } from '@viktar-b/cso-core';
+import { CommandReportSchema, type CommandReport } from '@cs-object/core';
 import { version } from '../package.json';
 
 export function initialReport(command?: 'verify' | 'pdf'): CommandReport {

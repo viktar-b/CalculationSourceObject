@@ -1,4 +1,4 @@
-# @viktar-b/cso-core
+# @cs-object/core
 
 Core owns calculation schemas, formula verification, conversion and Python code
 generation. It does not require Python, React, Next.js or Chromium at runtime.

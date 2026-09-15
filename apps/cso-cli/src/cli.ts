@@ -2,7 +2,7 @@
 import { stringifyJson } from './json.ts';
 import { help, parseCliArgs, UsageError } from './arguments.ts';
 import { initialReport, usageReport } from './reports.ts';
-import { CommandReportSchema } from '@viktar-b/cso-core';
+import { CommandReportSchema } from '@cs-object/core';
 import { parseVerifiedArgs, verifiedHelp } from './verified-arguments.ts';
 import { verifyCommand } from './verification.ts';
 import { bindingsCommand, bindingsHelp } from './bindings.ts';

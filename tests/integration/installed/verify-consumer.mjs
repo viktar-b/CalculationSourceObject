@@ -14,14 +14,14 @@ import { resolve } from 'node:path';
 import {
   CommandReportSchema,
   ExecutionResponseSchema,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const read = (path) => JSON.parse(readFileSync(path, 'utf8'));
 const twoPanelReference = 'examples/two-panel/reference.json';
 const write = (path, value) =>
   writeFileSync(path, JSON.stringify(value, null, 2));
-const cli = resolve('node_modules/@viktar-b/cso-cli/dist/cli.js');
+const cli = resolve('node_modules/@cs-object/cli/dist/cli.js');
 const realPython = process.env.PYTHON;
 assert(realPython);
 // Recreate ignored editor/runtime bindings from the copied canonical sources.
@@ -423,7 +423,7 @@ for (const [name, content] of [
 }
 // Removing render-only packages proves the built verify entry does not import them.
 const renderPackages = [
-  '@viktar-b/cso-react',
+  '@cs-object/react',
   'react',
   'react-dom',
   'playwright',

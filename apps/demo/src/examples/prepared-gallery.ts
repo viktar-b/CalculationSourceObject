@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { PreparedDocumentSchema } from '@viktar-b/cso-core';
+import { PreparedDocumentSchema } from '@cs-object/core';
 
 export const loadPreparedDocumentEntries = (directory: string) => {
   if (!directory) return [];

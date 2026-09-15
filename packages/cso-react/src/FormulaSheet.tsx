@@ -3,8 +3,8 @@ import { FormulaSheetItem } from './formula-sheet/FormulaSheetItem.tsx';
 import {
   type SheetRenderableItem,
   getRootSectionItems,
-} from '@viktar-b/cso-core';
-import type { SheetDocument } from '@viktar-b/cso-core';
+} from '@cs-object/core';
+import type { SheetDocument } from '@cs-object/core';
 import type { ReactElement } from 'react';
 
 export interface FormulaSheetProps {

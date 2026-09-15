@@ -14,7 +14,7 @@ import {
   BoundPreparedDocumentSchema,
   CommandReportSchema,
   ExecutionResponseSchema,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import { expect, test } from 'vitest';
 import { loadPreparedDocuments } from '../../apps/demo/src/examples/prepared-gallery.ts';
 import { loadExamples } from '../../apps/demo/src/examples/gallery.ts';

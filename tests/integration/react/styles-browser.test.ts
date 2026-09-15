@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import {
   createSheetFromCalculationSourceObject,
   ExecutionResponseSchema,
-} from '@viktar-b/cso-core';
-import { FormulaSheet } from '@viktar-b/cso-react';
+} from '@cs-object/core';
+import { FormulaSheet } from '@cs-object/react';
 import { chromium } from 'playwright';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -32,7 +32,7 @@ test('packaged styles retain sheet utilities, responsive spacing and print dimen
     },
   );
   const css = readFileSync(
-    new URL(import.meta.resolve('@viktar-b/cso-react/style.css')),
+    new URL(import.meta.resolve('@cs-object/react/style.css')),
     'utf8',
   );
   const html = renderToStaticMarkup(createElement(FormulaSheet, { sheet }));

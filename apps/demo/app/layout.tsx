@@ -1,4 +1,4 @@
-import '@viktar-b/cso-react/style.css';
+import '@cs-object/react/style.css';
 import type { Metadata } from 'next';
 import { Analytics } from '@vercel/analytics/next';
 import type { ReactNode } from 'react';

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
-import { ExecutionResponseSchema, verifyExecution } from "@viktar-b/cso-core";
+import { ExecutionResponseSchema, verifyExecution } from "@cs-object/core";
 
 
 function fixture(name = "composed") {

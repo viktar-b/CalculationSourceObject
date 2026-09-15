@@ -1,4 +1,4 @@
-import type { PreparedDocument } from '@viktar-b/cso-core';
+import type { PreparedDocument } from '@cs-object/core';
 import { join } from 'node:path';
 import { loadPreparedDocumentEntries } from './prepared-gallery.ts';
 import { loadPythonSource, type PythonSourceFile } from './python-source.ts';

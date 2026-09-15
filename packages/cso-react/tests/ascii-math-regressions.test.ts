@@ -1,5 +1,5 @@
-import type { SheetDocument } from '@viktar-b/cso-core';
-import { AsciiMathView, FormulaSheet } from '@viktar-b/cso-react';
+import type { SheetDocument } from '@cs-object/core';
+import { AsciiMathView, FormulaSheet } from '@cs-object/react';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';

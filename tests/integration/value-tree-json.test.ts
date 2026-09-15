@@ -1,6 +1,6 @@
-import { getRootSectionItems } from '@viktar-b/cso-core';
-import { safeParseValueTreeJson } from '@viktar-b/cso-core';
-import { createSheetFromValueTreeJson } from '@viktar-b/cso-core';
+import { getRootSectionItems } from '@cs-object/core';
+import { safeParseValueTreeJson } from '@cs-object/core';
+import { createSheetFromValueTreeJson } from '@cs-object/core';
 import { describe, expect, test } from 'vitest';
 
 const validMinimalDocument = {

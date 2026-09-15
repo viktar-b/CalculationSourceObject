@@ -1,7 +1,7 @@
 import type {
   PreparedContextField,
   PreparedContextValue,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import type { ReactElement } from 'react';
 import { GlyphMathBlock } from './mathml/GlyphMathBlock.tsx';
 

@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { notationIdentity, parseNotation } from '@viktar-b/cso-core';
+import { notationIdentity, parseNotation } from '@cs-object/core';
 import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
 

@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import * as esm from '@viktar-b/cso-core';
+import * as esm from '@cs-object/core';
 const require = createRequire(import.meta.url);
 const mode = process.argv[2];
-const cjs = require('@viktar-b/cso-core');
+const cjs = require('@cs-object/core');
 const values = [];
 for (const width of [2, 4]) {
   // Independently calculated expectations for the synthetic rectangle fixture.
@@ -53,14 +53,14 @@ for (const width of [2, 4]) {
     if (mode === 'react' && api === esm) {
       const React = await import('react');
       const { renderToStaticMarkup } = await import('react-dom/server');
-      const renderer = await import('@viktar-b/cso-react');
+      const renderer = await import('@cs-object/react');
       const html = renderToStaticMarkup(
         React.createElement(renderer.FormulaSheet, { sheet }),
       );
       assert(html.includes('<math'));
       assert(html.includes(width === 2 ? '6.00' : '12.00'));
       const css = readFileSync(
-        require.resolve('@viktar-b/cso-react/style.css'),
+        require.resolve('@cs-object/react/style.css'),
         'utf8',
       );
       assert(css.includes('formula-sheet-printing'));
@@ -78,16 +78,16 @@ for (const width of [2, 4]) {
   }
 }
 for (const dependency of mode === 'core'
-  ? ['react', 'react-dom', 'playwright', 'next', '@viktar-b/cso-cli']
+  ? ['react', 'react-dom', 'playwright', 'next', '@cs-object/cli']
   : mode === 'react'
-    ? ['playwright', 'next', '@viktar-b/cso-cli']
+    ? ['playwright', 'next', '@cs-object/cli']
     : ['next', 'tsx', 'typescript', 'vitest']) {
   assert.throws(
     () => require.resolve(dependency),
     `${dependency} must be absent`,
   );
 }
-assert.throws(() => require.resolve('@viktar-b/cso-core/src/index.ts'));
+assert.throws(() => require.resolve('@cs-object/core/src/index.ts'));
 if (mode === 'cli') {
   const typo = esm.CommandReportSchema.parse(
     JSON.parse(readFileSync('unknown-command.json', 'utf8')),
