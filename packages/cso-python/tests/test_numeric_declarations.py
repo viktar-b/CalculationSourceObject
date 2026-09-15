@@ -55,6 +55,7 @@ class NumericDeclarationsTest(unittest.TestCase):
         diagnostic = response["diagnostics"][0]
         self.assertEqual(diagnostic["code"], code)
         self.assertEqual(diagnostic["stage"], "execution")
+        self.assertEqual(response["provenance"]["resolvedInputs"], {"quantity": value})
         self.assertEqual(diagnostic["location"]["moduleId"], source.name)
         line_index = diagnostic["location"]["start"]["line"] - 1
         actual_line = source.read_text().splitlines()[line_index]

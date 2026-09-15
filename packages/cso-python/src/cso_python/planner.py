@@ -43,6 +43,19 @@ class Planner:
         self.invocations: list[Invocation] = []
         self.sections: list[Json] = []
         self.assets: dict[str, Json] = {}
+        self.asset_files: dict[Path, tuple[Path, bytes]] = {}
+
+    def unchanged(self) -> bool:
+        if not self.capture.unchanged():
+            return False
+        try:
+            return all(
+                requested.resolve(strict=True) == resolved
+                and resolved.read_bytes() == data
+                for requested, (resolved, data) in self.asset_files.items()
+            )
+        except (OSError, RuntimeError):
+            return False
 
     def error(
         self, inv: Invocation, node: ast.AST, code: str, message: str, **details: Any
@@ -1023,7 +1036,8 @@ class Planner:
                     "Figure needs a module-relative local path",
                 )
             try:
-                asset_path = (inv.module.path.parent / path).resolve(strict=True)
+                requested_asset = inv.module.path.parent / path
+                asset_path = requested_asset.resolve(strict=True)
                 asset_path.relative_to(self.capture.root)
                 asset_bytes = asset_path.read_bytes()
             except (OSError, ValueError, RuntimeError) as error:
@@ -1033,6 +1047,7 @@ class Planner:
                     "INVALID_ASSET_PATH",
                     f"Missing or escaping asset: {path}: {error}",
                 )
+            self.asset_files[requested_asset.absolute()] = (asset_path, asset_bytes)
             if data["media_type"] not in {"image/png", "image/jpeg", "image/svg+xml"}:
                 self.error(
                     inv, node, "UNSUPPORTED_ASSET", "Unsupported figure media type"

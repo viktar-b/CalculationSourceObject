@@ -23,6 +23,10 @@ CSO JSON. Inspect `python -m cso_python --help` and each subcommand's `--help`
 for options. Paths resolve from the invoking directory. Authored output and
 operational messages go to stderr so stdout contains one JSON response.
 
+A generated handle reuses its captured plan and compiled code while its supplied
+input names, source bytes and assets remain unchanged. Calls through one handle
+run serially because each call updates that handle's execution trace.
+
 Successful execution supplies observations; it does not establish formula
 consistency. Use [the verified CLI](../../apps/cso-cli/README.md) for that check.
 The captured path preflights local source and executes captured UTF-8 bytes.

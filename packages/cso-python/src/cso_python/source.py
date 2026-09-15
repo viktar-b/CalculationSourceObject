@@ -272,13 +272,16 @@ class Invocation:
 
 class Capture:
     def __init__(self, entry: Path):
+        requested_entry = entry.absolute()
         self.entry = entry.resolve(strict=True)
         self.root = self.entry.parent
         self.modules: dict[Path, CapturedModule] = {}
         self.loading: set[Path] = set()
+        self.resolutions = {requested_entry: self.entry}
         self.for_bindings = False
 
     def resolve(self, path: Path, location: Json | None = None) -> Path:
+        requested = path.absolute()
         try:
             resolved = path.resolve(strict=True)
             relative = resolved.relative_to(self.root).as_posix()
@@ -301,7 +304,22 @@ class Capture:
                 f"Expected a local .cso.py file: {path}",
                 location=location,
             )
+        self.resolutions[requested] = resolved
         return resolved
+
+    def unchanged(self) -> bool:
+        try:
+            if any(
+                requested.resolve(strict=True) != resolved
+                for requested, resolved in self.resolutions.items()
+            ):
+                return False
+            return all(
+                module.path.read_bytes() == module.data
+                for module in self.modules.values()
+            )
+        except (OSError, RuntimeError):
+            return False
 
     def load(self, path: Path, location: Json | None = None) -> CapturedModule:
         path = self.resolve(path, location)

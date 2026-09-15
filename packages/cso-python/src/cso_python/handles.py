@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import sys
+import threading
 from pathlib import Path
 
 from .authoring import CalculationResults
@@ -16,6 +17,9 @@ class CalculationHandle:
         self.path = path
         self.function = function
         self.fingerprint = fingerprint
+        self._execution = None
+        self._input_names: frozenset[str] | None = None
+        self._lock = threading.Lock()
 
     def _definition(self) -> Definition:
         capture = Capture(self.path)
@@ -53,14 +57,34 @@ class CalculationHandle:
             return invoke(
                 str(self.path), function=self.function, inputs=inputs, frame=frame
             )
-        engine = Execution(self.path, self.function, inputs)
-        definition = engine.planner.definitions.get(self.path, self.function)
-        if self.fingerprint is not None and definition.fingerprint != self.fingerprint:
-            raise SourceError(
-                "STALE_BINDINGS",
-                "Run cso bindings to refresh the changed public interface",
-            )
-        return engine.run(engine.root, inputs)
+        input_names = frozenset(inputs)
+        with self._lock:
+            engine = self._execution
+            if (
+                engine is None
+                or input_names != self._input_names
+                or not engine.unchanged()
+            ):
+                self._execution = None
+                self._input_names = None
+                engine = Execution(self.path, self.function, inputs)
+                definition = engine.planner.definitions.get(self.path, self.function)
+                if (
+                    self.fingerprint is not None
+                    and definition.fingerprint != self.fingerprint
+                ):
+                    raise SourceError(
+                        "STALE_BINDINGS",
+                        "Run cso bindings to refresh the changed public interface",
+                    )
+                self._execution = engine
+                self._input_names = input_names
+            try:
+                return engine.run_root(inputs)
+            except BaseException:
+                self._execution = None
+                self._input_names = None
+                raise
 
 
 def load_calculation(
@@ -76,4 +100,4 @@ def load_calculation(
             "INVALID_CALL", "Use a relative .cso.py path and named function"
         )
     caller = Path(sys._getframe(1).f_code.co_filename).resolve()
-    return CalculationHandle((caller.parent / path).resolve(), function, fingerprint)
+    return CalculationHandle((caller.parent / path).absolute(), function, fingerprint)
