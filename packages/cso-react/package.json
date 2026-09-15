@@ -1,5 +1,5 @@
 {
-  "name": "@viktar-b/cso-react",
+  "name": "@cs-object/react",
   "version": "0.1.0",
   "license": "Apache-2.0",
   "description": "CalculationSourceObject React rendering, mathematical notation and printing.",
@@ -57,7 +57,7 @@
     "@tailwindcss/cli": "^4.3.3"
   },
   "dependencies": {
-    "@viktar-b/cso-core": "0.1.0"
+    "@cs-object/core": "0.1.0"
   },
   "peerDependencies": {
     "react": ">=18.3.0"

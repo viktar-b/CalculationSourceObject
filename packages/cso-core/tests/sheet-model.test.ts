@@ -1,4 +1,4 @@
-import { type SheetDocument, SheetDocumentSchema } from '@viktar-b/cso-core';
+import { type SheetDocument, SheetDocumentSchema } from '@cs-object/core';
 import { describe, expect, test } from 'vitest';
 
 const minimalSheet = {

@@ -1,5 +1,5 @@
 {
-  "name": "@viktar-b/cso-cli",
+  "name": "@cs-object/cli",
   "version": "0.1.0",
   "license": "Apache-2.0",
   "private": true,
@@ -27,8 +27,8 @@
     "pretest": "npm run build"
   },
   "dependencies": {
-    "@viktar-b/cso-core": "0.1.0",
-    "@viktar-b/cso-react": "0.1.0",
+    "@cs-object/core": "0.1.0",
+    "@cs-object/react": "0.1.0",
     "playwright": "^1.63.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

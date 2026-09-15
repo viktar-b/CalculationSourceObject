@@ -14,13 +14,13 @@ import { dirname, join, basename } from 'node:path';
 import { chromium } from 'playwright';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { FormulaSheet } from '@viktar-b/cso-react';
+import { FormulaSheet } from '@cs-object/react';
 import {
   CalculationSourceObjectSchema,
   createSheetFromCalculationSourceObject,
   type CalculationSourceObject,
   type SheetDocument,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import { UsageError, type DevelopmentOptions } from './arguments.ts';
 export { parseCliArgs } from './arguments.ts';
 export type AnnotatedPythonPdfOptions = DevelopmentOptions;
@@ -34,7 +34,7 @@ export interface FormulaSheetHtmlOptions {
   readonly title: string;
 }
 const defaultCssPath = createRequire(import.meta.url).resolve(
-  '@viktar-b/cso-react/style.css',
+  '@cs-object/react/style.css',
 );
 const escapeHtml = (value: string): string =>
   value

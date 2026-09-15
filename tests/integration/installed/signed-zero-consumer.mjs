@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 
 const cli =
   process.env.CSO_TEST_CLI ??
-  resolve('node_modules/@viktar-b/cso-cli/dist/cli.js');
+  resolve('node_modules/@cs-object/cli/dist/cli.js');
 const python = process.env.PYTHON;
 assert(python);
 const wrapper = resolve('signed-zero-python-observer.mjs');

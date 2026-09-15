@@ -1,4 +1,4 @@
-import type { SheetSection } from '@viktar-b/cso-core';
+import type { SheetSection } from '@cs-object/core';
 import type { ReactElement } from 'react';
 import { FormulaSheetItemIndex } from './FormulaSheetItemIndex.tsx';
 import type { FormulaSheetRowProps } from './FormulaSheetRowProps.ts';

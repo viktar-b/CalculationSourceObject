@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import * as esm from '@viktar-b/cso-core';
+import * as esm from '@cs-object/core';
 
 const require = createRequire(import.meta.url);
-const cjs = require('@viktar-b/cso-core');
+const cjs = require('@cs-object/core');
 
 const read = (directory, name) =>
   JSON.parse(

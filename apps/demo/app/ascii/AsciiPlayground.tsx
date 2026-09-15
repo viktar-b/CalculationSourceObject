@@ -1,6 +1,6 @@
 'use client';
 
-import { AsciiMathView } from '@viktar-b/cso-react';
+import { AsciiMathView } from '@cs-object/react';
 import { useState } from 'react';
 
 export function AsciiPlayground() {

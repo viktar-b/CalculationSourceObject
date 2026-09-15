@@ -11,9 +11,9 @@ import { join } from 'node:path';
 import {
   CalculationSourceObjectSchema,
   ExecutionResponseSchema,
-} from '@viktar-b/cso-core';
-import { createSheetFromCalculationSourceObject } from '@viktar-b/cso-core';
-import { prepareExecutionDocument } from '@viktar-b/cso-react';
+} from '@cs-object/core';
+import { createSheetFromCalculationSourceObject } from '@cs-object/core';
+import { prepareExecutionDocument } from '@cs-object/react';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import {
   parseCliArgs,

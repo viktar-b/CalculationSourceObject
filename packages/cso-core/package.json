@@ -1,5 +1,5 @@
 {
-  "name": "@viktar-b/cso-core",
+  "name": "@cs-object/core",
   "version": "0.1.0",
   "license": "Apache-2.0",
   "description": "CalculationSourceObject validation, conversion and code generation.",

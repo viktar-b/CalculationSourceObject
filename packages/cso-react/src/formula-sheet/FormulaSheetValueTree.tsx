@@ -4,7 +4,7 @@ import {
   type SheetSymbol,
   type SheetValueTree,
   getFunctionBinaryOperatorById,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import type { ReactElement } from 'react';
 import { AsciiMathView } from '../ascii-math/AsciiMathView.tsx';
 import { SymbolValueMathBlock } from '../mathml/SymbolValueMathBlock.tsx';

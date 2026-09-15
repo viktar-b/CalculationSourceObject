@@ -1,4 +1,4 @@
-import { parseNotation } from '@viktar-b/cso-core';
+import { parseNotation } from '@cs-object/core';
 import type { MathMathMLAttributes } from '../mathml/attributes.ts';
 import type { ReactElement } from 'react';
 import { NotationMathmlView } from './NotationMathmlView.tsx';

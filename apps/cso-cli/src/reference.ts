@@ -8,7 +8,7 @@ import {
   type ExecutionPayload,
   type Provenance,
   type ReferenceCase,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import { parseStrictJson } from './strict-json.ts';
 
 type CapturedReference =

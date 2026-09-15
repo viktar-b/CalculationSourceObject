@@ -1,5 +1,5 @@
-import type { SheetRenderableItem } from '@viktar-b/cso-core';
-import type { SheetDocument } from '@viktar-b/cso-core';
+import type { SheetRenderableItem } from '@cs-object/core';
+import type { SheetDocument } from '@cs-object/core';
 import type { ReactElement } from 'react';
 import { FormulaSheetSectionRow } from './FormulaSheetSectionRow.tsx';
 import { FormulaSheetSymbolRow } from './FormulaSheetSymbolRow.tsx';

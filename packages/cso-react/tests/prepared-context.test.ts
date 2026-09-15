@@ -1,11 +1,11 @@
 import {
   CalculationSourceObjectSchema,
   PreparedDocumentSchema,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import {
   PreparedFormulaSheet,
   prepareLegacyDocument,
-} from '@viktar-b/cso-react';
+} from '@cs-object/react';
 import React, { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';

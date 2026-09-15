@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import * as esm from '@viktar-b/cso-core';
+import * as esm from '@cs-object/core';
 import { z } from 'zod';
 
 const require = createRequire(import.meta.url);
 const read = (name) =>
   JSON.parse(readFileSync(new URL(`./${name}.json`, import.meta.url), 'utf8'));
-for (const api of [esm, require('@viktar-b/cso-core')]) {
+for (const api of [esm, require('@cs-object/core')]) {
   for (const name of [
     'single-success',
     'repeated-nested-success',

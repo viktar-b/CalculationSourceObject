@@ -4,7 +4,7 @@ import {
   type CommandReport,
   type ExecutionPayload,
   type VerificationReport,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import { initialReport } from './reports.ts';
 import { captureReference } from './reference.ts';
 import { runPythonExecution } from './execution.ts';

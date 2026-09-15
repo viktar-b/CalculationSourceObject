@@ -1,8 +1,8 @@
-import { CommandReportSchema } from '@viktar-b/cso-core';
+import { CommandReportSchema } from '@cs-object/core';
 import {
   prepareExecutionDocument,
   DocumentPreparationError,
-} from '@viktar-b/cso-react';
+} from '@cs-object/react';
 import { captureAssets, sha256 } from './assets.ts';
 import { jsonBytes, retainSource, publishPdfEvidence } from './evidence.ts';
 import { renderPreparedPdf } from './pdf-rendering.ts';

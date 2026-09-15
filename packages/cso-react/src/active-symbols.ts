@@ -1,4 +1,4 @@
-import type { CalculationSourceSymbol } from '@viktar-b/cso-core';
+import type { CalculationSourceSymbol } from '@cs-object/core';
 
 // Follow only nodes reachable from each root; inactive records remain evidence.
 export const activeSymbolIds = (

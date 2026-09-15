@@ -3,7 +3,7 @@ import {
   createSheetFromValueTreeJson,
   parseValueTreeJson,
   safeParseValueTreeJson,
-} from '@viktar-b/cso-core';
+} from '@cs-object/core';
 import { describe, expect, test } from 'vitest';
 
 const minimalValueTreeDocument = {

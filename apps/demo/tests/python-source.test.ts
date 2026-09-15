@@ -6,8 +6,8 @@ import {
   CalculationSourceObjectSchema,
   PreparedDocumentSchema,
   sourceClosureHash,
-} from '@viktar-b/cso-core';
-import { prepareLegacyDocument } from '@viktar-b/cso-react';
+} from '@cs-object/core';
+import { prepareLegacyDocument } from '@cs-object/react';
 import { describe, expect, test } from 'vitest';
 import { loadExamples } from '../src/examples/gallery.ts';
 import { PythonSourceBundleSchema } from '../src/examples/python-source.ts';

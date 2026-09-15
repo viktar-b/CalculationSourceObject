@@ -1,4 +1,4 @@
-import { PythonIdentifierSchema } from '@viktar-b/cso-core';
+import { PythonIdentifierSchema } from '@cs-object/core';
 import { resolve } from 'node:path';
 
 export class UsageError extends Error {}

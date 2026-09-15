@@ -1,4 +1,4 @@
-import { printFormulaSheet } from '@viktar-b/cso-react';
+import { printFormulaSheet } from '@cs-object/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 class FakeClassList {

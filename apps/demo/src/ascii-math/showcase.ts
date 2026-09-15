@@ -1,5 +1,5 @@
-import { parseNotation } from '@viktar-b/cso-core';
-import type { NotationDiagnostic } from '@viktar-b/cso-core';
+import { parseNotation } from '@cs-object/core';
+import type { NotationDiagnostic } from '@cs-object/core';
 import { expectedNotationSemantics } from './semantic-expectations.ts';
 import { notationSemantic } from './semantics.ts';
 
