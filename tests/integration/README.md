@@ -28,3 +28,16 @@ Source-to-document consistency and independent agreement are separate checks.
 
 Automatic PDF generation leaves visual inspection pending. Inspect every page
 before delivering a PDF and record findings against its exact hash.
+
+## Measure generated handle calls
+
+Run the repeated-call acceptance check with an interpreter that contains the
+wheel under review:
+
+```sh
+$PYTHON tests/integration/benchmark-calculation-handle.py
+```
+
+The script copies the canonical two-panel sources, generates their bindings,
+checks the width-1 and width-2 results, and requires 1,000 calls to finish in
+less than one second.
