@@ -17,10 +17,10 @@
     "@cs-object/core": "0.1.0",
     "@cs-object/react": "0.1.0",
     "@vercel/analytics": "^2.0.1",
-    "next": "16.3.4",
+    "next": "16.3.5",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "zod": "^4.6.2"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^24",
@@ -30,7 +30,7 @@
     "tailwindcss": "^4.3.3",
     "postcss": "8.5.28",
     "@biomejs/biome": "1.9.4",
-    "vitest": "^5.0.0",
+    "vitest": "^5.0.1",
     "@tailwindcss/postcss": "^4.3.3"
   }
 }

@@ -42,12 +42,12 @@
   "devDependencies": {
     "tsup": "^8.5.1",
     "typescript": "^5",
-    "vitest": "^5.0.0",
+    "vitest": "^5.0.1",
     "@types/node": "^24",
     "@biomejs/biome": "1.9.4"
   },
   "dependencies": {
     "@noble/hashes": "2.4.0",
-    "zod": "^4.6.2"
+    "zod": "^4.6.5"
   }
 }

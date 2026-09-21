@@ -44,9 +44,9 @@
     "react-dom": "^19.3.0",
     "tsx": "^4.23.13",
     "typescript": "^5",
-    "vitest": "^5.0.0",
+    "vitest": "^5.0.1",
     "@cs-object/core": "0.1.0",
     "@cs-object/react": "0.1.0",
-    "zod": "^4.6.2"
+    "zod": "^4.6.5"
   }
 }
