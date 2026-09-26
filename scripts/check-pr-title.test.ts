@@ -2,15 +2,61 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { parse, stringify } from 'yaml';
+import { z } from 'zod';
 
 // Run the workflow's literal script so the regression cases exercise CI's validator.
 const workflow = readFileSync(
   new URL('../.github/workflows/pr-title.yml', import.meta.url),
   'utf8',
 );
-const block = workflow.match(/^        run: \|\n((?:          [^\n]*\n|\n)+)/mu)?.[1];
-assert.ok(block, 'Expected the title workflow to contain an inline run block');
-const script = block.replace(/^          /gmu, '');
+const workflowSchema = z.object({
+  jobs: z.object({
+    'pr-title': z.object({
+      steps: z.array(z.object({ name: z.string().optional(), run: z.string().optional() })),
+    }),
+  }),
+});
+
+function readValidator(source: string): string {
+  const { jobs } = workflowSchema.parse(parse(source));
+  const steps = jobs['pr-title'].steps.filter(
+    (step) => step.name === 'Validate contribution format',
+  );
+  assert.equal(steps.length, 1, 'Expected exactly one Validate contribution format step');
+  const script = steps[0]?.run;
+  assert.ok(typeof script === 'string', 'Expected the validation step to contain a run script');
+  assert.match(script, /const scopedTitle = /u, 'Missing title validator marker');
+  return script;
+}
+
+const script = readValidator(workflow);
+
+test('selects the validator when an earlier step has a run block', () => {
+  const withEarlierStep = workflow.replace(
+    '      - name: Validate contribution format',
+    '      - name: Earlier step\n        run: |\n          console.log("earlier");\n      - name: Validate contribution format',
+  );
+  assert.equal(readValidator(withEarlierStep), script);
+});
+
+test('reads the same validator after YAML reformatting', () => {
+  assert.equal(readValidator(stringify(parse(workflow), { indent: 4 })), script);
+});
+
+test('fails loudly when the named validation step is missing', () => {
+  assert.throws(
+    () => readValidator(workflow.replace('Validate contribution format', 'Renamed step')),
+    /Expected exactly one Validate contribution format step/u,
+  );
+});
+
+test('fails loudly when the validator marker is missing', () => {
+  assert.throws(
+    () => readValidator(workflow.replace('const scopedTitle = ', 'const other = ')),
+    /Missing title validator marker/u,
+  );
+});
 
 for (const title of [
   'feat(formulas): expand verified Python function support',
