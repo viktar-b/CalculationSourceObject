@@ -196,12 +196,7 @@ const ValueTreeFunctionMathmlView = ({
           return (
             <mrow key={child.key}>
               {index > 0 && (
-                <mo
-                  form="infix"
-                  lspace="0.3em"
-                  rspace="0.3em"
-                  style={{ marginInline: '0.3em' }}
-                >
+                <mo form="infix" lspace="0.3em" rspace="0.3em">
                   {operator.glyph}
                 </mo>
               )}

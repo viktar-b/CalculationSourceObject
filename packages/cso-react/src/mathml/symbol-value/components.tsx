@@ -179,7 +179,7 @@ export const SymbolValueBinaryOperatorMathmlView = ({
   return (
     <mrow>
       {argLeft}
-      <mo lspace={spacing} rspace={spacing} style={{ marginInline: spacing }}>
+      <mo lspace={spacing} rspace={spacing}>
         {operator.glyph}
       </mo>
       {argRight}

@@ -3,7 +3,7 @@ import {
   spawnSync,
   type SpawnSyncReturns,
 } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -22,6 +22,7 @@ import React, { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, expect, it } from 'vitest';
 import { z } from 'zod';
+import { chromium } from 'playwright';
 
 Object.assign(globalThis, { React });
 const python = process.env.PYTHON ?? 'python3';
@@ -715,3 +716,54 @@ it.each(['and', 'or'])(
     }
   },
 );
+
+it('renders one 0.3em gap after binary and variadic logical operators', async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({
+      viewport: { width: 820, height: 1100 },
+    });
+    const css = readFileSync(
+      new URL(import.meta.resolve('@cs-object/react/style.css')),
+      'utf8',
+    );
+    for (const operator of ['and', 'or']) {
+      for (const count of [2, 3]) {
+        const predicate = Array.from(
+          { length: count },
+          (_, index) => `quantity < ${index + 1}`,
+        ).join(` ${operator} `);
+        const { execution } = successfulCapture(`1 if ${predicate} else 2`);
+        const html = renderToStaticMarkup(
+          createElement(PreparedFormulaSheet, {
+            document: prepareExecutionDocument({ execution, assets: [] }),
+          }),
+        );
+        await page.setContent(`<style>${css}</style>${html}`);
+        const gaps = await page.locator('mo').evaluateAll(
+          (nodes, word) =>
+            nodes
+              .filter((node) => node.textContent === word)
+              .map((node) => {
+                const next = node.nextElementSibling;
+                if (!next)
+                  throw new Error('Logical operator has no following operand');
+                const range = document.createRange();
+                range.selectNodeContents(node);
+                return {
+                  actual:
+                    next.getBoundingClientRect().x -
+                    range.getBoundingClientRect().right,
+                  expected: parseFloat(getComputedStyle(node).fontSize) * 0.3,
+                };
+              }),
+          operator,
+        );
+        expect(gaps.length).toBeGreaterThan(0);
+        for (const gap of gaps) expect(gap.actual).toBeCloseTo(gap.expected, 1);
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+});
