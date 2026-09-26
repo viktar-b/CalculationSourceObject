@@ -1,9 +1,15 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { z } from 'zod';
+import {
+  NumericKindSchema,
+  SupportedNumberSchema,
+  numericValueIssue,
+} from './numbers.ts';
 import type {
   CalculationSourceObject,
   CalculationSourceSymbol,
 } from '../calculation-source/object-schema.ts';
+export { SupportedNumberSchema } from './numbers.ts';
 
 const invalidUnicodePattern = /[\uD800-\uDFFF]/u;
 const absoluteSchemePattern = /^[A-Za-z][A-Za-z0-9+.-]*:/;
@@ -15,13 +21,6 @@ const UnicodeStringSchema = NonemptyStringSchema.refine(
     params: { diagnosticCode: 'INVALID_UNICODE' },
   },
 );
-export const SupportedNumberSchema = z
-  .number()
-  .finite()
-  .refine((value) => !Number.isInteger(value) || Number.isSafeInteger(value), {
-    message: 'Integer exceeds the supported exact range',
-    params: { diagnosticCode: 'UNSUPPORTED_NUMERIC_RANGE' },
-  });
 export const HashSchema = z.string().regex(/^[a-f0-9]{64}$/);
 export const ModuleIdSchema = UnicodeStringSchema.refine(
   (value) =>
@@ -41,27 +40,77 @@ export const ModuleIdSchema = UnicodeStringSchema.refine(
 export const PythonIdentifierSchema = UnicodeStringSchema.regex(
   /^(?:_|\p{ID_Start})(?:_|\p{ID_Continue})*$/u,
 );
-export const ResolvedInputsSchema = z
-  .unknown()
-  .transform((value, ctx) => {
-    if (
-      value === null ||
-      typeof value !== 'object' ||
-      Array.isArray(value) ||
-      (Object.getPrototypeOf(value) !== Object.prototype &&
-        Object.getPrototypeOf(value) !== null)
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Expected a parameter object',
-        params: { diagnosticCode: 'INVALID_RESOLVED_INPUTS' },
-      });
-      return z.NEVER;
-    }
-    return Object.entries(value);
+const parameterMapSchema = <T>(valueSchema: z.ZodType<T>) =>
+  z
+    .unknown()
+    .transform((value, ctx) => {
+      if (
+        value === null ||
+        typeof value !== 'object' ||
+        Array.isArray(value) ||
+        (Object.getPrototypeOf(value) !== Object.prototype &&
+          Object.getPrototypeOf(value) !== null)
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Expected a parameter object',
+          params: { diagnosticCode: 'INVALID_RESOLVED_INPUTS' },
+        });
+        return z.NEVER;
+      }
+      return Object.entries(value);
+    })
+    .pipe(z.array(z.tuple([PythonIdentifierSchema, valueSchema])))
+    .transform((entries): Record<string, T> => Object.fromEntries(entries));
+
+export const ResolvedInputsSchema = parameterMapSchema(SupportedNumberSchema);
+const FiniteInputsSchema = parameterMapSchema(z.number().finite());
+const InputKindsSchema = parameterMapSchema(NumericKindSchema);
+const OptionalResolvedInputEvidenceSchema = z
+  .strictObject({
+    resolvedInputs: FiniteInputsSchema.optional(),
+    resolvedInputKinds: InputKindsSchema.optional(),
   })
-  .pipe(z.array(z.tuple([PythonIdentifierSchema, z.number().finite()])))
-  .transform((entries): Record<string, number> => Object.fromEntries(entries));
+  .superRefine(({ resolvedInputs, resolvedInputKinds }, ctx) => {
+    for (const name of Object.keys(resolvedInputKinds ?? {})) {
+      if (!resolvedInputs || !Object.hasOwn(resolvedInputs, name)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['resolvedInputKinds', name],
+          message: 'Numeric kind must name a resolved input',
+          params: { diagnosticCode: 'ORPHAN_INPUT_NUMERIC_KIND' },
+        });
+      }
+    }
+    for (const [name, value] of Object.entries(resolvedInputs ?? {})) {
+      const numericKind =
+        resolvedInputKinds && Object.hasOwn(resolvedInputKinds, name)
+          ? resolvedInputKinds[name]
+          : undefined;
+      const issue = numericValueIssue({ value, numericKind });
+      if (issue)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['resolvedInputs', name],
+          message: issue.message,
+          params: { diagnosticCode: issue.code },
+        });
+    }
+  });
+
+/** Extend this record, rather than spreading its fields and losing validation. */
+export const ResolvedInputEvidenceSchema =
+  OptionalResolvedInputEvidenceSchema.safeExtend({
+    resolvedInputs: FiniteInputsSchema,
+  });
+
+export const resolvedInputKind = (
+  record: z.infer<typeof OptionalResolvedInputEvidenceSchema>,
+  name: string,
+) =>
+  record.resolvedInputKinds && Object.hasOwn(record.resolvedInputKinds, name)
+    ? record.resolvedInputKinds[name]
+    : undefined;
 const PositionSchema = z.strictObject({
   line: z.number().int().min(1),
   column: z.number().int().min(0),
@@ -203,54 +252,51 @@ export const DiagnosticSchema = z
       params: { diagnosticCode: 'UNQUALIFIED_NODE_ADDRESS' },
     },
   );
-export const ProvenanceSchema = z
-  .strictObject({
-    entryModuleId: ModuleIdSchema.optional(),
-    entrySourceHash: HashSchema.optional(),
-    sourceClosureHash: HashSchema.optional(),
-    function: PythonIdentifierSchema.optional(),
-    resolvedInputs: ResolvedInputsSchema.optional(),
-    sourceManifest: SourceManifestSchema.optional(),
-    versions: VersionsSchema.partial().optional(),
-    reference: z
-      .strictObject({
-        path: NonemptyStringSchema,
-        sha256: HashSchema,
-        revisions: z.array(NonemptyStringSchema),
-      })
-      .optional(),
-  })
-  .superRefine((value, ctx) => {
+export const ProvenanceSchema = OptionalResolvedInputEvidenceSchema.safeExtend({
+  entryModuleId: ModuleIdSchema.optional(),
+  entrySourceHash: HashSchema.optional(),
+  sourceClosureHash: HashSchema.optional(),
+  function: PythonIdentifierSchema.optional(),
+  sourceManifest: SourceManifestSchema.optional(),
+  versions: VersionsSchema.partial().optional(),
+  reference: z
+    .strictObject({
+      path: NonemptyStringSchema,
+      sha256: HashSchema,
+      revisions: z.array(NonemptyStringSchema),
+    })
+    .optional(),
+}).superRefine((value, ctx) => {
+  if (
+    value.sourceManifest &&
+    SourceManifestSchema.safeParse(value.sourceManifest).success &&
+    value.sourceClosureHash &&
+    sourceClosureHash(value.sourceManifest) !== value.sourceClosureHash
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Source closure hash does not match manifest',
+      path: ['sourceClosureHash'],
+      params: { diagnosticCode: 'SOURCE_CLOSURE_MISMATCH' },
+    });
+  }
+  if (value.sourceManifest && value.entryModuleId) {
+    const entry = value.sourceManifest.find(
+      (item) => item.moduleId === value.entryModuleId,
+    );
     if (
-      value.sourceManifest &&
-      SourceManifestSchema.safeParse(value.sourceManifest).success &&
-      value.sourceClosureHash &&
-      sourceClosureHash(value.sourceManifest) !== value.sourceClosureHash
+      !entry ||
+      (value.entrySourceHash && entry.sha256 !== value.entrySourceHash)
     ) {
       ctx.addIssue({
         code: 'custom',
-        message: 'Source closure hash does not match manifest',
-        path: ['sourceClosureHash'],
-        params: { diagnosticCode: 'SOURCE_CLOSURE_MISMATCH' },
+        message: 'Entry does not match source manifest',
+        path: ['entryModuleId'],
+        params: { diagnosticCode: 'ENTRY_MANIFEST_MISMATCH' },
       });
     }
-    if (value.sourceManifest && value.entryModuleId) {
-      const entry = value.sourceManifest.find(
-        (item) => item.moduleId === value.entryModuleId,
-      );
-      if (
-        !entry ||
-        (value.entrySourceHash && entry.sha256 !== value.entrySourceHash)
-      ) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Entry does not match source manifest',
-          path: ['entryModuleId'],
-          params: { diagnosticCode: 'ENTRY_MANIFEST_MISMATCH' },
-        });
-      }
-    }
-  });
+  }
+});
 
 export const sha256Bytes = (bytes: Uint8Array): string =>
   Array.from(sha256(bytes), (byte) => byte.toString(16).padStart(2, '0')).join(
@@ -340,12 +386,11 @@ export type DiagnosticStage = z.infer<typeof DiagnosticStageSchema>;
 export type CheckName = z.infer<typeof CheckNameSchema>;
 export type SourceManifest = z.infer<typeof SourceManifestSchema>;
 
-export const ExecutionBindingSchema = z.strictObject({
+export const ExecutionBindingSchema = ResolvedInputEvidenceSchema.safeExtend({
   entryModuleId: ModuleIdSchema,
   entrySourceHash: HashSchema,
   sourceClosureHash: HashSchema,
   function: PythonIdentifierSchema,
-  resolvedInputs: ResolvedInputsSchema,
 });
 export type ExecutionBinding = z.infer<typeof ExecutionBindingSchema>;
 export const executionBindingKey = (binding: ExecutionBinding): string =>

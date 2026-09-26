@@ -1,3 +1,4 @@
+import { executionBindingFrom } from '@cs-object/core';
 import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -71,16 +72,10 @@ export function prepareDemoExamples({
     execution: result.capture.execution,
     assets: captureAssets(sourcePath, result.capture.execution),
   });
-  const { entry, sourceManifest, sourceClosureHash } = result.capture.execution;
+  const { sourceManifest } = result.capture.execution;
   const pythonSource = PythonSourceBundleSchema.parse({
     version: '1',
-    binding: {
-      entryModuleId: entry.moduleId,
-      entrySourceHash: entry.sourceHash,
-      sourceClosureHash,
-      function: entry.function,
-      resolvedInputs: entry.resolvedInputs,
-    },
+    binding: executionBindingFrom(result.capture.execution),
     files: sourceManifest.map((file) => ({
       ...file,
       code: readFileSync(join(source, file.moduleId), 'utf8'),

@@ -124,7 +124,11 @@ class ExecutionTest(unittest.TestCase):
                 parameters="x: float = 1e20",
             )
         )
-        execution = self.success(self.run_case())
+        execution = json.loads(json.dumps(self.success(self.run_case())))
+        self.assertEqual(execution["entry"]["resolvedInputKinds"], {"x": "float"})
+        self.assertEqual(
+            execution["invocations"][0]["resolvedInputKinds"], {"x": "float"}
+        )
         self.assertEqual(
             execution["invocations"][0]["inputBindings"][0]["numericKind"], "float"
         )

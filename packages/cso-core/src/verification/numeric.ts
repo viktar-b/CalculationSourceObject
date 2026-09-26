@@ -1,4 +1,4 @@
-import type { NumericKind } from '../contracts/numbers.ts';
+import { numericValueIssue, type NumericKind } from '../contracts/numbers.ts';
 import type { Comparison, Diagnostic } from '../contracts/common.ts';
 import type { NumericPolicy } from '../contracts/reports.ts';
 
@@ -51,28 +51,12 @@ export function validateNumber(
   value: number,
   numericKind?: NumericKind,
 ): NumericResult {
-  if (!Number.isFinite(value)) {
+  const issue = numericValueIssue({ value, numericKind });
+  if (issue) {
     return failure(
-      'NON_FINITE_NUMBER',
-      `Expected a finite real number, received ${String(value)}.`,
-      numberDisplay(value),
-    );
-  }
-  if (numericKind === 'int' && !Number.isInteger(value)) {
-    return failure(
-      'NUMERIC_KIND_MISMATCH',
-      'Python int evidence requires an integer.',
-    );
-  }
-  if (
-    numericKind !== 'float' &&
-    Number.isInteger(value) &&
-    !Number.isSafeInteger(value)
-  ) {
-    return failure(
-      'UNSUPPORTED_NUMERIC_RANGE',
-      `Integer-valued number ${String(value)} is outside the supported exact range.`,
-      numberDisplay(value),
+      issue.code,
+      issue.message,
+      issue.code === 'NUMERIC_KIND_MISMATCH' ? undefined : numberDisplay(value),
     );
   }
   return {

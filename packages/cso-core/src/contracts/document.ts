@@ -9,7 +9,7 @@ import {
   executionBindingKey,
   sha256Bytes,
 } from './common.ts';
-import { ExecutionPayloadSchema } from './execution.ts';
+import { ExecutionPayloadSchema, executionBindingFrom } from './execution.ts';
 import { glyphIdentity } from './glyphs.ts';
 
 type HistoricalJsonValue = z.infer<ReturnType<typeof z.json>>;
@@ -258,10 +258,7 @@ export const PreparedDocumentSchema = z
     documentVersion: z.literal('2'),
     context: ContextSchema,
     source: z.discriminatedUnion('kind', [
-      z.strictObject({
-        ...ExecutionBindingSchema.shape,
-        kind: z.literal('execution'),
-      }),
+      ExecutionBindingSchema.safeExtend({ kind: z.literal('execution') }),
       z.strictObject({
         kind: z.literal('legacy'),
         fixtureId: NonemptyStringSchema,
@@ -300,13 +297,9 @@ export const BoundPreparedDocumentSchema = z
       );
       return;
     }
-    const expected = ExecutionBindingSchema.safeParse({
-      entryModuleId: execution.entry.moduleId,
-      entrySourceHash: execution.entry.sourceHash,
-      sourceClosureHash: execution.sourceClosureHash,
-      function: execution.entry.function,
-      resolvedInputs: execution.entry.resolvedInputs,
-    });
+    const expected = ExecutionBindingSchema.safeParse(
+      executionBindingFrom(execution),
+    );
     const { kind: _, ...binding } = document.source;
     const actual = ExecutionBindingSchema.safeParse(binding);
     if (!(expected.success && actual.success)) {

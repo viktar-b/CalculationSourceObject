@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import {
+  executionBindingFrom,
   ReferenceFileSchema,
   contractIssuesToDiagnostics,
   referenceBindingKey,
@@ -49,13 +50,7 @@ export function captureReference(
         ),
       };
     }
-    const binding = referenceBindingKey({
-      entryModuleId: execution.entry.moduleId,
-      entrySourceHash: execution.entry.sourceHash,
-      sourceClosureHash: execution.sourceClosureHash,
-      function: execution.entry.function,
-      resolvedInputs: execution.entry.resolvedInputs,
-    });
+    const binding = referenceBindingKey(executionBindingFrom(execution));
     provenance.revisions = parsed.data.cases
       .filter((item) => referenceBindingKey(item.binding) === binding)
       .map((item) => item.revision);

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { NumericKindSchema } from '../contracts/numbers.ts';
+import { NumericValueSchema } from '../contracts/numbers.ts';
 import { glyphIdentity } from '../contracts/glyphs.ts';
 import { parseNotation } from '../notation/parse.ts';
 import { supportedValueFunctionIds } from './functions.ts';
@@ -8,13 +8,7 @@ const IdSchema = z.string().min(1);
 
 export const SheetLiteralSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('empty') }).strict(),
-  z
-    .object({
-      kind: z.literal('number'),
-      value: z.number(),
-      numericKind: NumericKindSchema.optional(),
-    })
-    .strict(),
+  NumericValueSchema.safeExtend({ kind: z.literal('number') }),
   z.object({ kind: z.literal('string'), value: z.string() }).strict(),
   z.object({ kind: z.literal('boolean'), value: z.boolean() }).strict(),
 ]);

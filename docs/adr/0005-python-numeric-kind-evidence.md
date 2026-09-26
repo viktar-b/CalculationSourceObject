@@ -32,6 +32,18 @@ conservative integer-valued range rule. The verification report identifies the
 new policy as `finite-real-typed-safe-integer`; report readers also accept the
 historical policy identifier.
 
+Keep resolved input values as number maps and carry their actual kinds in
+optional `resolvedInputKinds` maps. Preserve that evidence in execution,
+reference, document and report bindings. A missing kind uses the conservative
+range rule; a large floating-point input needs explicit float evidence.
+Reject contradictory kinds and kinds for nonexistent inputs. Core checks
+captured input kinds against their authoritative bindings.
+
+Reference identity remains numerical: equal `int` and `float` inputs match the
+same case, while positive and negative zero remain distinct. Kind evidence
+governs acceptance and arithmetic, not a new reference identity. This retains
+existing safe-input references without inventing kinds for older records.
+
 ## Consequences
 
 ### Positive
@@ -39,6 +51,8 @@ historical policy identifier.
 - Reference formulas can retain large floating-point intermediates unchanged.
 - Exact integers remain protected against silent JSON rounding.
 - Existing captured fixtures remain readable without fabricating numeric kinds.
+- Numeric contracts retain their validation when extended; callers no longer
+  assemble numeric fields and attach a separate validation step.
 
 ### Negative / Trade-offs
 

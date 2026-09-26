@@ -41,7 +41,11 @@ within the supported numeric range: exact integers fit ±(2**53 - 1), while
 Python floats may use the full finite binary64 range. Execution records actual
 `numericKind` separately from the declared annotation. Older captures without
 kind evidence retain the conservative integer-valued range limit. See
-[the numeric evidence decision](adr/0005-python-numeric-kind-evidence.md). Execution preserves values without coercion
+[the numeric evidence decision](adr/0005-python-numeric-kind-evidence.md).
+Input-kind evidence accompanies resolved input values in captures and their
+reference, document and report bindings. Older safe-input references remain
+valid; large floating-point reference inputs require explicit kind evidence.
+Execution preserves values without coercion
 and rejects booleans. Use `float` when a formula can produce a fractional value,
 including Python division. See [the decision](adr/0003-runtime-numeric-declarations.md).
 

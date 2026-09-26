@@ -13,8 +13,10 @@ import {
   SourceSpanSchema,
   collectCsoSymbols,
   executionBindingKey,
+  resolvedInputKind,
 } from '../contracts/common.ts';
 import {
+  executionBindingFrom,
   type ExecutionPayload,
   ExecutionPayloadSchema,
   type InputBinding,
@@ -308,13 +310,7 @@ const applyReferenceIssueContext = (
       if (
         binding.success &&
         executionBindingKey(binding.data) ===
-          executionBindingKey({
-            entryModuleId: referenceExecution.entry.moduleId,
-            entrySourceHash: referenceExecution.entry.sourceHash,
-            sourceClosureHash: referenceExecution.sourceClosureHash,
-            function: referenceExecution.entry.function,
-            resolvedInputs: referenceExecution.entry.resolvedInputs,
-          })
+          executionBindingKey(executionBindingFrom(referenceExecution))
       ) {
         execution = referenceExecution;
       }
@@ -669,10 +665,12 @@ const bindingLocations = (
 
 const checkBinding = ({
   binding,
+  entry,
   evaluator,
   invocation,
 }: {
   readonly binding: InputBinding;
+  readonly entry: ExecutionPayload['entry'];
   readonly evaluator: FormulaEvaluator;
   readonly invocation: Invocation;
 }): BindingCheck => {
@@ -703,6 +701,32 @@ const checkBinding = ({
     };
   }
 
+  const capturedKind = resolvedInputKind(invocation, binding.parameterName);
+  const entryKind =
+    invocation.id === 'root'
+      ? resolvedInputKind(entry, binding.parameterName)
+      : undefined;
+  if (
+    expected.numericKind !== undefined &&
+    [capturedKind, entryKind].some(
+      (kind) => kind !== undefined && kind !== expected.numericKind,
+    )
+  ) {
+    return {
+      expected,
+      passed: false,
+      diagnostics: [
+        {
+          code: 'INPUT_NUMERIC_KIND_MISMATCH',
+          message: `Resolved input '${binding.parameterName}' differs from its authoritative numeric kind.`,
+          stage: 'verification',
+          check: 'inputConsistency',
+          invocationId: invocation.id,
+          location: binding.parameterLocation,
+        },
+      ],
+    };
+  }
   const resolved = invocation.resolvedInputs[binding.parameterName];
   const comparison = compareNumbers(resolved, expected.value);
   if (comparison.matches) {
@@ -1179,7 +1203,15 @@ const verifyDefinitions = ({
   for (const invocation of execution.invocations) {
     for (const binding of invocation.inputBindings) {
       const key = JSON.stringify([invocation.id, binding.parameterName]);
-      bindingChecks.set(key, checkBinding({ binding, evaluator, invocation }));
+      bindingChecks.set(
+        key,
+        checkBinding({
+          binding,
+          entry: execution.entry,
+          evaluator,
+          invocation,
+        }),
+      );
     }
   }
 
@@ -1321,13 +1353,7 @@ const verifyReferences = ({
       }),
     };
   }
-  const bindingKey = executionBindingKey({
-    entryModuleId: execution.entry.moduleId,
-    entrySourceHash: execution.entry.sourceHash,
-    sourceClosureHash: execution.sourceClosureHash,
-    function: execution.entry.function,
-    resolvedInputs: execution.entry.resolvedInputs,
-  });
+  const bindingKey = executionBindingKey(executionBindingFrom(execution));
   const reference = parsed.data.find(
     (candidate) => executionBindingKey(candidate.binding) === bindingKey,
   );

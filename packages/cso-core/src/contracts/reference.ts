@@ -1,12 +1,12 @@
 import { z } from 'zod';
-import { numericValueShape, refineNumericValue } from './numbers.ts';
+import { NumericValueSchema } from './numbers.ts';
 import {
   ExecutionBindingSchema,
   executionBindingKey,
   collectCsoSymbols,
   NonemptyStringSchema,
 } from './common.ts';
-import { ExecutionPayloadSchema } from './execution.ts';
+import { ExecutionPayloadSchema, executionBindingFrom } from './execution.ts';
 import type { VerificationReport } from './reports.ts';
 
 export const ReferenceBindingSchema = ExecutionBindingSchema;
@@ -21,13 +21,10 @@ export const ReferenceCaseSchema = z
     }),
     binding: ReferenceBindingSchema,
     expected: z.array(
-      z
-        .strictObject({
-          symbolId: NonemptyStringSchema,
-          ...numericValueShape,
-          unit: z.string(),
-        })
-        .superRefine(refineNumericValue),
+      NumericValueSchema.safeExtend({
+        symbolId: NonemptyStringSchema,
+        unit: z.string(),
+      }),
     ),
   })
   .superRefine((reference, ctx) => {
@@ -86,13 +83,7 @@ export const BoundReferenceCaseSchema = z
     referenceCase: ReferenceCaseSchema,
   })
   .superRefine(({ execution, referenceCase }, ctx) => {
-    const binding = {
-      entryModuleId: execution.entry.moduleId,
-      entrySourceHash: execution.entry.sourceHash,
-      sourceClosureHash: execution.sourceClosureHash,
-      function: execution.entry.function,
-      resolvedInputs: execution.entry.resolvedInputs,
-    };
+    const binding = executionBindingFrom(execution);
     if (
       referenceBindingKey(binding) !==
       referenceBindingKey(referenceCase.binding)

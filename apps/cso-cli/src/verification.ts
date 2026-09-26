@@ -1,4 +1,5 @@
 import {
+  executionBindingFrom,
   CommandReportSchema,
   verifyExecution,
   type CommandReport,
@@ -80,11 +81,7 @@ export function executeAndVerify(
   }
   const execution = response.execution;
   report.provenance = {
-    entryModuleId: execution.entry.moduleId,
-    entrySourceHash: execution.entry.sourceHash,
-    sourceClosureHash: execution.sourceClosureHash,
-    function: execution.entry.function,
-    resolvedInputs: execution.entry.resolvedInputs,
+    ...executionBindingFrom(execution),
     sourceManifest: execution.sourceManifest,
     versions: execution.versions,
   };

@@ -314,6 +314,9 @@ class Planner:
             if "value" in rec:
                 rec["numericKind"] = numeric_kind(rec["value"])
             record["inputBindings"].append(rec)
+        record["resolvedInputKinds"] = {
+            name: numeric_kind(value) for name, value in record["resolvedInputs"].items()
+        }
         self.invocations.append(inv)
         self.sections.append(section_obj)
         for name, param in parameters.items():

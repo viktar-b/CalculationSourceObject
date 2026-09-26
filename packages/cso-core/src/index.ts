@@ -176,6 +176,7 @@ export {
   type Versions,
 } from './contracts/common.ts';
 export {
+  executionBindingFrom,
   ExecutionPayloadSchema,
   ExecutionResponseSchema,
   GivenSourceSchema,

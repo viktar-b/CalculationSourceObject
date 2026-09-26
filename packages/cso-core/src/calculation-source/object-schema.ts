@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { NumericKindSchema } from '../contracts/numbers.ts';
+import { NumericValueSchema } from '../contracts/numbers.ts';
 import { glyphIdentity } from '../contracts/glyphs.ts';
 import { parseNotation } from '../notation/parse.ts';
 import { supportedValueFunctionIds } from '../sheet-model/functions.ts';
@@ -27,13 +27,7 @@ const JsonObjectSchema: z.ZodType<Record<string, unknown>> = z
 
 export const CalculationSourceLiteralSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('empty') }).strict(),
-  z
-    .object({
-      kind: z.literal('number'),
-      value: z.number(),
-      numericKind: NumericKindSchema.optional(),
-    })
-    .strict(),
+  NumericValueSchema.safeExtend({ kind: z.literal('number') }),
   z.object({ kind: z.literal('string'), value: z.string() }).strict(),
   z.object({ kind: z.literal('boolean'), value: z.boolean() }).strict(),
 ]);

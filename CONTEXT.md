@@ -25,6 +25,10 @@ A named quantity with a displayed glyph, descriptive metadata, and a value.
 A formula represented by literal values, symbol references, and function
 applications, with a designated root and a documented result.
 
+**Numeric evidence**:
+A recorded quantity's value and, when captured, its actual integer or
+floating-point kind. Its kind is distinct from the quantity's declared type.
+
 **FormulaSheet**:
 The reviewable presentation of a calculation's rows, mathematical notation,
 substitutions, units, explanations, and results.

@@ -87,6 +87,7 @@ class Execution:
         self.observations.clear()
         for invocation in self.planner.invocations:
             invocation.record["resolvedInputs"] = {}
+            invocation.record["resolvedInputKinds"] = {}
             for symbol in invocation.symbols.values():
                 symbol.cso["valueTree"].pop("result", None)
             for output in invocation.output_records:
@@ -228,6 +229,10 @@ class Execution:
             )
             for name, param in invocation.parameters.items()
         }
+        invocation.record["resolvedInputKinds"] = {
+            name: numeric_kind(value)
+            for name, value in invocation.record["resolvedInputs"].items()
+        }
         for binding in invocation.record["inputBindings"]:
             name = binding["parameterName"]
             if binding["kind"] == "entrySupplied":
@@ -240,6 +245,9 @@ class Execution:
             ):
                 symbol.cso["valueTree"]["nodes"][0]["literal"]["value"] = (
                     invocation.record["resolvedInputs"][name]
+                )
+                symbol.cso["valueTree"]["nodes"][0]["literal"]["numericKind"] = (
+                    invocation.record["resolvedInputKinds"][name]
                 )
         token = ACTIVE.set((self, invocation, iter(invocation.calls.values())))
         try:
@@ -342,6 +350,7 @@ class Execution:
                     "function": root.function.name,
                     "invocationId": "root",
                     "resolvedInputs": root.record["resolvedInputs"],
+                    "resolvedInputKinds": root.record["resolvedInputKinds"],
                 },
                 "sourceManifest": manifest,
                 "sourceClosureHash": capture.closure_hash(),
@@ -400,6 +409,7 @@ def execute(source: Path, function: str, inputs: Json) -> Json:
                     execution.planner.capture.closure_hash()
                 )
                 provenance["resolvedInputs"] = execution.root.record["resolvedInputs"]
+                provenance["resolvedInputKinds"] = execution.root.record["resolvedInputKinds"]
         return {
             "protocolVersion": "2",
             "ok": False,

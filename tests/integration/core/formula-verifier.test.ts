@@ -733,7 +733,9 @@ describe('verifyExecution', () => {
         expect(report.ok).toBe(false);
         const diagnostic = required(
           report.diagnostics.find(
-            (item) => item.code === 'UNSUPPORTED_NUMERIC_RANGE',
+            (item) =>
+              item.code === 'UNSUPPORTED_NUMERIC_RANGE' &&
+              item.valueDisplay?.text === String(value),
           ),
           `Missing range diagnostic for ${target}.`,
         );

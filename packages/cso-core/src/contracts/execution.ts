@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { numericValueShape, refineNumericValue } from './numbers.ts';
+import { NumericValueSchema } from './numbers.ts';
 import { AuthoringEvidenceSchema } from './authoring.ts';
 import { scopedGlyph } from './glyphs.ts';
 import { CalculationSourceObjectSchema } from '../calculation-source/object-schema.ts';
@@ -12,12 +12,14 @@ import {
   NonemptyStringSchema,
   ProvenanceSchema,
   PythonIdentifierSchema,
-  ResolvedInputsSchema,
+  ResolvedInputEvidenceSchema,
+  type ExecutionBinding,
   SourceManifestSchema,
   SourceSpanSchema,
   VersionsSchema,
   collectCsoSymbols,
   namespacedId,
+  resolvedInputKind,
   sourceClosureHash,
 } from './common.ts';
 
@@ -30,13 +32,9 @@ const IdentityStringSchema = NonemptyStringSchema.refine(
   },
 );
 const ParameterNameSchema = PythonIdentifierSchema;
-const LiteralSourceSchema = z
-  .object({
-    ...numericValueShape,
-    location: SourceSpanSchema,
-  })
-  .strict()
-  .superRefine(refineNumericValue);
+const LiteralSourceSchema = NumericValueSchema.safeExtend({
+  location: SourceSpanSchema,
+});
 
 export const GivenSourceSchema = z.discriminatedUnion('kind', [
   z
@@ -45,10 +43,7 @@ export const GivenSourceSchema = z.discriminatedUnion('kind', [
       parameterName: ParameterNameSchema,
     })
     .strict(),
-  z
-    .object({ kind: z.literal('literal'), ...LiteralSourceSchema.shape })
-    .strict()
-    .superRefine(refineNumericValue),
+  LiteralSourceSchema.safeExtend({ kind: z.literal('literal') }),
 ]);
 
 const definitionIdentity = {
@@ -92,32 +87,20 @@ const bindingIdentity = {
   parameterName: ParameterNameSchema,
   parameterLocation: SourceSpanSchema,
 };
-const EntrySuppliedBindingSchema = z
-  .object({
-    ...bindingIdentity,
-    kind: z.literal('entrySupplied'),
-    ...numericValueShape,
-  })
-  .strict()
-  .superRefine(refineNumericValue);
-const ParsedDefaultBindingSchema = z
-  .object({
-    ...bindingIdentity,
-    kind: z.literal('parsedDefault'),
-    ...numericValueShape,
-    defaultLocation: SourceSpanSchema,
-  })
-  .strict()
-  .superRefine(refineNumericValue);
-const CallerLiteralBindingSchema = z
-  .object({
-    ...bindingIdentity,
-    kind: z.literal('callerLiteral'),
-    ...numericValueShape,
-    callerLocation: SourceSpanSchema,
-  })
-  .strict()
-  .superRefine(refineNumericValue);
+const EntrySuppliedBindingSchema = NumericValueSchema.safeExtend({
+  ...bindingIdentity,
+  kind: z.literal('entrySupplied'),
+});
+const ParsedDefaultBindingSchema = NumericValueSchema.safeExtend({
+  ...bindingIdentity,
+  kind: z.literal('parsedDefault'),
+  defaultLocation: SourceSpanSchema,
+});
+const CallerLiteralBindingSchema = NumericValueSchema.safeExtend({
+  ...bindingIdentity,
+  kind: z.literal('callerLiteral'),
+  callerLocation: SourceSpanSchema,
+});
 const CallerSymbolBindingSchema = z
   .object({
     ...bindingIdentity,
@@ -135,76 +118,60 @@ export const InputBindingSchema = z.discriminatedUnion('kind', [
 const invocationFields = {
   moduleId: ModuleIdSchema,
   function: PythonIdentifierSchema,
-  resolvedInputs: ResolvedInputsSchema,
   symbols: z.array(SymbolDefinitionSchema),
 };
-const RootInvocationSchema = z
-  .object({
-    ...invocationFields,
-    id: z.literal('root'),
-    inputBindings: z.array(
-      z.discriminatedUnion('kind', [
-        EntrySuppliedBindingSchema,
-        ParsedDefaultBindingSchema,
-      ]),
-    ),
-  })
-  .strict();
-const ChildInvocationSchema = z
-  .object({
-    ...invocationFields,
-    id: IdentityStringSchema.refine((id) => id !== 'root', {
-      message: 'A child invocation cannot be root',
-    }),
-    parentInvocationId: IdentityStringSchema,
-    callBindingName: PythonIdentifierSchema,
-    callSite: SourceSpanSchema,
-    inputBindings: z.array(
-      z.discriminatedUnion('kind', [
-        ParsedDefaultBindingSchema,
-        CallerLiteralBindingSchema,
-        CallerSymbolBindingSchema,
-      ]),
-    ),
-  })
-  .strict();
+const RootInvocationSchema = ResolvedInputEvidenceSchema.safeExtend({
+  ...invocationFields,
+  id: z.literal('root'),
+  inputBindings: z.array(
+    z.discriminatedUnion('kind', [
+      EntrySuppliedBindingSchema,
+      ParsedDefaultBindingSchema,
+    ]),
+  ),
+}).strict();
+const ChildInvocationSchema = ResolvedInputEvidenceSchema.safeExtend({
+  ...invocationFields,
+  id: IdentityStringSchema.refine((id) => id !== 'root', {
+    message: 'A child invocation cannot be root',
+  }),
+  parentInvocationId: IdentityStringSchema,
+  callBindingName: PythonIdentifierSchema,
+  callSite: SourceSpanSchema,
+  inputBindings: z.array(
+    z.discriminatedUnion('kind', [
+      ParsedDefaultBindingSchema,
+      CallerLiteralBindingSchema,
+      CallerSymbolBindingSchema,
+    ]),
+  ),
+}).strict();
 export const InvocationSchema = z.union([
   RootInvocationSchema,
   ChildInvocationSchema,
 ]);
-export const SymbolObservationSchema = z
-  .object({
-    symbolId: IdentityStringSchema,
-    invocationId: IdentityStringSchema,
-    kind: z.enum(['input', 'constant', 'formula', 'unsupported']),
-    ...numericValueShape,
-    definitionLocation: SourceSpanSchema,
-  })
-  .strict()
-  .superRefine(refineNumericValue);
-export const OperationObservationSchema = z
-  .object({
-    address: NodeAddressSchema,
-    invocationId: IdentityStringSchema,
-    ...numericValueShape,
-    location: SourceSpanSchema,
-  })
-  .strict()
-  .superRefine(refineNumericValue);
+export const SymbolObservationSchema = NumericValueSchema.safeExtend({
+  symbolId: IdentityStringSchema,
+  invocationId: IdentityStringSchema,
+  kind: z.enum(['input', 'constant', 'formula', 'unsupported']),
+  definitionLocation: SourceSpanSchema,
+});
+export const OperationObservationSchema = NumericValueSchema.safeExtend({
+  address: NodeAddressSchema,
+  invocationId: IdentityStringSchema,
+  location: SourceSpanSchema,
+});
 
 const ExecutionPayloadBaseSchema = z
   .object({
     cso: CalculationSourceObjectSchema,
     authoring: AuthoringEvidenceSchema.optional(),
-    entry: z
-      .object({
-        moduleId: ModuleIdSchema,
-        function: PythonIdentifierSchema,
-        sourceHash: HashSchema,
-        invocationId: z.literal('root'),
-        resolvedInputs: ResolvedInputsSchema,
-      })
-      .strict(),
+    entry: ResolvedInputEvidenceSchema.safeExtend({
+      moduleId: ModuleIdSchema,
+      function: PythonIdentifierSchema,
+      sourceHash: HashSchema,
+      invocationId: z.literal('root'),
+    }).strict(),
     sourceManifest: SourceManifestSchema,
     sourceClosureHash: HashSchema,
     invocations: z.array(InvocationSchema).min(1),
@@ -349,6 +316,24 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
         ['entry'],
         'Entry module, function and resolved inputs must match the root invocation',
       );
+    }
+
+    if (root) {
+      for (const name of Object.keys(execution.entry.resolvedInputs)) {
+        const entryKind = resolvedInputKind(execution.entry, name);
+        const rootKind = resolvedInputKind(root, name);
+        if (
+          entryKind !== undefined &&
+          rootKind !== undefined &&
+          entryKind !== rootKind
+        ) {
+          issue(
+            'INPUT_NUMERIC_KIND_MISMATCH',
+            ['entry', 'resolvedInputKinds', name],
+            'Entry numeric kind differs from the root invocation',
+          );
+        }
+      }
     }
 
     const checkMetadata = (
@@ -1093,6 +1078,7 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
         if (
           parameter.numericType === 'int' &&
           (!Number.isInteger(owner.resolvedInputs[parameter.parameterName]) ||
+            resolvedInputKind(owner, parameter.parameterName) === 'float' ||
             execution.observations.some(
               (observation) =>
                 observation.symbolId === parameter.symbolId &&
@@ -1495,3 +1481,19 @@ export type OperationObservation = z.infer<typeof OperationObservationSchema>;
 export type ExecutionPayload = z.infer<typeof ExecutionPayloadSchema>;
 export type ExecutionResponse = z.infer<typeof ExecutionResponseSchema>;
 export type { Invocation, SymbolDefinition };
+
+/** Preserve the complete input evidence whenever an execution is bound to an artifact. */
+export const executionBindingFrom = (
+  execution: ExecutionPayload,
+): ExecutionBinding => ({
+  entryModuleId: execution.entry.moduleId,
+  entrySourceHash: execution.entry.sourceHash,
+  sourceClosureHash: execution.sourceClosureHash,
+  function: execution.entry.function,
+  resolvedInputs: execution.entry.resolvedInputs,
+  ...(execution.entry.resolvedInputKinds === undefined
+    ? {}
+    : {
+        resolvedInputKinds: execution.entry.resolvedInputKinds,
+      }),
+});

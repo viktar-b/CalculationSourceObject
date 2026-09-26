@@ -163,6 +163,28 @@ def calculate(amount: float):
         fresh.run_root({"amount": 5})
         self.assert_run_state_matches(execution, fresh)
 
+    def test_reuse_refreshes_numeric_kinds_in_root_and_child_inputs(self):
+        handle = self.handle("forwarded_output", "forward")
+        handle(amount=2)
+        execution = handle._execution
+        for amount, kind in [(2.0, "float"), (1e20, "float"), (3, "int")]:
+            with self.subTest(amount=amount, kind=kind):
+                self.assertEqual(handle(amount=amount), {"total": (amount + 3) * 2})
+                self.assertIs(handle._execution, execution)
+                fresh = Execution(
+                    self.root / "forwarded_output.cso.py", "forward", {"amount": amount}
+                )
+                fresh.run_root({"amount": amount})
+                self.assert_run_state_matches(execution, fresh)
+                for invocation in execution.planner.invocations:
+                    self.assertEqual(
+                        invocation.record["resolvedInputKinds"]["amount"], kind
+                    )
+                symbol = execution.root.parameter_symbols["amount"]
+                self.assertEqual(
+                    symbol.cso["valueTree"]["nodes"][0]["literal"]["numericKind"], kind
+                )
+
     def test_warm_handle_rechecks_the_generated_fingerprint(self):
         handle = self.handle("defaulted_step", "adjust")
         self.assertEqual(handle(amount=2), {"adjusted": 5, "original": 2})
