@@ -165,7 +165,10 @@ test.each(['fg.pow', 'fg.uminus'])(
   },
 );
 
-test('fences a negative literal power base', () => {
+test.each([
+  { name: 'literal', value: -2, draft: undefined, expected: '( -2.00 ) 2.00' },
+  { name: 'draft', value: 2, draft: '-2', expected: '( -2 ) 2.00' },
+])('fences a negative $name power base', ({ value, draft, expected }) => {
   const negative = SheetDocumentSchema.parse({
     ...sheet,
     symbols: [
@@ -184,7 +187,8 @@ test('fences a negative literal power base', () => {
             {
               key: 'base',
               kind: 'literal',
-              value: { kind: 'number', value: -2 },
+              value: { kind: 'number', value },
+              draft,
             },
             {
               key: 'exponent',
@@ -200,7 +204,7 @@ test('fences a negative literal power base', () => {
     htmlText(
       renderToStaticMarkup(createElement(FormulaSheet, { sheet: negative })),
     ),
-  ).toContain('( -2.00 ) 2.00');
+  ).toContain(expected);
 });
 
 describe.each([
@@ -225,6 +229,66 @@ describe.each([
       },
       left: 5,
       expected: [`5.00 ${operator} ( -2.00 )`],
+      fences: [1],
+    },
+    {
+      name: 'negative draft with positive backing',
+      right: {
+        kind: 'literal',
+        key: 'right',
+        value: { kind: 'number', value: 2 },
+        draft: '  -2',
+      },
+      left: 5,
+      expected: [`5.00 ${operator} ( -2 )`],
+      fences: [1],
+    },
+    {
+      name: 'negative draft with empty backing',
+      right: {
+        kind: 'literal',
+        key: 'right',
+        value: { kind: 'empty' },
+        draft: '-2',
+      },
+      left: 5,
+      expected: [`5.00 ${operator} ( -2 )`],
+      fences: [1],
+    },
+    {
+      name: 'positive draft with negative backing',
+      right: {
+        kind: 'literal',
+        key: 'right',
+        value: { kind: 'number', value: -2 },
+        draft: '2',
+      },
+      left: 5,
+      expected: [`5.00 ${operator} 2`],
+      fences: [0],
+    },
+    {
+      name: 'empty draft keeps negative numeric value',
+      right: {
+        kind: 'literal',
+        key: 'right',
+        value: { kind: 'number', value: -2 },
+        draft: '',
+      },
+      left: 5,
+      expected: [`5.00 ${operator} ( -2.00 )`],
+      fences: [1],
+    },
+    {
+      name: 'Unicode minus draft',
+      right: {
+        kind: 'literal',
+        key: 'right',
+        value: { kind: 'number', value: 2 },
+        draft: '−2',
+      },
+      left: 5,
+      expected: [`5.00 ${operator} ( −2 )`],
       fences: [1],
     },
     {
@@ -391,88 +455,99 @@ describe.each([
   );
 });
 
-test('groups negative continuation terms in long sums without fencing the first term', () => {
-  const terms: SheetValueNode[] = [
-    { kind: 'literal', key: 'first', value: { kind: 'number', value: -5 } },
-    { kind: 'literal', key: 'negative', value: { kind: 'number', value: -2 } },
-    { kind: 'symbol', key: 'reference', symbolId: 'operand' },
-    {
-      kind: 'function',
-      key: 'unary',
-      functionId: 'fg.uminus',
-      argKeys: ['positive'],
-    },
-    { kind: 'literal', key: 'positive', value: { kind: 'number', value: 2 } },
-    {
-      kind: 'function',
-      key: 'compound',
-      functionId: 'fg.subtract',
-      argKeys: ['positive', 'one'],
-    },
-  ];
-  const sums: SheetValueNode[] = terms.slice(1).map((term, index) => ({
-    kind: 'function',
-    key: `sum${index + 1}`,
-    functionId: 'fg.add',
-    argKeys: [index === 0 ? 'first' : `sum${index}`, term.key],
-  }));
-  const longSum = SheetDocumentSchema.parse({
-    ...sheet,
-    symbols: [
+test.each([
+  { name: 'literal', value: -2, draft: undefined, expected: '+ ( -2.00 )' },
+  { name: 'draft', value: 2, draft: '-2', expected: '+ ( -2 )' },
+])(
+  'groups negative $name continuation terms in long sums without fencing the first term',
+  ({ value, draft, expected }) => {
+    const terms: SheetValueNode[] = [
+      { kind: 'literal', key: 'first', value: { kind: 'number', value: -5 } },
       {
-        ...sheet.symbols[0],
-        glyph: 's',
-        valueTree: {
-          rootKey: 'sum5',
-          result: { kind: 'number', value: -9 },
-          nodes: [
-            ...terms,
-            ...sums,
-            {
-              kind: 'literal',
-              key: 'one',
-              value: { kind: 'number', value: 1 },
-            },
-          ],
-        },
+        kind: 'literal',
+        key: 'negative',
+        value: { kind: 'number', value },
+        draft,
       },
+      { kind: 'symbol', key: 'reference', symbolId: 'operand' },
       {
-        id: 'operand',
-        glyph: 'b',
-        description: 'Operand',
-        valueTree: {
-          rootKey: 'value',
-          result: { kind: 'number', value: -3 },
-          nodes: [
-            {
-              kind: 'literal',
-              key: 'value',
-              value: { kind: 'number', value: -3 },
-            },
-          ],
-        },
+        kind: 'function',
+        key: 'unary',
+        functionId: 'fg.uminus',
+        argKeys: ['positive'],
       },
-    ],
-  });
-  const markup = renderToStaticMarkup(
-    createElement(FormulaSheet, { sheet: longSum }),
-  );
-  const formulas = (markup.match(/<math\b[^>]*>[\s\S]*?<\/math>/g) ?? [])
-    .map(htmlText)
-    .filter((formula) => /[+=]/.test(formula));
+      { kind: 'literal', key: 'positive', value: { kind: 'number', value: 2 } },
+      {
+        kind: 'function',
+        key: 'compound',
+        functionId: 'fg.subtract',
+        argKeys: ['positive', 'one'],
+      },
+    ];
+    const sums: SheetValueNode[] = terms.slice(1).map((term, index) => ({
+      kind: 'function',
+      key: `sum${index + 1}`,
+      functionId: 'fg.add',
+      argKeys: [index === 0 ? 'first' : `sum${index}`, term.key],
+    }));
+    const longSum = SheetDocumentSchema.parse({
+      ...sheet,
+      symbols: [
+        {
+          ...sheet.symbols[0],
+          glyph: 's',
+          valueTree: {
+            rootKey: 'sum5',
+            result: { kind: 'number', value: -9 },
+            nodes: [
+              ...terms,
+              ...sums,
+              {
+                kind: 'literal',
+                key: 'one',
+                value: { kind: 'number', value: 1 },
+              },
+            ],
+          },
+        },
+        {
+          id: 'operand',
+          glyph: 'b',
+          description: 'Operand',
+          valueTree: {
+            rootKey: 'value',
+            result: { kind: 'number', value: -3 },
+            nodes: [
+              {
+                kind: 'literal',
+                key: 'value',
+                value: { kind: 'number', value: -3 },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const markup = renderToStaticMarkup(
+      createElement(FormulaSheet, { sheet: longSum }),
+    );
+    const formulas = (markup.match(/<math\b[^>]*>[\s\S]*?<\/math>/g) ?? [])
+      .map(htmlText)
+      .filter((formula) => /[+=]/.test(formula));
 
-  expect(formulas).toEqual([
-    's = -5.00',
-    '+ ( -2.00 )',
-    '+ b',
-    '+ ( - 2.00 )',
-    '+ 2.00',
-    '+ ( 2.00 - 1.00 )',
-    's = -5.00',
-    '+ ( -2.00 )',
-    '+ ( -3.00 )',
-    '+ ( - 2.00 )',
-    '+ 2.00',
-    '+ ( 2.00 - 1.00 )',
-  ]);
-});
+    expect(formulas).toEqual([
+      's = -5.00',
+      expected,
+      '+ b',
+      '+ ( - 2.00 )',
+      '+ 2.00',
+      '+ ( 2.00 - 1.00 )',
+      's = -5.00',
+      expected,
+      '+ ( -3.00 )',
+      '+ ( - 2.00 )',
+      '+ 2.00',
+      '+ ( 2.00 - 1.00 )',
+    ]);
+  },
+);
