@@ -16,7 +16,9 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
 const repository = fileURLToPath(new URL('..', import.meta.url));
-const output = realpathSync(mkdtempSync(join(tmpdir(), 'cso-isolated-projects-')));
+const output = realpathSync(
+  mkdtempSync(join(tmpdir(), 'cso-isolated-projects-')),
+);
 const archives = join(output, 'archives');
 mkdirSync(archives);
 const commands: {
@@ -85,11 +87,10 @@ for (const [name, relative] of [
 ]) {
   const directory = copyProject(relative, name);
   const manifest = z
-    .object({
+    .looseObject({
       name: z.string(),
       dependencies: z.record(z.string(), z.string()).optional(),
     })
-    .passthrough()
     .parse(JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')));
   for (const [dependency, archive] of dependencies) {
     if (manifest.dependencies?.[dependency])

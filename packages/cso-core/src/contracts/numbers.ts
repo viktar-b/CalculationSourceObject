@@ -35,7 +35,7 @@ export const numericValueIssue = (record: {
 /** Extend with safeExtend so every enclosing record retains the numeric policy. */
 export const NumericValueSchema = z
   .strictObject({
-    value: z.number().finite(),
+    value: z.number(),
     numericKind: NumericKindSchema.optional(),
   })
   .superRefine((record, ctx) => {
@@ -50,15 +50,12 @@ export const NumericValueSchema = z
   });
 
 /** A bare number has no evidence permitting the wider floating-point range. */
-export const SupportedNumberSchema = z
-  .number()
-  .finite()
-  .superRefine((value, ctx) => {
-    const issue = numericValueIssue({ value });
-    if (issue)
-      ctx.addIssue({
-        code: 'custom',
-        message: issue.message,
-        params: { diagnosticCode: issue.code },
-      });
-  });
+export const SupportedNumberSchema = z.number().superRefine((value, ctx) => {
+  const issue = numericValueIssue({ value });
+  if (issue)
+    ctx.addIssue({
+      code: 'custom',
+      message: issue.message,
+      params: { diagnosticCode: issue.code },
+    });
+});
