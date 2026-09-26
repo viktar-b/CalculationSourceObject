@@ -1,14 +1,14 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.5.3/schema.json",
-  "organizeImports": {
-    "enabled": true
+  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
+  "css": {
+    "parser": { "tailwindDirectives": true }
   },
   "linter": {
     "enabled": true,
     "rules": {
-      "all": true,
       "a11y": {
-        "recommended": true,
+        "preset": "recommended",
         "noRedundantRoles": "warn",
         "useButtonType": "warn",
         "useKeyWithClickEvents": "off",
@@ -22,10 +22,10 @@
       },
       "suspicious": {
         "noReactSpecificProps": "off",
-        "noConsoleLog": "error",
         "noShadowRestrictedNames": "warn",
         "noExplicitAny": "off",
-        "noImplicitAnyLet": "off"
+        "noImplicitAnyLet": "off",
+        "noConsole": { "level": "error", "options": { "allow": ["log"] } }
       },
       "style": {
         "useNamingConvention": "off",
@@ -52,7 +52,7 @@
     "indentWidth": 2,
     "lineWidth": 80,
     "lineEnding": "lf",
-    "ignore": []
+    "includes": ["**"]
   },
   "javascript": {
     "formatter": {
@@ -74,6 +74,6 @@
     }
   },
   "files": {
-    "ignore": ["node_modules", ".next", "dist"]
+    "includes": ["**", "!**/node_modules", "!**/.next", "!**/dist"]
   }
 }
