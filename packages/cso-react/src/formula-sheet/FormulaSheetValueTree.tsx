@@ -65,9 +65,11 @@ export const FormulaSheetValueTree = ({
     return (
       <div className="cso-long-formula">
         {(showSymbolic ? [false, true] : [true]).map((numerical) => (
+          // biome-ignore lint/a11y/useSemanticElements: This labels a formula group, not a fieldset of form controls.
           <div
             key={String(numerical)}
             className="cso-formula-terms"
+            role="group"
             aria-label={numerical ? 'Substitution' : 'Formula'}
           >
             {terms.map((rootKey, index) => {
