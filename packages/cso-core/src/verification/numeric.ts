@@ -246,6 +246,35 @@ const binary = (
       ? withKind(exact(left, right), 'int')
       : validateNumber(approximate(left, right), 'float'),
 });
+
+const floatUnary = (calculate: (value: number) => number): Operation => {
+  const evaluate = (value: number) => validateNumber(calculate(value), 'float');
+  return {
+    kind: 'numeric',
+    operands: ['number'],
+    evaluate,
+    typed: ([value]) => evaluate(value),
+  };
+};
+
+const inverseUnitInterval = (
+  name: string,
+  calculate: (value: number) => number,
+): Operation => {
+  const evaluate = (value: number): NumericResult =>
+    value < -1 || value > 1
+      ? failure(
+          'TRIG_DOMAIN_ERROR',
+          `${name} requires an argument between -1 and 1.`,
+        )
+      : validateNumber(calculate(value), 'float');
+  return {
+    kind: 'numeric',
+    operands: ['number'],
+    evaluate,
+    typed: ([value]) => evaluate(value),
+  };
+};
 /** Own operation roles and evaluation together; rendering has a broader vocabulary. */
 const operations = new Map<string, Operation>([
   ['fg.add', binary(add, (a, b) => a + b)],
@@ -323,6 +352,17 @@ const operations = new Map<string, Operation>([
       typed: ([a]) => validateNumber(roundInteger(a), 'int'),
     },
   ],
+  ['fg.rad', floatUnary((degrees) => degrees * (Math.PI / 180))],
+  ['fg.deg', floatUnary((radians) => radians * (180 / Math.PI))],
+  ['fg.sin', floatUnary(Math.sin)],
+  ['fg.cos', floatUnary(Math.cos)],
+  ['fg.tan', floatUnary(Math.tan)],
+  ['fg.asin', inverseUnitInterval('asin', Math.asin)],
+  ['fg.acos', inverseUnitInterval('acos', Math.acos)],
+  ['fg.atan', floatUnary(Math.atan)],
+  ['fg.sinh', floatUnary(Math.sinh)],
+  ['fg.cosh', floatUnary(Math.cosh)],
+  ['fg.tanh', floatUnary(Math.tanh)],
   [
     'fg.max',
     {

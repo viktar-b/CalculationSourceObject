@@ -51,6 +51,28 @@ const beamDocument = {
 };
 
 describe('Python export', () => {
+  test.each([
+    [2, 'float', '2.0'],
+    [-0, 'float', '-0.0'],
+    [1e20, 'float', '100000000000000000000.0'],
+    [1e308, 'float', '1e+308'],
+    [2, 'int', '2'],
+  ] as const)(
+    'preserves numeric literal %s with kind %s',
+    (value, numericKind, expected) => {
+      const { sheet } = createSheetFromValueTreeJson(beamDocument, {
+        id: 'numbers',
+        label: 'Numbers',
+      });
+      const node = sheet.symbols[0].valueTree.nodes[0];
+      if (node.kind !== 'literal') throw new Error('Expected input literal');
+      node.value = { kind: 'number', value, numericKind };
+      expect(createPythonFromSheetDocument(sheet)).toContain(
+        `b = ${expected}\n`,
+      );
+    },
+  );
+
   test('normalizes long separator runs in public identifiers', () => {
     const separators = '_'.repeat(100_000);
     const calculation = createCalculationFromValueTreeJson(beamDocument, {

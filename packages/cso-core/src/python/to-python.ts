@@ -155,12 +155,18 @@ const literalToPython = (literal: SheetLiteral): PythonExpression => {
         precedence: PythonPrecedence.Atom,
         usesMath: false,
       };
-    case 'number':
+    case 'number': {
+      let code = String(literal.value);
+      if (Object.is(literal.value, -0)) code = '-0.0';
+      else if (Number.isNaN(literal.value)) code = 'math.nan';
+      else if (literal.numericKind === 'float' && !/[.e]/i.test(code))
+        code += '.0';
       return {
-        code: Number.isNaN(literal.value) ? 'math.nan' : `${literal.value}`,
+        code,
         precedence: PythonPrecedence.Atom,
         usesMath: Number.isNaN(literal.value),
       };
+    }
     case 'string':
       return {
         code: JSON.stringify(literal.value),
@@ -357,6 +363,9 @@ const comparisonOptions = {
 const functionExpressionRenderers: Readonly<
   Record<string, FunctionExpressionRenderer>
 > = {
+  'fg.acos': (args) => mathSingleArgCall('fg.acos', args, 'acos'),
+  'fg.asin': (args) => mathSingleArgCall('fg.asin', args, 'asin'),
+  'fg.atan': (args) => mathSingleArgCall('fg.atan', args, 'atan'),
   'fg.add': (args) =>
     binaryExpression('fg.add', args, '+', PythonPrecedence.AddSubtract),
   'fg.and': (args) =>
@@ -371,6 +380,8 @@ const functionExpressionRenderers: Readonly<
     };
   },
   'fg.deg': (args) => mathSingleArgCall('fg.deg', args, 'degrees'),
+  'fg.cos': (args) => mathSingleArgCall('fg.cos', args, 'cos'),
+  'fg.cosh': (args) => mathSingleArgCall('fg.cosh', args, 'cosh'),
   'fg.divide': (args) =>
     binaryExpression('fg.divide', args, '/', PythonPrecedence.MultiplyDivide, {
       parenthesizeEqualRight: true,
@@ -421,6 +432,7 @@ const functionExpressionRenderers: Readonly<
     binaryExpression('fg.pow', args, '**', PythonPrecedence.Power, {
       parenthesizeEqualLeft: true,
     }),
+  'fg.rad': (args) => mathSingleArgCall('fg.rad', args, 'radians'),
   'fg.round': (args) =>
     optionalSecondArgCallExpression(
       'fg.round',
@@ -429,6 +441,10 @@ const functionExpressionRenderers: Readonly<
       combineMathUsage(args),
     ),
   'fg.sqrt': (args) => mathSingleArgCall('fg.sqrt', args, 'sqrt'),
+  'fg.sin': (args) => mathSingleArgCall('fg.sin', args, 'sin'),
+  'fg.sinh': (args) => mathSingleArgCall('fg.sinh', args, 'sinh'),
+  'fg.tan': (args) => mathSingleArgCall('fg.tan', args, 'tan'),
+  'fg.tanh': (args) => mathSingleArgCall('fg.tanh', args, 'tanh'),
   'fg.stub': passthroughExpression,
   'fg.subtract': (args) =>
     binaryExpression('fg.subtract', args, '-', PythonPrecedence.AddSubtract, {

@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .function_calls import MATH_FUNCTION_NAMES
+
 Json = dict[str, Any]
 HELPERS = {
     "CalculationResults",
@@ -27,7 +29,7 @@ HELPERS = {
 IMPORTS = {
     "__future__": {"annotations"},
     "typing": {"Annotated", "Any", "TypeAlias"},
-    "math": {"sqrt", "ceil", "pi", "isclose"},
+    "math": MATH_FUNCTION_NAMES | {"pi", "isclose"},
     "cso_python": HELPERS,
 }
 
@@ -40,7 +42,7 @@ def authoring_name(node: ast.AST) -> str | None:
         isinstance(node, ast.Attribute)
         and isinstance(node.value, ast.Name)
         and node.value.id == "math"
-        and node.attr in {"sqrt", "ceil", "pi"}
+        and node.attr in MATH_FUNCTION_NAMES | {"pi"}
     ):
         return "math." + node.attr
     return None

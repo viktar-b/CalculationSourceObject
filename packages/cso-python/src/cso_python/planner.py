@@ -11,6 +11,7 @@ from typing import Any
 from .annotations import Annotation, symbol_annotation
 from .definitions import Definitions
 from .exporter import derived_section_id
+from .function_calls import BUILTIN_FUNCTION_NAMES, CALLS
 from .notation import parse_notation
 from .source import (
     Capture,
@@ -37,14 +38,6 @@ OPS = {
 }
 
 COMPARISONS = {ast.Lt: "fg.lt", ast.LtE: "fg.le", ast.Gt: "fg.gt", ast.GtE: "fg.ge"}
-CALLS = {
-    "sqrt": ("fg.sqrt", 1),
-    "math.sqrt": ("fg.sqrt", 1),
-    "ceil": ("fg.ceil", 1),
-    "math.ceil": ("fg.ceil", 1),
-    "round": ("fg.round", 1),
-    "max": ("fg.max", 2),
-}
 
 
 class Planner:
@@ -608,7 +601,7 @@ class Planner:
                 if (
                     name not in {"given", "documented_result", *CALLS}
                     or node.keywords
-                    or len(node.args) != (CALLS[name][1] if name in CALLS else 1)
+                    or len(node.args) != (CALLS[name].arity if name in CALLS else 1)
                 ):
                     self.error(
                         inv,
@@ -616,7 +609,7 @@ class Planner:
                         "UNSUPPORTED_SYNTAX",
                         "Unsupported formula call or arity",
                     )
-                if name in {"round", "max"} and (
+                if name in BUILTIN_FUNCTION_NAMES and (
                     name in inv.parameters
                     or name in inv.module.imported
                     or name in inv.module.functions
@@ -635,7 +628,7 @@ class Planner:
                     )
                 imported = "math" if name.startswith("math.") else name
                 if (
-                    imported not in {"round", "max"}
+                    imported not in BUILTIN_FUNCTION_NAMES
                     and imported not in inv.module.imported
                 ):
                     self.error(
@@ -705,7 +698,7 @@ class Planner:
                 else:
                     item.update(
                         mode="FUNCTION",
-                        funcSpec={"id": CALLS[name][0]},
+                        funcSpec={"id": CALLS[name].function_id},
                         funcArgs=[{"key": lower(argument)} for argument in node.args],
                     )
             else:
