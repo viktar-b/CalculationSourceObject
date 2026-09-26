@@ -5,25 +5,25 @@
  * literals, symbol references, binary operators, grouped function calls, and
  * special MathML structures using the concrete leaf components in this folder.
  */
-import { renderSpecialValueFunction } from '../function-renderers.tsx';
-import { requiresExplicitOperandGroup } from './operand-grouping.ts';
-import { displayedLiteralDraft } from './literal-display.ts';
-import {
-  getFunctionBinaryOperatorById,
-  getFunctionSpec,
-} from '@cs-object/core';
-import { emptyLiteral } from '@cs-object/core';
-import {
-  getSymbolById,
-  getValueNodeByKey,
-  getValueNodeByKeyOrUndefined,
-} from '@cs-object/core';
+
 import type {
   SheetDocument,
   SheetValueNode,
   SheetValueTree,
 } from '@cs-object/core';
+import {
+  emptyLiteral,
+  getFunctionBinaryOperatorById,
+  getFunctionSpec,
+  getSymbolById,
+  getValueNodeByKey,
+  getValueNodeByKeyOrUndefined,
+  isSheetLiteralEmpty,
+} from '@cs-object/core';
 import type { ReactElement } from 'react';
+import { requiresExplicitOperandGroup } from './operand-grouping.ts';
+import { displayedLiteralDraft } from './literal-display.ts';
+import { renderSpecialValueFunction } from '../function-renderers.tsx';
 import {
   SymbolValueBinaryOperatorMathmlView,
   SymbolValueDraftMathmlView,
@@ -257,7 +257,17 @@ const ValueTreeFunctionMathmlView = ({
     );
 
   return (
-    <SymbolValueGroupMathmlView prefix={groupPrefix} cursor={undefined}>
+    <SymbolValueGroupMathmlView
+      prefix={groupPrefix}
+      cursor={undefined}
+      empty={
+        node.functionId === 'fg.pi' ||
+        node.functionId === 'fg.noop' ||
+        node.functionId === 'fg.stub'
+          ? 'omit'
+          : 'fence'
+      }
+    >
       {node.argKeys
         .map((key) => getValueNodeByKey(valueTree, key))
         .map((argNode) => (

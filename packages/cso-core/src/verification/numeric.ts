@@ -256,15 +256,24 @@ const binary = (
       : validateNumber(approximate(left, right), 'float'),
 });
 
-const floatUnary = (calculate: (value: number) => number): Operation => {
-  const evaluate = (value: number) => validateNumber(calculate(value), 'float');
+const floatOperation = (
+  operands: readonly OperandRole[],
+  calculate: (values: readonly number[]) => number,
+  arity?: Arity,
+): Operation => {
+  const evaluate = (...values: number[]) =>
+    validateNumber(calculate(values), 'float');
   return {
     kind: 'numeric',
-    operands: ['number'],
+    operands,
+    ...(arity === undefined ? {} : { arity }),
     evaluate,
-    typed: ([value]) => evaluate(value),
+    typed: (values) => validateNumber(calculate(values), 'float'),
   };
 };
+
+const floatUnary = (calculate: (value: number) => number): Operation =>
+  floatOperation(['number'], ([value]) => calculate(value));
 
 const inverseUnitInterval = (
   name: string,
@@ -359,6 +368,10 @@ const operations = new Map<string, Operation>([
       evaluate: (value) => absoluteValue(value),
       typed: ([value], kinds) => absoluteValue(value, kinds[0]),
     },
+  ],
+  [
+    'fg.atan2',
+    floatOperation(['number', 'number'], ([y, x]) => Math.atan2(y, x)),
   ],
   ['fg.add', binary(add, (a, b) => a + b)],
   ['fg.subtract', binary(subtract, (a, b) => a - b)],
@@ -455,6 +468,13 @@ const operations = new Map<string, Operation>([
       evaluate: logarithm,
       typed: ([value, base]) => logarithm(value, base),
     },
+  ],
+  [
+    'fg.hypot',
+    floatOperation(['number'], (values) => Math.hypot(...values), {
+      min: 0,
+      max: null,
+    }),
   ],
   [
     'fg.and',
@@ -630,12 +650,15 @@ export function evaluateOperation(
         'Conditional evaluation requires a formula graph.',
       );
     case 'numeric': {
+      const normalizedOperands = operands.map((operand, index) =>
+        numericKinds?.[index] === 'int' && operand === 0 ? 0 : operand,
+      );
       const kinds = numericKinds?.filter(
         (kind): kind is NumericKind => kind !== undefined,
       );
       return kinds !== undefined && kinds.length === operands.length
-        ? operation.typed(operands, kinds)
-        : operation.evaluate(...operands);
+        ? operation.typed(normalizedOperands, kinds)
+        : operation.evaluate(...normalizedOperands);
     }
     default: {
       const exhaustive: never = operation;

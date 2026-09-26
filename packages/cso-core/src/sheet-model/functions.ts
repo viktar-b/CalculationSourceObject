@@ -52,6 +52,7 @@ export const sheetFunctionSpecs = [
   { id: 'fg.acos', glyph: 'acos' },
   { id: 'fg.asin', glyph: 'asin' },
   { id: 'fg.atan', glyph: 'atan' },
+  { id: 'fg.atan2', glyph: 'atan2' },
   {
     id: 'fg.add',
     glyph: '+',
@@ -125,6 +126,7 @@ export const sheetFunctionSpecs = [
     ),
   },
   { id: 'fg.log', glyph: 'log' },
+  { id: 'fg.hypot', glyph: 'hypot' },
   {
     id: 'fg.lt',
     glyph: '<',

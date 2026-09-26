@@ -5,14 +5,13 @@
  * This file keeps the small MathML fragments for literals, symbol glyphs,
  * groups, binary operators, and draft placeholders in one place.
  */
+
+import type { SheetBinaryOperator, SheetLiteral } from '@cs-object/core';
+import { assertNever, formatNumerical } from '@cs-object/core';
+import { isValidElement, type ReactElement, type ReactNode } from 'react';
 import { AsciiMathView } from '../../ascii-math/AsciiMathView.tsx';
 import type { MathMLGlobalAttributes } from '../attributes.ts';
 import { MATHML_FONT_SIZE } from '../constants.ts';
-import type { SheetBinaryOperator } from '@cs-object/core';
-import type { SheetLiteral } from '@cs-object/core';
-import { assertNever } from '@cs-object/core';
-import { formatNumerical } from '@cs-object/core';
-import { isValidElement, type ReactElement, type ReactNode } from 'react';
 
 interface SymbolValueBinaryOperatorMathmlViewProps {
   readonly operator: SheetBinaryOperator;
@@ -33,6 +32,7 @@ interface SymbolValueGroupMathmlViewProps {
   readonly prefix?: ReactNode;
   readonly children: readonly ReactNode[];
   readonly cursor?: unknown;
+  readonly empty?: 'omit' | 'fence';
 }
 
 interface SymbolValueLiteralMathmlViewProps {
@@ -138,6 +138,7 @@ export const SymbolValueGroupMathmlView = ({
   prefix,
   children,
   cursor,
+  empty = 'omit',
 }: SymbolValueGroupMathmlViewProps): ReactElement => {
   const mathProps: MathMLGlobalAttributes = {
     mathbackground: cursor ? 'lightgray' : undefined,
@@ -145,7 +146,7 @@ export const SymbolValueGroupMathmlView = ({
   return (
     <mrow {...mathProps}>
       {prefix}
-      {children.length > 0 && (
+      {(children.length > 0 || empty === 'fence') && (
         <>
           <mo fence={'true'}>{'('}</mo>
           {children.flatMap((child, argIndex, arr) => {

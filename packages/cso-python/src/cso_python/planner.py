@@ -669,8 +669,8 @@ class Planner:
                     self.error(
                         inv, node, "UNSUPPORTED_SYNTAX", f"Unimported helper {name}"
                     )
-                arg = node.args[0]
                 if name == "given":
+                    arg = node.args[0]
                     if not given or node is not expr:
                         self.error(
                             inv,
@@ -720,6 +720,7 @@ class Planner:
                             "given accepts a parameter or finite literal",
                         )
                 elif name == "documented_result":
+                    arg = node.args[0]
                     # Still parse the bounded expression; its definition blocks verification.
                     if node is not expr:
                         self.error(

@@ -277,6 +277,96 @@ describe('Python export', () => {
     }
   });
 
+  test('exports atan2 and zero, one and multiple hypot arguments through math', () => {
+    const { sheet } = createSheetFromValueTreeJson(
+      {
+        title: 'Geometry functions',
+        sections: [
+          {
+            symbols: [
+              {
+                id: 'zero-distance',
+                result: 0,
+                valueTree: [
+                  { key: 'root', function: 'fg.hypot', arguments: [] },
+                ],
+              },
+              {
+                id: 'signed-distance',
+                result: 0,
+                valueTree: [
+                  {
+                    key: 'root',
+                    function: 'fg.hypot',
+                    arguments: ['coordinate'],
+                  },
+                  { key: 'coordinate', literal: -0 },
+                ],
+              },
+              {
+                id: 'distance',
+                result: 7,
+                valueTree: [
+                  {
+                    key: 'root',
+                    function: 'fg.hypot',
+                    arguments: ['x', 'y', 'z'],
+                  },
+                  { key: 'x', literal: 2 },
+                  { key: 'y', literal: 3 },
+                  { key: 'z', literal: 6 },
+                ],
+              },
+              {
+                id: 'angle',
+                result: Math.PI / 2,
+                valueTree: [
+                  {
+                    key: 'root',
+                    function: 'fg.atan2',
+                    arguments: ['distance', 'negative-zero'],
+                  },
+                  { key: 'distance', symbol: 'distance' },
+                  { key: 'negative-zero', literal: -0 },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      { id: 'geometry-functions', label: 'Geometry functions' },
+    );
+    for (const [symbolId, nodeKey] of [
+      ['signed-distance', 'coordinate'],
+      ['angle', 'negative-zero'],
+    ] as const) {
+      const literal = sheet.symbols
+        .find((symbol) => symbol.id === symbolId)
+        ?.valueTree.nodes.find((node) => node.key === nodeKey);
+      if (literal?.kind !== 'literal') throw new Error('Expected literal');
+      literal.value = { kind: 'number', value: -0, numericKind: 'float' };
+    }
+    const code = createPythonFromSheetDocument(sheet);
+
+    expect(code).toContain('import math');
+    expect(code).toContain('zero_distance = math.hypot()');
+    expect(code).toContain('signed_distance = math.hypot(-0.0)');
+    expect(code).toContain('distance = math.hypot(2, 3, 6)');
+    expect(code).toContain('angle = math.atan2(distance, -0.0)');
+
+    const angle = sheet.symbols.find((symbol) => symbol.id === 'angle');
+    const root = angle?.valueTree.nodes.find((node) => node.key === 'root');
+    if (root?.kind !== 'function') throw new Error('Expected atan2 root');
+    const originalArgs = root.argKeys;
+    for (const count of [0, 1, 3, 6]) {
+      root.argKeys = Array.from({ length: count }, () => 'distance');
+      expect(() => createPythonFromSheetDocument(sheet)).toThrow(
+        `Cannot export function 'fg.atan2' with ${count} args to Python`,
+      );
+    }
+    root.argKeys = originalArgs;
+  });
+
   test('exports source fixture function ids used by canonical assets', () => {
     const code = createPythonFromSheetDocument({
       id: 'source-functions',
