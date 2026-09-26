@@ -1,3 +1,4 @@
+import { roundToDigits } from './round.ts';
 import { numericValueIssue, type NumericKind } from '../contracts/numbers.ts';
 import type { Comparison, Diagnostic } from '../contracts/common.ts';
 import type { NumericPolicy } from '../contracts/reports.ts';
@@ -208,23 +209,31 @@ function roundInteger(value: number): number {
 }
 
 export type ValueRole = 'number' | 'comparison';
+type OperandRole = ValueRole | 'either' | 'integer';
+type Arity = { readonly min: number; readonly max: number | null };
 type TypedEvaluation = (
   values: readonly number[],
   kinds: readonly NumericKind[],
 ) => NumericResult;
-type Operation =
+type Operation = (
   | {
       readonly kind: 'numeric';
-      readonly operands: readonly ValueRole[];
+      readonly operands: readonly OperandRole[];
       readonly evaluate: (...values: number[]) => NumericResult;
       readonly typed: TypedEvaluation;
     }
   | {
       readonly kind: 'comparison';
-      readonly operands: readonly ValueRole[];
+      readonly operands: readonly OperandRole[];
       readonly compare: (left: number, right: number) => boolean;
     }
-  | { readonly kind: 'conditional'; readonly operands: readonly ValueRole[] };
+  | { readonly kind: 'conditional'; readonly operands: readonly OperandRole[] }
+  | {
+      readonly kind: 'logical';
+      readonly operator: 'and' | 'or';
+      readonly operands: readonly OperandRole[];
+    }
+) & { readonly arity?: Arity };
 
 const withKind = (result: NumericResult, kind: NumericKind): NumericResult =>
   result.ok
@@ -275,7 +284,74 @@ const inverseUnitInterval = (
     typed: ([value]) => evaluate(value),
   };
 };
-/** Own operation roles and evaluation together; rendering has a broader vocabulary. */
+const extremum = (direction: 'min' | 'max'): Operation => {
+  const evaluate = (
+    values: readonly number[],
+    kinds?: readonly NumericKind[],
+  ): NumericResult => {
+    let selected = 0;
+    for (let index = 1; index < values.length; index++) {
+      if (
+        direction === 'min'
+          ? values[index] < values[selected]
+          : values[index] > values[selected]
+      )
+        selected = index;
+    }
+    return validateNumber(
+      kinds?.[selected] === 'int' && values[selected] === 0
+        ? 0
+        : values[selected],
+      kinds?.[selected],
+    );
+  };
+  return {
+    kind: 'numeric',
+    operands: ['number'],
+    arity: { min: 2, max: null },
+    evaluate: (...values) => evaluate(values),
+    typed: evaluate,
+  };
+};
+
+const logarithm = (value: number, base?: number): NumericResult => {
+  if (value <= 0 || (base !== undefined && base <= 0))
+    return failure(
+      'LOG_DOMAIN_ERROR',
+      'Logarithms require a positive value and base.',
+    );
+  if (base === 1)
+    return failure('DIVISION_BY_ZERO', 'A logarithm base cannot equal one.');
+  return validateNumber(
+    base === undefined ? Math.log(value) : Math.log(value) / Math.log(base),
+    'float',
+  );
+};
+
+const rounded = (
+  values: readonly number[],
+  kinds?: readonly NumericKind[],
+): NumericResult => {
+  if (values.length === 1)
+    return validateNumber(roundInteger(values[0]), 'int');
+  const [value, digits] = values;
+  if (!Number.isSafeInteger(digits) || kinds?.[1] === 'float')
+    return failure(
+      'INVALID_INTEGER_OPERAND',
+      'Rounding digits must be a safe Python integer.',
+    );
+  return validateNumber(roundToDigits(value, digits, kinds?.[0]), kinds?.[0]);
+};
+
+const identityOperation: Operation = {
+  kind: 'numeric',
+  operands: ['number'],
+  evaluate: (value) => validateNumber(value),
+  typed: ([value], kinds) =>
+    validateNumber(kinds[0] === 'int' && value === 0 ? 0 : value, kinds[0]),
+};
+
+/** Own operation roles and evaluation together; rendering also accepts non-numeric argument forms. */
 const operations = new Map<string, Operation>([
   ['fg.add', binary(add, (a, b) => a + b)],
   ['fg.subtract', binary(subtract, (a, b) => a - b)],
@@ -347,9 +423,41 @@ const operations = new Map<string, Operation>([
     'fg.round',
     {
       kind: 'numeric',
-      operands: ['number'],
-      evaluate: (a) => validateNumber(roundInteger(a), 'int'),
-      typed: ([a]) => validateNumber(roundInteger(a), 'int'),
+      operands: ['number', 'integer'],
+      arity: { min: 1, max: 2 },
+      evaluate: (...values) => rounded(values),
+      typed: rounded,
+    },
+  ],
+  ['fg.exp', floatUnary(Math.exp)],
+  [
+    'fg.log',
+    {
+      kind: 'numeric',
+      operands: ['number', 'number'],
+      arity: { min: 1, max: 2 },
+      evaluate: logarithm,
+      typed: ([value, base]) => logarithm(value, base),
+    },
+  ],
+  ['fg.noop', identityOperation],
+  ['fg.stub', identityOperation],
+  [
+    'fg.and',
+    {
+      kind: 'logical',
+      operator: 'and',
+      operands: ['either'],
+      arity: { min: 1, max: null },
+    },
+  ],
+  [
+    'fg.or',
+    {
+      kind: 'logical',
+      operator: 'or',
+      operands: ['either'],
+      arity: { min: 1, max: null },
     },
   ],
   ['fg.rad', floatUnary((degrees) => degrees * (Math.PI / 180))],
@@ -363,20 +471,22 @@ const operations = new Map<string, Operation>([
   ['fg.sinh', floatUnary(Math.sinh)],
   ['fg.cosh', floatUnary(Math.cosh)],
   ['fg.tanh', floatUnary(Math.tanh)],
+  ['fg.max', extremum('max')],
+  ['fg.min', extremum('min')],
   [
-    'fg.max',
+    'fg.eq',
     {
-      kind: 'numeric',
+      kind: 'comparison',
       operands: ['number', 'number'],
-      evaluate: (a, b) => validateNumber(a >= b ? a : b),
-      typed: ([a, b], kinds) => {
-        const index = a >= b ? 0 : 1;
-        const value = index === 0 ? a : b;
-        return validateNumber(
-          kinds[index] === 'int' && value === 0 ? 0 : value,
-          kinds[index],
-        );
-      },
+      compare: (a, b) => a === b,
+    },
+  ],
+  [
+    'fg.ne',
+    {
+      kind: 'comparison',
+      operands: ['number', 'number'],
+      compare: (a, b) => a !== b,
     },
   ],
   [
@@ -430,12 +540,28 @@ export function resolveOperation(
       'UNSUPPORTED_FUNCTION',
       `Function ${functionId} is outside the verified numeric subset.`,
     );
-  if (operandCount !== operation.operands.length)
+  const min = operation.arity?.min ?? operation.operands.length;
+  const max =
+    operation.arity === undefined
+      ? operation.operands.length
+      : operation.arity.max;
+  if (operandCount < min || (max !== null && operandCount > max))
     return failure(
       'INVALID_FUNCTION_ARITY',
-      `${functionId} expects ${operation.operands.length} operands, received ${operandCount}.`,
+      `${functionId} expects ${min}${max === min ? '' : max === null ? ' or more' : ` to ${max}`} operands, received ${operandCount}.`,
     );
-  return { ok: true, operation };
+  return {
+    ok: true,
+    operation: {
+      ...operation,
+      operands: Array.from(
+        { length: operandCount },
+        (_, index) =>
+          operation.operands[index] ??
+          operation.operands[operation.operands.length - 1],
+      ),
+    },
+  };
 }
 export function validateOperation(
   functionId: string,
@@ -467,6 +593,14 @@ export function evaluateOperation(
   for (const [index, operand] of operands.entries()) {
     const validated = validateNumber(operand, numericKinds?.[index]);
     if (!validated.ok) return validated;
+    if (
+      resolved.operation.operands[index] === 'integer' &&
+      (!Number.isSafeInteger(operand) || numericKinds?.[index] === 'float')
+    )
+      return failure(
+        'INVALID_INTEGER_OPERAND',
+        `${functionId} operand ${index + 1} requires a safe Python integer.`,
+      );
   }
   const operation = resolved.operation;
   switch (operation.kind) {
@@ -475,6 +609,7 @@ export function evaluateOperation(
         'NONNUMERIC_FORMULA',
         'Comparisons require a conditional test.',
       );
+    case 'logical':
     case 'conditional':
       return failure(
         'INVALID_CONDITIONAL',

@@ -163,15 +163,14 @@ it('checks dormant branch structure without evaluating its invalid square root',
       (n) => n.funcSpec?.id === 'fg.sqrt',
     );
     if (!squareRoot) throw new Error('Missing guarded sqrt');
-    if (change === 'unsupported') squareRoot.funcSpec = { id: 'fg.log' };
+    if (change === 'unsupported') squareRoot.funcSpec = { id: 'fg.unknown' };
     else squareRoot.funcArgs = [{ key: root.valueTree.rootKey }];
     const report = verifyExecution({ execution });
     expect(report.ok).toBe(false);
     expect(
       report.diagnostics.some(
         (d) =>
-          d.code ===
-          (change === 'cycle' ? 'FORMULA_CYCLE' : 'UNSUPPORTED_FUNCTION'),
+          d.code === (change === 'cycle' ? 'FORMULA_CYCLE' : 'SCHEMA_CUSTOM'),
       ),
     ).toBe(true);
   }
@@ -209,7 +208,7 @@ it.each([
   ['shared comparison operand reversed', 'NONNUMERIC_FORMULA'],
   ['string literal', 'NONNUMERIC_LITERAL'],
   ['arity', 'INVALID_FUNCTION_ARITY'],
-  ['detached operation', 'UNSUPPORTED_FUNCTION'],
+  ['detached operation', 'SCHEMA_CUSTOM'],
   ['detached arity', 'INVALID_FUNCTION_ARITY'],
   ['detached cycle', 'FORMULA_CYCLE'],
 ])('rejects invalid %s throughout the Value tree', (change, code) => {
@@ -257,7 +256,8 @@ it.each([
   if (change.startsWith('detached ')) {
     const detached = structuredClone(squareRoot);
     detached.key = 'detached';
-    if (change === 'detached operation') detached.funcSpec = { id: 'fg.log' };
+    if (change === 'detached operation')
+      detached.funcSpec = { id: 'fg.unknown' };
     else if (change === 'detached arity') detached.funcArgs = [];
     else detached.funcArgs = [{ key: detached.key }];
     nodes.push(detached);

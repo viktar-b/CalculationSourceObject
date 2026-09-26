@@ -35,8 +35,9 @@ def calculate(quantity: Annotated[float, symbol(glyph="q_{{in}}", description="I
     def test_all_declared_calls_reject_invalid_arity_and_keywords_before_execution(self):
         for call in FUNCTION_CALLS:
             for spelling in call.spellings:
-                imports = f"from math import {call.name}\nimport math" if call.module == "math" else ""
-                for args in ["", ", ".join(["quantity"] * (call.arity + 1)), "quantity=quantity"]:
+                imports = f"from math import {call.name}\nimport math" if call.module == "math" else f"from cso_python import {call.name}" if call.module == "cso_python" else ""
+                counts = [call.min_arity - 1] + ([call.max_arity + 1] if call.max_arity is not None else [])
+                for args in [*(", ".join(["quantity"] * count) for count in counts), "quantity=quantity"]:
                     with self.subTest(function=spelling, args=args):
                         self.reject(f"{spelling}({args})", imports, code="UNSUPPORTED_SYNTAX")
 
@@ -58,5 +59,5 @@ def calculate(quantity: Annotated[float, symbol(glyph="q_{{in}}", description="I
                     )
 
     def test_unlisted_math_functions_remain_unavailable(self):
-        self.reject("math.exp(quantity)", "import math", code="UNSUPPORTED_SYNTAX")
-        self.reject("exp(quantity)", "from math import exp", code="UNSUPPORTED_SYNTAX")
+        self.reject("math.floor(quantity)", "import math", code="UNSUPPORTED_SYNTAX")
+        self.reject("floor(quantity)", "from math import floor", code="UNSUPPORTED_SYNTAX")

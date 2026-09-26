@@ -174,10 +174,14 @@ export const SymbolValueBinaryOperatorMathmlView = ({
   argLeft,
   argRight,
 }: SymbolValueBinaryOperatorMathmlViewProps): ReactElement => {
+  const spacing =
+    operator.id === 'fg.and' || operator.id === 'fg.or' ? '0.3em' : undefined;
   return (
     <mrow>
       {argLeft}
-      <mo>{operator.glyph}</mo>
+      <mo lspace={spacing} rspace={spacing} style={{ marginInline: spacing }}>
+        {operator.glyph}
+      </mo>
       {argRight}
     </mrow>
   );

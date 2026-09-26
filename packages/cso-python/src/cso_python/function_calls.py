@@ -8,8 +8,14 @@ from typing import Literal
 class FunctionCall:
     name: str
     function_id: str
-    arity: int
-    module: Literal["math", "builtins"] = "math"
+    min_arity: int = 1
+    max_arity: int | None = 1
+    module: Literal["math", "builtins", "cso_python"] = "math"
+
+    def accepts_arity(self, count: int) -> bool:
+        return count >= self.min_arity and (
+            self.max_arity is None or count <= self.max_arity
+        )
 
     @property
     def spellings(self) -> tuple[str, ...]:
@@ -21,8 +27,13 @@ class FunctionCall:
 FUNCTION_CALLS = (
     FunctionCall("sqrt", "fg.sqrt", 1),
     FunctionCall("ceil", "fg.ceil", 1),
-    FunctionCall("round", "fg.round", 1, "builtins"),
-    FunctionCall("max", "fg.max", 2, "builtins"),
+    FunctionCall("round", "fg.round", max_arity=2, module="builtins"),
+    FunctionCall("max", "fg.max", min_arity=2, max_arity=None, module="builtins"),
+    FunctionCall("min", "fg.min", min_arity=2, max_arity=None, module="builtins"),
+    FunctionCall("exp", "fg.exp"),
+    FunctionCall("log", "fg.log", max_arity=2),
+    FunctionCall("noop", "fg.noop", module="cso_python"),
+    FunctionCall("stub", "fg.stub", module="cso_python"),
     FunctionCall("radians", "fg.rad", 1),
     FunctionCall("degrees", "fg.deg", 1),
     FunctionCall("sin", "fg.sin", 1),

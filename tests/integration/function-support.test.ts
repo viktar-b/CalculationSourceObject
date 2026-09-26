@@ -11,6 +11,7 @@ import {
   createPythonFromSheetDocument,
   createSheetFromCalculationSourceObject,
   getFunctionSpec,
+  sheetFunctionSpecs,
   verifyExecution,
 } from '@cs-object/core';
 import {
@@ -29,8 +30,9 @@ const declarations = z
     z.object({
       name: z.string(),
       function_id: z.string(),
-      arity: z.number().int().positive(),
-      module: z.enum(['math', 'builtins']),
+      min_arity: z.number().int().positive(),
+      max_arity: z.number().int().positive().nullable(),
+      module: z.enum(['math', 'builtins', 'cso_python']),
       spellings: z.array(z.string()).nonempty(),
     }),
   )
@@ -62,6 +64,11 @@ const referenceCases: Record<
   ceil: { args: [1.2], expected: 2, kind: 'int' },
   round: { args: [2.5], expected: 2, kind: 'int' },
   max: { args: [2, 1], expected: 2, kind: 'float' },
+  min: { args: [2, 1], expected: 1, kind: 'float' },
+  exp: { args: [0], expected: 1, kind: 'float' },
+  log: { args: [1], expected: 0, kind: 'float' },
+  noop: { args: [2], expected: 2, kind: 'float' },
+  stub: { args: [2], expected: 2, kind: 'float' },
   radians: { args: [180], expected: Math.PI, kind: 'float' },
   degrees: { args: [Math.PI], expected: 180, kind: 'float' },
   sin: { args: [Math.PI / 6], expected: 0.5, kind: 'float' },
@@ -230,7 +237,7 @@ it.each(declarations)(
   (call) => {
     const sample = referenceCases[call.name];
     if (!sample) throw new Error(`Missing reference case for ${call.name}`);
-    expect(sample.args).toHaveLength(call.arity);
+    expect(sample.args).toHaveLength(call.min_arity);
     const spec = getFunctionSpec(call.function_id);
     expect(spec).toBeDefined();
     for (const spelling of call.spellings) {
@@ -239,7 +246,7 @@ it.each(declarations)(
           ? ''
           : spelling.startsWith('math.')
             ? 'import math'
-            : `from math import ${call.name}`;
+            : `from ${call.module} import ${call.name}`;
       const args = sample.args.map((value, index) =>
         index === 0 ? 'quantity' : floatLiteral(value),
       );
@@ -260,27 +267,32 @@ it.each(declarations)(
       const callNode = nodes.find(
         (node) => node.funcSpec?.id === call.function_id,
       );
-      expect(callNode?.funcArgs).toHaveLength(call.arity);
+      expect(callNode?.funcArgs).toHaveLength(call.min_arity);
 
       const document = prepareExecutionDocument({ execution, assets: [] });
       const html = renderToStaticMarkup(
         createElement(PreparedFormulaSheet, { document }),
       );
       expect(html).not.toContain('>?</');
-      expect(html).toContain(
-        call.name === 'sqrt' ? '<msqrt>' : `>${spec?.glyph}</`,
-      );
+      if (call.module !== 'cso_python')
+        expect(html).toContain(
+          call.name === 'sqrt' ? '<msqrt>' : `>${spec?.glyph}</`,
+        );
       const { code, result } = exportReplay(execution, output.symbolId);
-      expect(code).toContain(
-        `${call.module === 'math' ? 'math.' : ''}${call.name}(`,
-      );
+      if (call.module !== 'cso_python')
+        expect(code).toContain(
+          `${call.module === 'math' ? 'math.' : ''}${call.name}(`,
+        );
       expect(result.kind).toBe(sample.kind);
       expect(result.value).toBe(output.value);
 
       if (!callNode?.funcArgs?.[0]) throw new Error('Missing function operand');
       const firstArg = callNode.funcArgs[0];
       const originalArgs = callNode.funcArgs;
-      for (const arity of [call.arity - 1, call.arity + 1]) {
+      for (const arity of [
+        call.min_arity - 1,
+        ...(call.max_arity === null ? [] : [call.max_arity + 1]),
+      ]) {
         callNode.funcArgs = Array.from({ length: arity }, () => ({
           key: firstArg.key,
         }));
@@ -401,5 +413,233 @@ it.each(['asin', 'acos'])(
     expect(report.diagnostics.some((d) => d.code === 'TRIG_DOMAIN_ERROR')).toBe(
       true,
     );
+  },
+);
+
+const syntaxCases = [
+  { id: 'fg.add', expression: 'quantity + 2', expected: 2.5, kind: 'float' },
+  {
+    id: 'fg.subtract',
+    expression: 'quantity - 2',
+    expected: -1.5,
+    kind: 'float',
+  },
+  { id: 'fg.multiply', expression: 'quantity * 2', expected: 1, kind: 'float' },
+  {
+    id: 'fg.divide',
+    expression: 'quantity / 2',
+    expected: 0.25,
+    kind: 'float',
+  },
+  { id: 'fg.pow', expression: 'quantity ** 2', expected: 0.25, kind: 'float' },
+  { id: 'fg.uminus', expression: '-quantity', expected: -0.5, kind: 'float' },
+  { id: 'fg.pi', expression: 'math.pi', expected: Math.PI, kind: 'float' },
+  {
+    id: 'fg.cnd',
+    expression: '1 if quantity < 1 else 2',
+    expected: 1,
+    kind: 'int',
+  },
+  {
+    id: 'fg.lt',
+    expression: '1 if quantity < 1 else 2',
+    expected: 1,
+    kind: 'int',
+  },
+  {
+    id: 'fg.le',
+    expression: '1 if quantity <= 0.5 else 2',
+    expected: 1,
+    kind: 'int',
+  },
+  {
+    id: 'fg.gt',
+    expression: '1 if quantity > 1 else 2',
+    expected: 2,
+    kind: 'int',
+  },
+  {
+    id: 'fg.ge',
+    expression: '1 if quantity >= 0.5 else 2',
+    expected: 1,
+    kind: 'int',
+  },
+  {
+    id: 'fg.eq',
+    expression: '1 if quantity == 0.5 else 2',
+    expected: 1,
+    kind: 'int',
+  },
+  {
+    id: 'fg.ne',
+    expression: '1 if quantity != 0.5 else 2',
+    expected: 2,
+    kind: 'int',
+  },
+  { id: 'fg.and', expression: 'quantity and 2', expected: 2, kind: 'int' },
+  { id: 'fg.or', expression: 'quantity or 2', expected: 0.5, kind: 'float' },
+];
+
+it('covers every registered FormulaSheet operation through Python authoring', () => {
+  expect(
+    [
+      ...declarations.map((call) => call.function_id),
+      ...syntaxCases.map((sample) => sample.id),
+    ].sort(),
+  ).toEqual(sheetFunctionSpecs.map((spec) => spec.id).sort());
+});
+
+it.each(syntaxCases)(
+  '$id works through capture, verification, rendering and replay',
+  (sample) => {
+    const { execution, output } = successfulCapture(sample.expression);
+    expect(output.value).toBe(sample.expected);
+    expect(output.numericKind).toBe(sample.kind);
+    const report = verifyExecution({ execution });
+    expect(report.ok, JSON.stringify(report.diagnostics)).toBe(true);
+    expect(JSON.stringify(execution.cso)).toContain(sample.id);
+    const html = renderToStaticMarkup(
+      createElement(PreparedFormulaSheet, {
+        document: prepareExecutionDocument({ execution, assets: [] }),
+      }),
+    );
+    expect(html).not.toContain('>?</');
+    expect(exportReplay(execution, output.symbolId).result).toEqual({
+      value: sample.expected,
+      kind: sample.kind,
+    });
+  },
+);
+
+const extendedCases = [
+  ['(2 if quantity > 0 else 3) if quantity < 1 else 4', '2.0', 4, 'int'],
+  ['math.log(quantity, 2)', '8.0', 3, 'float'],
+  ['math.log(quantity, 0.5)', '1.0', -0, 'float'],
+  ['math.exp(quantity)', '-1000.0', 0, 'float'],
+  ['min(quantity, 3, 2, 1)', '4.0', 1, 'int'],
+  ['max(quantity, 3, 2, 1)', '4.0', 4, 'float'],
+  ['min(quantity, 0.0)', '-0.0', -0, 'float'],
+  ['max(quantity, 0)', '-0.0', -0, 'float'],
+  ['min(quantity, 1.0)', '1', 1, 'int'],
+  ['max(quantity, 1.0)', '1', 1, 'int'],
+  ['round(quantity, 2)', '2.675', 2.67, 'float'],
+  ['round(quantity, 2)', '-2.675', -2.67, 'float'],
+  ['round(quantity, 1)', '1.25', 1.2, 'float'],
+  ['round(quantity, 1)', '1.75', 1.8, 'float'],
+  ['round(quantity, 0)', '-0.1', -0, 'float'],
+  ['round(quantity, -2)', '250', 200, 'int'],
+  ['round(quantity, -2)', '150', 200, 'int'],
+  ['round(quantity, 2)', '250', 250, 'int'],
+  ['round(quantity, 400)', '2.675', 2.675, 'float'],
+  ['round(quantity, -400)', '-2.675', -0, 'float'],
+  ['round(quantity, -400)', '-250', 0, 'int'],
+  ['round(quantity, 323)', '5e-324', 0, 'float'],
+  ['quantity and (1 / 0)', '-0.0', -0, 'float'],
+  ['quantity or (1 / 0)', '2', 2, 'int'],
+  ['0 or quantity or (1 / 0)', '2.0', 2, 'float'],
+  ['quantity and 2 and 3', '1.0', 3, 'int'],
+  ['1 if quantity > 0 and math.log(-1) > 0 else 2', '-1.0', 2, 'int'],
+  ['1 if quantity > 0 or math.log(-1) > 0 else 2', '1.0', 1, 'int'],
+  ['1 if 0 < quantity <= 2 != 3 else 2', '1.0', 1, 'int'],
+  ['1 if 0 < quantity < math.log(-1) else 2', '-1.0', 2, 'int'],
+  [
+    '1 if quantity == 1 and (quantity < 0 or quantity >= 1) else 2',
+    '1.0',
+    1,
+    'int',
+  ],
+  ['noop(quantity)', '-0.0', -0, 'float'],
+  ['stub(quantity)', '2', 2, 'int'],
+] satisfies [string, string, number, 'int' | 'float'][];
+
+it.each(extendedCases)(
+  '%s at %s preserves the expected value and kind',
+  (expression, input, value, kind) => {
+    const { execution, output } = successfulCapture(
+      expression,
+      input,
+      'import math\nfrom cso_python import noop, stub',
+    );
+    expect(output.value).toBe(value);
+    expect(output.numericKind).toBe(kind);
+    const report = verifyExecution({ execution });
+    expect(report.ok, JSON.stringify(report.diagnostics)).toBe(true);
+    expect(exportReplay(execution, output.symbolId).result).toEqual({
+      value,
+      kind,
+    });
+  },
+);
+
+it.each([
+  'math.log(0)',
+  'math.log(-1)',
+  'math.log(2, 1)',
+  'math.log(2, -1)',
+  'math.exp(1000)',
+  'round(quantity, 2.0)',
+  'round(1.7976931348623157e308, -308)',
+])(
+  'rejects active domain/type failure %s but permits a dormant branch',
+  (expression) => {
+    expect(capture(expression).ok).toBe(false);
+    const { execution } = successfulCapture(
+      `${expression} if quantity < 0 else 1`,
+    );
+    expect(verifyExecution({ execution }).ok).toBe(true);
+    const predicate = execution.cso.sections
+      .flatMap((section) =>
+        section.items.flatMap((item) =>
+          item.kind === 'symbol' ? item.symbol.valueTree.nodes : [],
+        ),
+      )
+      .find((node) => node.funcSpec?.id === 'fg.lt');
+    if (!predicate?.funcSpec) throw new Error('Expected a predicate');
+    predicate.funcSpec.id = 'fg.gt';
+    const report = verifyExecution({ execution });
+    expect(report.ok).toBe(false);
+    expect(
+      report.diagnostics.some((d) =>
+        [
+          'LOG_DOMAIN_ERROR',
+          'DIVISION_BY_ZERO',
+          'NON_FINITE_NUMBER',
+          'INVALID_INTEGER_OPERAND',
+        ].includes(d.code),
+      ),
+    ).toBe(true);
+  },
+);
+
+it.each(['arity', 'role', 'cycle'])(
+  'validates dormant logical operands for %s errors before evaluation',
+  (change) => {
+    const { execution } = successfulCapture('quantity or math.sqrt(-1)');
+    const nodes = execution.cso.sections.flatMap((section) =>
+      section.items.flatMap((item) =>
+        item.kind === 'symbol' ? item.symbol.valueTree.nodes : [],
+      ),
+    );
+    const dormant = nodes.find((node) => node.funcSpec?.id === 'fg.sqrt');
+    if (!dormant?.funcArgs?.[0]) throw new Error('Missing dormant operand');
+    if (change === 'arity') dormant.funcArgs = [];
+    if (change === 'role') {
+      dormant.funcSpec = { id: 'fg.eq' };
+      dormant.funcArgs = [dormant.funcArgs[0], dormant.funcArgs[0]];
+    }
+    if (change === 'cycle') dormant.funcArgs = [{ key: dormant.key }];
+    const report = verifyExecution({ execution });
+    expect(report.ok).toBe(false);
+    expect(
+      report.diagnostics.some(
+        (d) =>
+          d.code ===
+          (change === 'arity'
+            ? 'INVALID_FUNCTION_ARITY'
+            : change === 'cycle'
+              ? 'FORMULA_CYCLE'
+              : 'NONNUMERIC_FORMULA'),
+      ),
+    ).toBe(true);
   },
 );

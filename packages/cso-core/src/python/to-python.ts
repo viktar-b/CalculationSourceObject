@@ -377,7 +377,7 @@ const functionExpressionRenderers: Readonly<
   'fg.cnd': (args) => {
     requireArgCount('fg.cnd', args, 3);
     return {
-      code: `${args[1].code} if ${args[0].code} else ${args[2].code}`,
+      code: `${parenthesize(args[1], PythonPrecedence.Conditional + 1)} if ${args[0].code} else ${args[2].code}`,
       precedence: PythonPrecedence.Conditional,
       usesMath: combineMathUsage(args),
     };
