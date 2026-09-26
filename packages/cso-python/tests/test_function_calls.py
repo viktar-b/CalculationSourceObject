@@ -13,7 +13,7 @@ class FunctionCallsTest(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.path = Path(self.temp.name) / "functions.cso.py"
 
-    def reject(self, expression, imports="", extra=""):
+    def reject(self, expression, imports="", extra="", *, code):
         self.path.write_text(
             f"""{imports}
 from typing import Annotated
@@ -28,6 +28,7 @@ def calculate(quantity: Annotated[float, symbol(glyph="q_{{in}}", description="I
         with patch.object(Execution, "run") as run:
             response = execute(self.path, "calculate", {})
             self.assertFalse(response["ok"], response)
+            self.assertEqual(response["diagnostics"][0]["code"], code, response)
             run.assert_not_called()
         return response
 
@@ -37,8 +38,7 @@ def calculate(quantity: Annotated[float, symbol(glyph="q_{{in}}", description="I
                 imports = f"from math import {call.name}\nimport math" if call.module == "math" else ""
                 for args in ["", ", ".join(["quantity"] * (call.arity + 1)), "quantity=quantity"]:
                     with self.subTest(function=spelling, args=args):
-                        response = self.reject(f"{spelling}({args})", imports)
-                        self.assertEqual(response["diagnostics"][0]["code"], "UNSUPPORTED_SYNTAX")
+                        self.reject(f"{spelling}({args})", imports, code="UNSUPPORTED_SYNTAX")
 
     def test_math_calls_require_imports_and_reject_local_shadowing(self):
         for call in FUNCTION_CALLS:
@@ -46,7 +46,7 @@ def calculate(quantity: Annotated[float, symbol(glyph="q_{{in}}", description="I
                 continue
             for spelling in call.spellings:
                 with self.subTest(function=spelling, issue="missing import"):
-                    self.reject(f"{spelling}(quantity)")
+                    self.reject(f"{spelling}(quantity)", code="UNSUPPORTED_SYNTAX")
                 imported = "math" if spelling.startswith("math.") else call.name
                 imports = "import math" if imported == "math" else f"from math import {call.name}"
                 with self.subTest(function=spelling, issue="local shadowing"):
@@ -54,8 +54,9 @@ def calculate(quantity: Annotated[float, symbol(glyph="q_{{in}}", description="I
                         f"{spelling}(quantity)",
                         imports,
                         f'    {imported}: Annotated[float, symbol(glyph="q_{{shadow}}", description="Shadow", unit="")] = 1.0\n',
+                        code="DUPLICATE_IDENTITY",
                     )
 
     def test_unlisted_math_functions_remain_unavailable(self):
-        self.reject("math.exp(quantity)", "import math")
-        self.reject("exp(quantity)", "from math import exp")
+        self.reject("math.exp(quantity)", "import math", code="UNSUPPORTED_SYNTAX")
+        self.reject("exp(quantity)", "from math import exp", code="UNSUPPORTED_SYNTAX")

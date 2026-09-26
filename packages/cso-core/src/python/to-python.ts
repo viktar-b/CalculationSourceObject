@@ -157,13 +157,16 @@ const literalToPython = (literal: SheetLiteral): PythonExpression => {
       };
     case 'number': {
       let code = String(literal.value);
-      if (Object.is(literal.value, -0)) code = '-0.0';
+      if (Object.is(literal.value, -0))
+        code = literal.numericKind === 'float' ? '-0.0' : '0';
       else if (Number.isNaN(literal.value)) code = 'math.nan';
       else if (literal.numericKind === 'float' && !/[.e]/i.test(code))
         code += '.0';
       return {
         code,
-        precedence: PythonPrecedence.Atom,
+        precedence: code.startsWith('-')
+          ? PythonPrecedence.Unary
+          : PythonPrecedence.Atom,
         usesMath: Number.isNaN(literal.value),
       };
     }

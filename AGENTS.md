@@ -16,6 +16,8 @@ and human engineering approval.
   [rendering](docs/rendering.md) and inspect the affected example output.
 - For setup and verification commands, use [development](docs/development.md)
   and the owning package's scripts. CLI behavior is in [its guide](apps/cso-cli/README.md).
+- For function support, cross-package verification, execution evidence or
+  review-feedback work, use the [repository workflows](.agents/README.md).
 
 ## Package and test boundaries
 

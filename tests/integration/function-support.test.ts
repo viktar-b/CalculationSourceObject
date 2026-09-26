@@ -1,4 +1,8 @@
-import { execFileSync, spawnSync } from 'node:child_process';
+import {
+  execFileSync,
+  spawnSync,
+  type SpawnSyncReturns,
+} from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -83,6 +87,18 @@ const floatLiteral = (value: number): string => {
   return /[.e]/i.test(token) ? token : `${token}.0`;
 };
 
+function parseCaptureResponse(run: SpawnSyncReturns<string>) {
+  try {
+    if (run.error) throw run.error;
+    return ExecutionResponseSchema.parse(JSON.parse(run.stdout));
+  } catch (cause) {
+    throw new Error(
+      `Python capture did not produce a valid response (status=${run.status}, signal=${run.signal}): ${cause instanceof Error ? cause.message : String(cause)}\nstderr: ${run.stderr || '(empty)'}`,
+      { cause },
+    );
+  }
+}
+
 function capture(expression: string, input = '0.5', imports = 'import math') {
   const directory = mkdtempSync(join(tmpdir(), 'cso-function-support-'));
   directories.push(directory);
@@ -104,7 +120,7 @@ def calculate(quantity: Annotated[float, symbol(glyph="q_{in}", description="Inp
     ['-I', '-m', 'cso_python', 'execute', path, '--function', 'calculate'],
     { encoding: 'utf8' },
   );
-  return ExecutionResponseSchema.parse(JSON.parse(run.stdout));
+  return parseCaptureResponse(run);
 }
 
 function successfulCapture(
@@ -149,6 +165,53 @@ print(json.dumps({"value": result, "kind": type(result).__name__}))
     );
   return { code, result };
 }
+
+it.each(['', 'not json', '{}'])(
+  'retains process diagnostics when capture stdout is %j',
+  (stdout) => {
+    const run = spawnSync(
+      python,
+      [
+        '-I',
+        '-c',
+        `import sys\nsys.stdout.write(${JSON.stringify(stdout)})\nsys.stderr.write("capture process failed")\nsys.exit(2)`,
+      ],
+      { encoding: 'utf8' },
+    );
+    expect(() => parseCaptureResponse(run)).toThrow(
+      /status=2, signal=null[\s\S]*stderr: capture process failed/,
+    );
+  },
+);
+
+it('reports a missing capture interpreter', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'cso-missing-python-'));
+  directories.push(directory);
+  const run = spawnSync(join(directory, 'python'), [], { encoding: 'utf8' });
+  expect(() => parseCaptureResponse(run)).toThrow(/ENOENT/);
+});
+
+it.each([
+  ['(-0.0) ** 2', 0, 'float'],
+  ['(-0.0) ** 3', -0, 'float'],
+  ['(-2.0) ** 2', 4, 'float'],
+  ['(-2.0) ** 3', -8, 'float'],
+  ['(-2) ** 2', 4, 'int'],
+  ['(-2) ** (-2)', 0.25, 'float'],
+  ['((-2) ** 2) ** 3', 64, 'int'],
+] as const)(
+  '%s replays as %s with numeric kind %s in Python',
+  (expression, expected, kind) => {
+    const { execution, output } = successfulCapture(expression);
+    expect(output.value).toBe(expected);
+    expect(output.numericKind).toBe(kind);
+    expect(verifyExecution({ execution }).ok).toBe(true);
+    expect(exportReplay(execution, output.symbolId).result).toEqual({
+      value: expected,
+      kind,
+    });
+  },
+);
 
 it('has independent reference cases for every declared call, without duplicate names, spellings or IDs', () => {
   expect(declarations.map((call) => call.name).sort()).toEqual(
@@ -291,9 +354,14 @@ it.each(['sin', 'tan', 'asin', 'atan', 'sinh', 'tanh', 'radians', 'degrees'])(
   },
 );
 
-it.each(['asin', 'acos', 'sinh', 'cosh'])(
-  'checks dormant %s structurally and evaluates only the selected branch',
-  (name) => {
+it.each([
+  ['asin', 'ValueError'],
+  ['acos', 'ValueError'],
+  ['sinh', 'OverflowError'],
+  ['cosh', 'OverflowError'],
+])(
+  'checks dormant %s structurally and reports %s only in the selected branch',
+  (name, errorName) => {
     const { execution, output } = successfulCapture(
       `math.${name}(quantity) if quantity < 0 else 1.0`,
       '1000.0',
@@ -301,7 +369,16 @@ it.each(['asin', 'acos', 'sinh', 'cosh'])(
     expect(output.value).toBe(1);
     expect(verifyExecution({ execution }).ok).toBe(true);
     const active = capture(`math.${name}(quantity)`, '1000.0');
-    expect(active.ok).toBe(false);
+    expect(active).toMatchObject({
+      ok: false,
+      diagnostics: [
+        {
+          code: 'EXECUTION_FAILED',
+          stage: 'execution',
+          message: expect.stringContaining(errorName),
+        },
+      ],
+    });
   },
 );
 

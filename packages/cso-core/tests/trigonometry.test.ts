@@ -24,7 +24,7 @@ const identities = [
 
 describe('trigonometry', () => {
   it.each(identities)(
-    '%s(%s) agrees with an analytic identity',
+    '%s(%d) agrees with the analytic value %d',
     (id, input, expected) => {
       for (const kinds of [undefined, ['float'] as const]) {
         const result = evaluateOperation(id, [input], kinds);
