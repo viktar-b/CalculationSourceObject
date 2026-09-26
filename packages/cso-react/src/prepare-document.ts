@@ -198,20 +198,20 @@ const assertExtensionFields = (cso: CalculationSourceObject): void => {
       contentFields(item, itemPath);
     });
   });
-  cso.detachedItems?.forEach((item, index) =>
-    contentFields(item, `/detachedItems/${index}`),
-  );
+  cso.detachedItems?.forEach((item, index) => {
+    contentFields(item, `/detachedItems/${index}`);
+  });
   symbolDefinitions(cso).forEach((symbol, index) => {
     const path = `/definitions/${index}`;
     fields(symbol, ['aliases', 'metadata'], path);
     fields(symbol.valueTree, ['metadata'], `${path}/valueTree`);
-    symbol.valueTree.nodes.forEach((node, nodeIndex) =>
+    symbol.valueTree.nodes.forEach((node, nodeIndex) => {
       fields(
         node,
         ['metadata', 'tags'],
         `${path}/valueTree/nodes/${nodeIndex}`,
-      ),
-    );
+      );
+    });
   });
 };
 

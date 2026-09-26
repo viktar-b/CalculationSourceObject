@@ -674,18 +674,18 @@ const validateContext = (document: PreparedDocument, ctx: z.RefinementCtx) => {
         }
         break;
       case 'list':
-        value.items.forEach((item, index) =>
-          checkValue(item, [...path, 'items', index], sourceRoot),
-        );
+        value.items.forEach((item, index) => {
+          checkValue(item, [...path, 'items', index], sourceRoot);
+        });
         break;
       case 'record':
-        value.entries.forEach((entry, index) =>
+        value.entries.forEach((entry, index) => {
           checkValue(
             entry.value,
             [...path, 'entries', index, 'value'],
             sourceRoot,
-          ),
-        );
+          );
+        });
         break;
       default: {
         const exhaustive: never = value;

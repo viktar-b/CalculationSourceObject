@@ -35,7 +35,7 @@
     "postcss": "8.5.28"
   },
   "devDependencies": {
-    "@biomejs/biome": "1.9.4",
+    "@biomejs/biome": "2.5.14",
     "@types/node": "^26",
     "@types/react": "^19",
     "@types/react-dom": "^19",
