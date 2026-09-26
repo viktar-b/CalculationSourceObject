@@ -206,12 +206,13 @@ test('fences a negative literal power base', () => {
 describe.each([
   { functionId: 'fg.multiply', operator: '⋅' },
   { functionId: 'fg.subtract', operator: '-' },
+  { functionId: 'fg.add', operator: '+' },
 ])('$functionId signed operands', ({ functionId, operator }) => {
   const cases: {
     name: string;
     right: SheetValueNode;
     left: number;
-    referencedValue: number;
+    referencedValue?: number;
     expected: string[];
     fences: number[];
   }[] = [
@@ -223,7 +224,6 @@ describe.each([
         value: { kind: 'number', value: -2 },
       },
       left: 5,
-      referencedValue: -2,
       expected: [`5.00 ${operator} ( -2.00 )`],
       fences: [1],
     },
@@ -235,7 +235,6 @@ describe.each([
         value: { kind: 'number', value: -0 },
       },
       left: 5,
-      referencedValue: -2,
       expected: [`5.00 ${operator} ( 0 )`],
       fences: [1],
     },
@@ -264,7 +263,6 @@ describe.each([
         argKeys: ['magnitude'],
       },
       left: 5,
-      referencedValue: -2,
       expected: [`5.00 ${operator} ( - 2.00 )`],
       fences: [1],
     },
@@ -276,7 +274,6 @@ describe.each([
         value: { kind: 'number', value: 2 },
       },
       left: 5,
-      referencedValue: -2,
       expected: [`5.00 ${operator} 2.00`],
       fences: [0],
     },
@@ -296,7 +293,6 @@ describe.each([
         value: { kind: 'number', value: 2 },
       },
       left: -5,
-      referencedValue: -2,
       expected: [`-5.00 ${operator} 2.00`],
       fences: [0],
     },
@@ -309,7 +305,6 @@ describe.each([
         argKeys: ['magnitude', 'one'],
       },
       left: 5,
-      referencedValue: -2,
       expected: [`5.00 ${operator} ( 2.00 - 1.00 )`],
       fences: [1],
     },
@@ -352,22 +347,26 @@ describe.each([
               ],
             },
           },
-          {
-            id: 'operand',
-            glyph: 'b',
-            description: 'Operand',
-            valueTree: {
-              rootKey: 'value',
-              result: { kind: 'number', value: referencedValue },
-              nodes: [
+          ...(referencedValue === undefined
+            ? []
+            : [
                 {
-                  kind: 'literal',
-                  key: 'value',
-                  value: { kind: 'number', value: referencedValue },
+                  id: 'operand',
+                  glyph: 'b',
+                  description: 'Operand',
+                  valueTree: {
+                    rootKey: 'value',
+                    result: { kind: 'number', value: referencedValue },
+                    nodes: [
+                      {
+                        kind: 'literal',
+                        key: 'value',
+                        value: { kind: 'number', value: referencedValue },
+                      },
+                    ],
+                  },
                 },
-              ],
-            },
-          },
+              ]),
         ],
       });
       const markup = renderToStaticMarkup(
@@ -390,4 +389,90 @@ describe.each([
       ).toEqual(fences);
     },
   );
+});
+
+test('groups negative continuation terms in long sums without fencing the first term', () => {
+  const terms: SheetValueNode[] = [
+    { kind: 'literal', key: 'first', value: { kind: 'number', value: -5 } },
+    { kind: 'literal', key: 'negative', value: { kind: 'number', value: -2 } },
+    { kind: 'symbol', key: 'reference', symbolId: 'operand' },
+    {
+      kind: 'function',
+      key: 'unary',
+      functionId: 'fg.uminus',
+      argKeys: ['positive'],
+    },
+    { kind: 'literal', key: 'positive', value: { kind: 'number', value: 2 } },
+    {
+      kind: 'function',
+      key: 'compound',
+      functionId: 'fg.subtract',
+      argKeys: ['positive', 'one'],
+    },
+  ];
+  const sums: SheetValueNode[] = terms.slice(1).map((term, index) => ({
+    kind: 'function',
+    key: `sum${index + 1}`,
+    functionId: 'fg.add',
+    argKeys: [index === 0 ? 'first' : `sum${index}`, term.key],
+  }));
+  const longSum = SheetDocumentSchema.parse({
+    ...sheet,
+    symbols: [
+      {
+        ...sheet.symbols[0],
+        glyph: 's',
+        valueTree: {
+          rootKey: 'sum5',
+          result: { kind: 'number', value: -9 },
+          nodes: [
+            ...terms,
+            ...sums,
+            {
+              kind: 'literal',
+              key: 'one',
+              value: { kind: 'number', value: 1 },
+            },
+          ],
+        },
+      },
+      {
+        id: 'operand',
+        glyph: 'b',
+        description: 'Operand',
+        valueTree: {
+          rootKey: 'value',
+          result: { kind: 'number', value: -3 },
+          nodes: [
+            {
+              kind: 'literal',
+              key: 'value',
+              value: { kind: 'number', value: -3 },
+            },
+          ],
+        },
+      },
+    ],
+  });
+  const markup = renderToStaticMarkup(
+    createElement(FormulaSheet, { sheet: longSum }),
+  );
+  const formulas = (markup.match(/<math\b[^>]*>[\s\S]*?<\/math>/g) ?? [])
+    .map(htmlText)
+    .filter((formula) => /[+=]/.test(formula));
+
+  expect(formulas).toEqual([
+    's = -5.00',
+    '+ ( -2.00 )',
+    '+ b',
+    '+ ( - 2.00 )',
+    '+ 2.00',
+    '+ ( 2.00 - 1.00 )',
+    's = -5.00',
+    '+ ( -2.00 )',
+    '+ ( -3.00 )',
+    '+ ( - 2.00 )',
+    '+ 2.00',
+    '+ ( 2.00 - 1.00 )',
+  ]);
 });
