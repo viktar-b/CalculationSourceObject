@@ -4,11 +4,13 @@ import {
   type SheetLiteral,
   type SheetValueNode,
 } from '@cs-object/core';
+import { displayedLiteralDraft } from './literal-display.ts';
 
 interface ExplicitOperandGroupInput {
   readonly sheet: SheetDocument;
   readonly node: SheetValueNode;
   readonly numerical: boolean;
+  readonly literalsAsDrafts: boolean;
   readonly parentFunctionId: Extract<SheetValueNode, { kind: 'function' }>['functionId'];
   readonly argumentIndex: number;
 }
@@ -17,12 +19,15 @@ export const requiresExplicitOperandGroup = ({
   sheet,
   node,
   numerical,
+  literalsAsDrafts,
   parentFunctionId,
   argumentIndex,
 }: ExplicitOperandGroupInput): boolean => {
   let literal: SheetLiteral | undefined;
+  let draft: string | undefined;
   switch (node.kind) {
     case 'literal':
+      draft = displayedLiteralDraft({ node, literalsAsDrafts });
       literal = node.value;
       break;
     case 'symbol':
@@ -38,8 +43,10 @@ export const requiresExplicitOperandGroup = ({
     }
   }
   const negative =
-    literal?.kind === 'number' &&
-    (literal.value < 0 || Object.is(literal.value, -0));
+    draft !== undefined
+      ? /^\s*[-−]/u.test(draft)
+      : literal?.kind === 'number' &&
+        (literal.value < 0 || Object.is(literal.value, -0));
 
   return (
     (argumentIndex === 0 &&

@@ -91,6 +91,7 @@ export const FormulaSheetValueTree = ({
                     sheet,
                     node,
                     numerical,
+                    literalsAsDrafts: true,
                     parentFunctionId: 'fg.add',
                     argumentIndex: index === 0 ? 0 : 1,
                   }));

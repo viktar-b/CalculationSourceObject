@@ -7,11 +7,12 @@
  */
 import { renderSpecialValueFunction } from '../function-renderers.tsx';
 import { requiresExplicitOperandGroup } from './operand-grouping.ts';
+import { displayedLiteralDraft } from './literal-display.ts';
 import {
   getFunctionBinaryOperatorById,
   getFunctionSpec,
 } from '@cs-object/core';
-import { emptyLiteral, isSheetLiteralEmpty } from '@cs-object/core';
+import { emptyLiteral } from '@cs-object/core';
 import {
   getSymbolById,
   getValueNodeByKey,
@@ -86,11 +87,12 @@ const ValueTreeNodeMathmlView = ({
   viewOptions,
 }: ValueTreeNodeMathmlViewProps): ReactElement => {
   if (node.kind === 'literal') {
-    if (
-      (viewOptions.literalsAsDrafts || isSheetLiteralEmpty(node.value)) &&
-      (node.draft ?? '').length > 0
-    ) {
-      return <SymbolValueDraftMathmlView draft={node.draft ?? ''} />;
+    const draft = displayedLiteralDraft({
+      node,
+      literalsAsDrafts: viewOptions.literalsAsDrafts,
+    });
+    if (draft !== undefined) {
+      return <SymbolValueDraftMathmlView draft={draft} />;
     }
     return <SymbolValueLiteralMathmlView literal={node.value} />;
   }
@@ -149,6 +151,7 @@ const ValueTreeFunctionMathmlView = ({
       sheet,
       node: argNode,
       numerical: Boolean(viewOptions.numerical),
+      literalsAsDrafts: Boolean(viewOptions.literalsAsDrafts),
       parentFunctionId: node.functionId,
       argumentIndex: index,
     });
