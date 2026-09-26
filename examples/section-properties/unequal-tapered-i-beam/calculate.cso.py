@@ -17,7 +17,7 @@ from cso_python import (
     title="Unequal tapered I-beam",
     metadata={
         "referenceUrl": "https://www.enji.io/templates/basic-section-properties/unequal-tapered-i-beam",
-        "corrections": ["Squared web parallel-axis distance", "Full symmetric taper y-axis inertia", "Linear bottom-taper width", "Translated section-origin coordinates"],
+        "corrections": ["Squared web parallel-axis distance", "Full symmetric taper y-axis inertia", "Linear bottom-taper width", "Governing extreme-fiber elastic modulus", "Translated section-origin coordinates"],
         "referenceExportSha256": "be2631bfc9179b680aa22ff7e58278743c959e8755cbecde5e41eb6c8ac7cfdf",
     },
 )
@@ -65,7 +65,7 @@ def calculate(
 ) -> CalculationResults:
     text(
         id="reference-corrections",
-        content="Based on the Enji template with corrections to the web parallel-axis term, symmetric taper inertia and bottom-taper width. Y_0 translates absolute boundary and plastic-neutral-axis coordinates; centroid distances and section properties remain relative to the lower boundary. Independent polygon checks cover five plastic-neutral-axis regions. Human engineering approval is separate.",
+        content="Based on the Enji template with corrections to the web parallel-axis term, symmetric taper inertia, bottom-taper width and governing elastic modulus. Y_0 translates absolute boundary and plastic-neutral-axis coordinates; centroid distances and section properties remain relative to the lower boundary. Independent polygon checks cover five plastic-neutral-axis regions. Human engineering approval is separate.",
     )
     outer_flange_to_flange_depth: Annotated[
         float,
@@ -638,12 +638,15 @@ def calculate(
         symbol(
             id="S_x",
             glyph="S_{x}",
-            description="Elastic section modulus about x-axis",
+            description="Governing elastic section modulus about x-axis",
             unit="mm^3",
         ),
     ] = (
         second_moment_of_area_about_x_axis
-        / distance_to_centroid_y_axis_from_the_bottom_of_the_section
+        / max(
+            distance_to_centroid_y_axis_from_the_bottom_of_the_section,
+            section_depth - distance_to_centroid_y_axis_from_the_bottom_of_the_section,
+        )
     )
 
     elastic_section_modulus_about_y_axis: Annotated[

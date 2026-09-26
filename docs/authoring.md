@@ -96,6 +96,9 @@ comparisons `<`, `<=`, `>` and `>=`, including nested conditionals. Only the
 selected branch is evaluated. Core checks every Value tree node, including
 dormant and disconnected nodes, for supported operations, operand roles,
 numeric literals, references and cycles before evaluation.
+Every captured literal must satisfy the numeric kind and range contract, even
+in a dormant branch. Lazy evaluation skips arithmetic such as an unselected
+division by zero; it does not permit invalid captured data.
 Comparisons cannot be returned as numeric quantities. Legacy `given`, `calculation_call` and
 `documented_result` remain readable. `documented_result` is an explicitly
 unverified result and blocks verified PDF generation.

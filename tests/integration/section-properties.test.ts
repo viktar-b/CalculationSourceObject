@@ -270,6 +270,32 @@ it.each([
   ).toBe(true);
 });
 
+it.each([
+  [Number.MAX_SAFE_INTEGER + 1, 'UNSUPPORTED_NUMERIC_RANGE'],
+  [1.5, 'NUMERIC_KIND_MISMATCH'],
+])(
+  'rejects invalid dormant literal %s at the capture contract',
+  (value, code) => {
+    const execution = capture(conditionalSource('>'), { discriminant: 4 });
+    expect(verifyExecution({ execution }).ok).toBe(true);
+    const root = symbols(execution).find(
+      (symbol) => symbol.description === 'Root',
+    );
+    const literal = root?.valueTree.nodes.find(
+      (node) => node.literal?.kind === 'number' && node.literal.value === -1,
+    );
+    if (!literal) throw new Error('Missing dormant literal');
+    literal.literal = { kind: 'number', value, numericKind: 'int' };
+    const report = verifyExecution({ execution });
+    expect(report.ok).toBe(false);
+    expect(report.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code, stage: 'contract' }),
+      ]),
+    );
+  },
+);
+
 it('checks dormant division structurally and reports division by zero only when selected', () => {
   const path = conditionalSource('>');
   writeFileSync(

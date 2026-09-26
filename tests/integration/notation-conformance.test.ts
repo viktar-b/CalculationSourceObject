@@ -1,6 +1,10 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { notationIdentity, parseNotation } from '@cs-object/core';
+import {
+  notationIdentity,
+  parseNotation,
+  symbolDisplayIdentity,
+} from '@cs-object/core';
 import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
 
@@ -169,10 +173,7 @@ describe('cross-language notation conformance', () => {
   });
 });
 
-test('scoped Symbol display identities have identical Python and TypeScript encoding', async () => {
-  const { symbolDisplayIdentity } = await import(
-    '../../packages/cso-core/src/contracts/glyphs.ts'
-  );
+test('scoped Symbol display identities have identical Python and TypeScript encoding', () => {
   const symbols = [
     { glyph: 'Z_web' },
     { glyph: 'Z_{web}' },

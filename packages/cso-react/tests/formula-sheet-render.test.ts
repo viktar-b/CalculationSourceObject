@@ -105,7 +105,7 @@ test.each(['fg.pow', 'fg.uminus'])(
           ...sheet.symbols[0],
           valueTree: {
             rootKey: 'root',
-            result: { kind: 'number', value: 4 },
+            result: { kind: 'number', value: functionId === 'fg.pow' ? 4 : -2 },
             nodes: [
               {
                 key: 'root',
@@ -145,8 +145,15 @@ test.each(['fg.pow', 'fg.uminus'])(
     const markup = renderToStaticMarkup(
       createElement(FormulaSheet, { sheet: compound }),
     );
-    expect(htmlText(markup)).toContain('( 5.00 - 3.00 )');
-    expect(markup).toContain('<mo fence="true">(</mo>');
+    const formulas = (
+      markup.match(/<math\b[^>]*>[\s\S]*?<\/math>/g) ?? []
+    ).filter((math) => htmlText(math).includes('5.00'));
+    expect(formulas.length).toBeGreaterThan(0);
+    for (const formula of formulas) {
+      expect(htmlText(formula)).toContain('( 5.00 - 3.00 )');
+      expect(formula.match(/<mo fence="true">\(<\/mo>/g)).toHaveLength(1);
+      expect(formula.match(/<mo fence="true">\)<\/mo>/g)).toHaveLength(1);
+    }
   },
 );
 

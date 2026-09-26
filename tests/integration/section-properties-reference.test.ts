@@ -178,7 +178,10 @@ it.each([
         radius_of_gyration_about_the_z_axis: Math.sqrt(
           (inertiaX + inertiaY) / total.area,
         ),
-        elastic_section_modulus_about_x_axis: inertiaX / centroid,
+        elastic_section_modulus_about_x_axis:
+          inertiaX / Math.max(centroid, depth - centroid),
+        elastic_section_modulus_about_y_axis:
+          inertiaY / (Math.max(topWidth, bottomWidth) / 2),
         plastic_neutral_axis_location: pna + origin,
         distance_to_plastic_neutral_axis_from_lower_boundary: pna,
         plastic_section_modulus_about_x_axis: plasticModulus,

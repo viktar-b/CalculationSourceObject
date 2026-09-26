@@ -38,11 +38,16 @@ check selected default values against the external export.
 
 ## Tapered-section corrections
 
+The elastic x-axis modulus uses the farther extreme fiber, so it governs both
+orientations of an asymmetric section. Independent checks also cover the y-axis
+elastic modulus using the maximum flange width.
+
 The original export remains identified by its URL and hash. The maintained
-calculation corrects three inherited expressions: the web parallel-axis distance
+calculation corrects four inherited expressions: the web parallel-axis distance
 is squared; each tapered y-axis inertia includes both triangular wings and the
 central rectangle; bottom-taper width varies linearly with height using its
-gradient. These changes affect the dependent inertias, radii and moduli.
+gradient; and the elastic x-axis modulus uses the farther extreme fiber.
+These changes affect the dependent inertias, radii and moduli.
 
 `Y_0` translates absolute section boundaries, candidate PNA coordinates and the
 selected PNA. Component centroids and the new local PNA distance are measured
