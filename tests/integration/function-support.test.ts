@@ -853,7 +853,7 @@ it.each(['min', 'max'])(
     if (!call?.funcArgs || !predicate)
       throw new Error('Missing function or predicate');
     const originalArgs = call.funcArgs;
-    for (let index = 2; index < originalArgs.length; index += 1) {
+    for (let index = 0; index < originalArgs.length; index += 1) {
       call.funcArgs = originalArgs.map((arg, position) =>
         position === index ? { key: predicate.key } : arg,
       );
