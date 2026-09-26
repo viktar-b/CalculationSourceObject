@@ -116,6 +116,34 @@ class ExecutionTest(unittest.TestCase):
         )
         self.reject_before_execution("UNSUPPORTED_SIGNATURE")
 
+    def test_unimported_pi_is_an_ordinary_parameter_or_symbol(self):
+        for body, parameters in [
+            (f'b: {RESULT} = pi + 1\nreturn {{"b": b}}', f"pi: {SYMBOL} = 2"),
+            (f'pi: {SYMBOL} = 2\nb: {RESULT} = pi + 1\nreturn {{"b": b}}', ""),
+        ]:
+            with self.subTest(parameters=parameters):
+                self.entry.write_text(source(body, parameters=parameters))
+                execution = self.success(self.run_case())
+                self.assertEqual(execution["authoring"]["outputs"][0]["value"], 3)
+
+    def test_builtin_formula_helpers_reject_shadowing_before_execution(self):
+        for helper, call in [("max", "max(a, 3)"), ("round", "round(a)")]:
+            for scope in ["parameter", "earlier-local", "later-local", "module"]:
+                with self.subTest(helper=helper, scope=scope):
+                    body = f'a: {SYMBOL} = 2\nb: {RESULT} = {call}\n'
+                    parameters = ""
+                    if scope == "parameter":
+                        parameters = f"{helper}: {SYMBOL} = 2"
+                    if scope == "earlier-local":
+                        body = f'{helper}: Annotated[float, symbol(glyph="H", description="Helper", unit="m")] = 2\n' + body
+                    if scope == "later-local":
+                        body += f'{helper}: Annotated[float, symbol(glyph="H", description="Helper", unit="m")] = 2\n'
+                    text = source(body + 'return {"b": b}', parameters=parameters)
+                    if scope == "module":
+                        text += source(f'a: {SYMBOL} = 2\nreturn {{"a": a}}', parameters="", name=helper).removeprefix(IMPORTS)
+                    self.entry.write_text(text)
+                    self.reject_before_execution("SHADOWED_HELPER")
+
     def test_float_kind_survives_json_and_large_intermediates(self):
         self.entry.write_text(
             source(

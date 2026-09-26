@@ -207,167 +207,196 @@ function roundInteger(value: number): number {
   return rounded === 0 ? 0 : rounded;
 }
 
-type Operation = {
-  readonly arity: 0 | 1 | 2 | 3;
-  readonly evaluate: (...operands: number[]) => NumericResult;
-};
-const booleanResult = (): NumericFailure =>
-  failure('NONNUMERIC_FORMULA', 'Comparisons require a conditional test.');
+export type ValueRole = 'number' | 'comparison';
+type TypedEvaluation = (
+  values: readonly number[],
+  kinds: readonly NumericKind[],
+) => NumericResult;
+type Operation =
+  | {
+      readonly kind: 'numeric';
+      readonly operands: readonly ValueRole[];
+      readonly evaluate: (...values: number[]) => NumericResult;
+      readonly typed: TypedEvaluation;
+    }
+  | {
+      readonly kind: 'comparison';
+      readonly operands: readonly ValueRole[];
+      readonly compare: (left: number, right: number) => boolean;
+    }
+  | { readonly kind: 'conditional'; readonly operands: readonly ValueRole[] };
+
+const withKind = (result: NumericResult, kind: NumericKind): NumericResult =>
+  result.ok
+    ? {
+        ...result,
+        value: kind === 'int' && result.value === 0 ? 0 : result.value,
+        numericKind: kind,
+      }
+    : result;
+const binary = (
+  exact: (a: number, b: number) => NumericResult,
+  approximate: (a: number, b: number) => number,
+): Operation => ({
+  kind: 'numeric',
+  operands: ['number', 'number'],
+  evaluate: exact,
+  typed: ([left, right], kinds) =>
+    kinds.every((kind) => kind === 'int')
+      ? withKind(exact(left, right), 'int')
+      : validateNumber(approximate(left, right), 'float'),
+});
+/** Own operation roles and evaluation together; rendering has a broader vocabulary. */
 const operations = new Map<string, Operation>([
-  ['fg.add', { arity: 2, evaluate: add }],
-  ['fg.subtract', { arity: 2, evaluate: subtract }],
-  ['fg.multiply', { arity: 2, evaluate: multiply }],
-  ['fg.divide', { arity: 2, evaluate: divide }],
-  ['fg.pow', { arity: 2, evaluate: power }],
-  ['fg.sqrt', { arity: 1, evaluate: squareRoot }],
-  ['fg.uminus', { arity: 1, evaluate: unaryMinus }],
-  ['fg.pi', { arity: 0, evaluate: () => validateNumber(Math.PI, 'float') }],
+  ['fg.add', binary(add, (a, b) => a + b)],
+  ['fg.subtract', binary(subtract, (a, b) => a - b)],
+  ['fg.multiply', binary(multiply, (a, b) => a * b)],
+  [
+    'fg.divide',
+    {
+      kind: 'numeric',
+      operands: ['number', 'number'],
+      evaluate: divide,
+      typed: ([a, b]) =>
+        b === 0 ? divide(a, b) : validateNumber(a / b, 'float'),
+    },
+  ],
+  [
+    'fg.pow',
+    {
+      kind: 'numeric',
+      operands: ['number', 'number'],
+      evaluate: power,
+      typed: ([a, b], kinds) => {
+        if ((a === 0 && b < 0) || (a < 0 && !Number.isInteger(b)))
+          return power(a, b);
+        return kinds.every((kind) => kind === 'int') && b >= 0
+          ? withKind(power(a, b), 'int')
+          : validateNumber(a ** b, 'float');
+      },
+    },
+  ],
+  [
+    'fg.sqrt',
+    {
+      kind: 'numeric',
+      operands: ['number'],
+      evaluate: squareRoot,
+      typed: ([a]) =>
+        a < 0 ? squareRoot(a) : validateNumber(Math.sqrt(a), 'float'),
+    },
+  ],
+  [
+    'fg.uminus',
+    {
+      kind: 'numeric',
+      operands: ['number'],
+      evaluate: unaryMinus,
+      typed: ([a], kinds) =>
+        validateNumber(kinds[0] === 'int' && a === 0 ? 0 : -a, kinds[0]),
+    },
+  ],
+  [
+    'fg.pi',
+    {
+      kind: 'numeric',
+      operands: [],
+      evaluate: () => validateNumber(Math.PI, 'float'),
+      typed: () => validateNumber(Math.PI, 'float'),
+    },
+  ],
   [
     'fg.ceil',
     {
-      arity: 1,
-      evaluate: (value) => validateNumber(Math.ceil(value) || 0, 'int'),
+      kind: 'numeric',
+      operands: ['number'],
+      evaluate: (a) => validateNumber(Math.ceil(a) || 0, 'int'),
+      typed: ([a]) => validateNumber(Math.ceil(a) || 0, 'int'),
     },
   ],
   [
     'fg.round',
     {
-      arity: 1,
-      evaluate: (value) => validateNumber(roundInteger(value), 'int'),
+      kind: 'numeric',
+      operands: ['number'],
+      evaluate: (a) => validateNumber(roundInteger(a), 'int'),
+      typed: ([a]) => validateNumber(roundInteger(a), 'int'),
     },
   ],
   [
     'fg.max',
     {
-      arity: 2,
-      evaluate: (left, right) => validateNumber(left >= right ? left : right),
+      kind: 'numeric',
+      operands: ['number', 'number'],
+      evaluate: (a, b) => validateNumber(a >= b ? a : b),
+      typed: ([a, b], kinds) => {
+        const index = a >= b ? 0 : 1;
+        const value = index === 0 ? a : b;
+        return validateNumber(
+          kinds[index] === 'int' && value === 0 ? 0 : value,
+          kinds[index],
+        );
+      },
     },
   ],
-  ['fg.lt', { arity: 2, evaluate: booleanResult }],
-  ['fg.le', { arity: 2, evaluate: booleanResult }],
-  ['fg.gt', { arity: 2, evaluate: booleanResult }],
-  ['fg.ge', { arity: 2, evaluate: booleanResult }],
+  [
+    'fg.lt',
+    {
+      kind: 'comparison',
+      operands: ['number', 'number'],
+      compare: (a, b) => a < b,
+    },
+  ],
+  [
+    'fg.le',
+    {
+      kind: 'comparison',
+      operands: ['number', 'number'],
+      compare: (a, b) => a <= b,
+    },
+  ],
+  [
+    'fg.gt',
+    {
+      kind: 'comparison',
+      operands: ['number', 'number'],
+      compare: (a, b) => a > b,
+    },
+  ],
+  [
+    'fg.ge',
+    {
+      kind: 'comparison',
+      operands: ['number', 'number'],
+      compare: (a, b) => a >= b,
+    },
+  ],
   [
     'fg.cnd',
-    {
-      arity: 3,
-      evaluate: () =>
-        failure(
-          'INVALID_CONDITIONAL',
-          'Conditional evaluation requires a formula graph.',
-        ),
-    },
+    { kind: 'conditional', operands: ['comparison', 'number', 'number'] },
   ],
 ]);
-
-export function evaluateComparison(
-  functionId: string,
-  left: number,
-  right: number,
-): boolean | NumericFailure {
-  switch (functionId) {
-    case 'fg.lt':
-      return left < right;
-    case 'fg.le':
-      return left <= right;
-    case 'fg.gt':
-      return left > right;
-    case 'fg.ge':
-      return left >= right;
-    default:
-      return failure(
-        'INVALID_CONDITIONAL',
-        'A conditional test requires one numeric comparison.',
-      );
-  }
-}
-
-function evaluateTypedOperation(
-  functionId: string,
-  operands: readonly number[],
-  kinds: readonly NumericKind[],
-): NumericResult {
-  const [left, right] = operands;
-  const integerOperands = kinds.every((kind) => kind === 'int');
-  const withKind = (result: NumericResult, kind: NumericKind): NumericResult =>
-    result.ok
-      ? {
-          ...result,
-          value: kind === 'int' && result.value === 0 ? 0 : result.value,
-          numericKind: kind,
-        }
-      : result;
-  switch (functionId) {
-    case 'fg.add':
-      return integerOperands
-        ? withKind(add(left, right), 'int')
-        : validateNumber(left + right, 'float');
-    case 'fg.subtract':
-      return integerOperands
-        ? withKind(subtract(left, right), 'int')
-        : validateNumber(left - right, 'float');
-    case 'fg.multiply':
-      return integerOperands
-        ? withKind(multiply(left, right), 'int')
-        : validateNumber(left * right, 'float');
-    case 'fg.divide':
-      return right === 0
-        ? divide(left, right)
-        : validateNumber(left / right, 'float');
-    case 'fg.pow':
-      if ((left === 0 && right < 0) || (left < 0 && !Number.isInteger(right)))
-        return power(left, right);
-      return integerOperands && right >= 0
-        ? withKind(power(left, right), 'int')
-        : validateNumber(left ** right, 'float');
-    case 'fg.sqrt':
-      return left < 0
-        ? squareRoot(left)
-        : validateNumber(Math.sqrt(left), 'float');
-    case 'fg.uminus':
-      return validateNumber(
-        kinds[0] === 'int' && left === 0 ? 0 : -left,
-        kinds[0],
-      );
-    case 'fg.pi':
-      return validateNumber(Math.PI, 'float');
-    case 'fg.ceil':
-      return validateNumber(Math.ceil(left) || 0, 'int');
-    case 'fg.round':
-      return validateNumber(roundInteger(left), 'int');
-    case 'fg.max':
-      return left >= right
-        ? validateNumber(left, kinds[0])
-        : validateNumber(right, kinds[1]);
-    default:
-      return booleanResult();
-  }
-}
 
 type ResolvedOperation =
   | { readonly ok: true; readonly operation: Operation }
   | NumericFailure;
-
-function resolveOperation(
+export function resolveOperation(
   functionId: string,
   operandCount: number,
 ): ResolvedOperation {
   const operation = operations.get(functionId);
-  if (operation === undefined) {
+  if (operation === undefined)
     return failure(
       'UNSUPPORTED_FUNCTION',
       `Function ${functionId} is outside the verified numeric subset.`,
     );
-  }
-  if (operandCount !== operation.arity) {
+  if (operandCount !== operation.operands.length)
     return failure(
       'INVALID_FUNCTION_ARITY',
-      `${functionId} expects ${operation.arity} operands, received ${operandCount}.`,
+      `${functionId} expects ${operation.operands.length} operands, received ${operandCount}.`,
     );
-  }
   return { ok: true, operation };
 }
-
 export function validateOperation(
   functionId: string,
   operandCount: number,
@@ -375,29 +404,55 @@ export function validateOperation(
   const resolved = resolveOperation(functionId, operandCount);
   return resolved.ok ? { ok: true } : resolved;
 }
-
+export function evaluateComparison(
+  functionId: string,
+  left: number,
+  right: number,
+): boolean | NumericFailure {
+  const resolved = resolveOperation(functionId, 2);
+  if (!resolved.ok || resolved.operation.kind !== 'comparison')
+    return failure(
+      'INVALID_CONDITIONAL',
+      'A conditional test requires one numeric comparison.',
+    );
+  return resolved.operation.compare(left, right);
+}
 export function evaluateOperation(
   functionId: string,
   operands: readonly number[],
   numericKinds?: readonly (NumericKind | undefined)[],
 ): NumericResult {
   const resolved = resolveOperation(functionId, operands.length);
-  if (!resolved.ok) {
-    return resolved;
-  }
+  if (!resolved.ok) return resolved;
   for (const [index, operand] of operands.entries()) {
     const validated = validateNumber(operand, numericKinds?.[index]);
-    if (!validated.ok) {
-      return validated;
+    if (!validated.ok) return validated;
+  }
+  const operation = resolved.operation;
+  switch (operation.kind) {
+    case 'comparison':
+      return failure(
+        'NONNUMERIC_FORMULA',
+        'Comparisons require a conditional test.',
+      );
+    case 'conditional':
+      return failure(
+        'INVALID_CONDITIONAL',
+        'Conditional evaluation requires a formula graph.',
+      );
+    case 'numeric': {
+      const kinds = numericKinds?.filter(
+        (kind): kind is NumericKind => kind !== undefined,
+      );
+      return kinds !== undefined && kinds.length === operands.length
+        ? operation.typed(operands, kinds)
+        : operation.evaluate(...operands);
+    }
+    default: {
+      const exhaustive: never = operation;
+      return exhaustive;
     }
   }
-  const kinds = numericKinds?.filter(
-    (kind): kind is NumericKind => kind !== undefined,
-  );
-  if (kinds !== undefined && kinds.length === operands.length) {
-    return evaluateTypedOperation(functionId, operands, kinds);
-  }
-  return resolved.operation.evaluate(...operands);
 }
 
 export function compareNumbers(

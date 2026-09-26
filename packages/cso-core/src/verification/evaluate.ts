@@ -19,7 +19,8 @@ import {
   evaluateOperation,
   evaluateComparison,
   validateNumber,
-  validateOperation,
+  resolveOperation,
+  type ValueRole,
 } from './numeric.ts';
 
 export type EvaluationResult =
@@ -60,7 +61,7 @@ type EvaluationState =
 
 type StructureState =
   | { readonly kind: 'visiting' }
-  | { readonly kind: 'resolved' }
+  | { readonly kind: 'resolved'; readonly role: ValueRole }
   | { readonly kind: 'failed'; readonly diagnostics: readonly Diagnostic[] };
 
 const addressKey = ({ symbolId, nodeKey }: NodeAddress): string =>
@@ -254,142 +255,120 @@ export const createFormulaEvaluator = (
           }),
         );
 
-  function structureChildren(
-    graph: FormulaGraph,
-    node: CalculationSourceValueNode,
-  ): readonly NodeAddress[] {
+  function validateStructure(
+    address: NodeAddress,
+    stack: readonly NodeAddress[] = [],
+  ): { readonly ok: true; readonly role: ValueRole } | EvaluationFailure {
+    const key = addressKey(address);
+    const known = structureStates.get(key);
+    if (known?.kind === 'resolved') return { ok: true, role: known.role };
+    if (known?.kind === 'failed') return failure(...known.diagnostics);
+    if (known?.kind === 'visiting') return cycleFailure(address, stack);
+    structureStates.set(key, { kind: 'visiting' });
+    const result = checkNodeStructure(address, [...stack, address]);
+    structureStates.set(
+      key,
+      result.ok
+        ? { kind: 'resolved', role: result.role }
+        : { kind: 'failed', diagnostics: result.diagnostics },
+    );
+    return result;
+  }
+
+  function roleFailure(
+    address: NodeAddress,
+    role: ValueRole,
+  ): EvaluationFailure {
+    return failure(
+      diagnostic({
+        address,
+        code:
+          role === 'comparison' ? 'INVALID_CONDITIONAL' : 'NONNUMERIC_FORMULA',
+        message:
+          role === 'comparison'
+            ? 'A conditional test requires one numeric comparison.'
+            : 'A numeric operand cannot contain a comparison.',
+      }),
+    );
+  }
+
+  function checkNodeStructure(
+    address: NodeAddress,
+    stack: readonly NodeAddress[],
+  ): { readonly ok: true; readonly role: ValueRole } | EvaluationFailure {
+    const graph = graphs.get(address.symbolId);
+    const node = graph?.nodes.get(address.nodeKey);
+    if (!graph || !node)
+      return failure(
+        diagnostic({
+          address,
+          code: 'MISSING_FORMULA_OPERAND',
+          message: 'Formula structure contains an unresolved operand.',
+        }),
+      );
     switch (node.mode) {
-      case 'LITERAL':
-        return [];
+      case 'LITERAL': {
+        const literal = evaluateLiteral(graph, node);
+        return literal.ok ? { ok: true, role: 'number' } : literal;
+      }
       case 'SYMBOL': {
         const referenced =
-          node.symbol === undefined || node.symbol === null
-            ? undefined
-            : graphs.get(node.symbol.id);
-        return referenced === undefined
-          ? []
-          : [
-              {
-                symbolId: referenced.symbol.id,
-                nodeKey: referenced.symbol.valueTree.rootKey,
-              },
-            ];
+          node.symbol == null ? undefined : graphs.get(node.symbol.id);
+        if (!referenced)
+          return failure(
+            diagnostic({
+              address,
+              code: 'UNRESOLVED_SYMBOL_REFERENCE',
+              message: 'Formula structure contains an unresolved symbol.',
+            }),
+          );
+        const target = {
+          symbolId: referenced.symbol.id,
+          nodeKey: referenced.symbol.valueTree.rootKey,
+        };
+        const child = validateStructure(target, stack);
+        if (!child.ok) return child;
+        return child.role === 'number' ? child : roleFailure(target, 'number');
       }
       case 'FUNCTION': {
-        if (
-          node.funcSpec === undefined ||
-          node.funcSpec === null ||
-          node.funcArgs === undefined ||
-          !validateOperation(node.funcSpec.id, node.funcArgs.length).ok
-        ) {
-          return [];
+        if (node.funcSpec == null || node.funcArgs === undefined)
+          return failure(
+            diagnostic({
+              address,
+              code: 'MISSING_FUNCTION_PAYLOAD',
+              message: 'Formula structure has an incomplete function.',
+            }),
+          );
+        const resolved = resolveOperation(
+          node.funcSpec.id,
+          node.funcArgs.length,
+        );
+        if (!resolved.ok)
+          return failure(
+            diagnostic({
+              address,
+              code: resolved.code,
+              message: resolved.message,
+            }),
+          );
+        for (const [index, argument] of node.funcArgs.entries()) {
+          const target = { symbolId: address.symbolId, nodeKey: argument.key };
+          const child = validateStructure(target, stack);
+          if (!child.ok) return child;
+          const expected = resolved.operation.operands[index];
+          if (child.role !== expected) return roleFailure(target, expected);
         }
-        return node.funcArgs.map((argument) => ({
-          symbolId: graph.symbol.id,
-          nodeKey: argument.key,
-        }));
+        return {
+          ok: true,
+          role:
+            resolved.operation.kind === 'comparison' ? 'comparison' : 'number',
+        };
       }
       default: {
         const exhaustive: never = node.mode;
         return exhaustive;
       }
     }
-  }
-
-  function structureLookup(
-    address: NodeAddress,
-    stack: readonly NodeAddress[],
-  ): 'unseen' | 'resolved' | EvaluationFailure {
-    const key = addressKey(address);
-    if (stack.some((candidate) => addressKey(candidate) === key)) {
-      return cycleFailure(address, stack);
-    }
-    const cached = structureStates.get(key);
-    switch (cached?.kind) {
-      case 'resolved':
-        return 'resolved';
-      case 'failed':
-        return failure(...cached.diagnostics);
-      case 'visiting':
-        return cycleFailure(address, stack);
-      default:
-        return 'unseen';
-    }
-  }
-
-  function validateStructure(
-    address: NodeAddress,
-    stack: readonly NodeAddress[] = [],
-  ): EvaluationFailure | undefined {
-    const key = addressKey(address);
-    const known = structureLookup(address, stack);
-    if (known === 'resolved') {
-      return undefined;
-    }
-    if (known !== 'unseen') {
-      return known;
-    }
-
-    const graph = graphs.get(address.symbolId);
-    const node = graph?.nodes.get(address.nodeKey);
-    if (graph === undefined || node === undefined) {
-      return failure(
-        diagnostic({
-          address,
-          code: 'MISSING_FORMULA_OPERAND',
-          message:
-            'Conditional formula structure contains an unresolved operand.',
-        }),
-      );
-    }
-    if (node.mode === 'FUNCTION') {
-      if (node.funcSpec == null || node.funcArgs === undefined) {
-        return failure(
-          diagnostic({
-            address,
-            code: 'MISSING_FUNCTION_PAYLOAD',
-            message:
-              'Conditional formula structure has an incomplete function.',
-          }),
-        );
-      }
-      const shape = validateOperation(node.funcSpec.id, node.funcArgs.length);
-      if (!shape.ok)
-        return failure(
-          diagnostic({ address, code: shape.code, message: shape.message }),
-        );
-    }
-    if (
-      node.mode === 'SYMBOL' &&
-      (node.symbol == null || !graphs.has(node.symbol.id))
-    ) {
-      return failure(
-        diagnostic({
-          address,
-          code: 'UNRESOLVED_SYMBOL_REFERENCE',
-          message:
-            'Conditional formula structure contains an unresolved symbol.',
-        }),
-      );
-    }
-
-    structureStates.set(key, { kind: 'visiting' });
-    const nextStack = [...stack, address];
-    let detected: EvaluationFailure | undefined;
-    for (const child of structureChildren(graph, node)) {
-      detected = validateStructure(child, nextStack);
-      if (detected !== undefined) {
-        break;
-      }
-    }
-
-    structureStates.set(
-      key,
-      detected === undefined
-        ? { kind: 'resolved' }
-        : { kind: 'failed', diagnostics: detected.diagnostics },
-    );
-    return detected;
   }
 
   function evaluateLiteral(
@@ -437,19 +416,6 @@ export const createFormulaEvaluator = (
         }),
       );
     }
-    const referenced = graphs.get(node.symbol.id);
-    if (referenced !== undefined) {
-      const structuralFailure = validateStructure(
-        {
-          symbolId: referenced.symbol.id,
-          nodeKey: referenced.symbol.valueTree.rootKey,
-        },
-        stack,
-      );
-      if (structuralFailure !== undefined) {
-        return structuralFailure;
-      }
-    }
     return evaluateSemanticSymbol(node.symbol.id, stack);
   }
 
@@ -477,11 +443,11 @@ export const createFormulaEvaluator = (
         }),
       );
     }
-    const shape = validateOperation(node.funcSpec.id, node.funcArgs.length);
+    const shape = resolveOperation(node.funcSpec.id, node.funcArgs.length);
     if (!shape.ok) {
       return numericEvaluation(address, shape);
     }
-    if (node.funcSpec.id === 'fg.cnd') {
+    if (shape.operation.kind === 'conditional') {
       return evaluateConditional(graph, node, stack);
     }
     const results = node.funcArgs.map((argument) =>
@@ -512,8 +478,6 @@ export const createFormulaEvaluator = (
     stack: readonly NodeAddress[],
   ): EvaluationResult {
     const address = { symbolId: graph.symbol.id, nodeKey: node.key };
-    const structuralFailure = validateStructure(address);
-    if (structuralFailure !== undefined) return structuralFailure;
     const args = node.funcArgs ?? [];
     const test = graph.nodes.get(args[0].key);
     if (
@@ -740,10 +704,29 @@ export const createFormulaEvaluator = (
     return store(symbolStates, symbolId, result);
   }
 
+  const structuralFailures = new Map<string, EvaluationFailure>();
+  for (const graph of graphs.values()) {
+    for (const node of graph.nodes.values()) {
+      const address = { symbolId: graph.symbol.id, nodeKey: node.key };
+      const checked = validateStructure(address);
+      const invalid = !checked.ok
+        ? checked
+        : node.key === graph.symbol.valueTree.rootKey &&
+            checked.role !== 'number'
+          ? roleFailure(address, 'number')
+          : undefined;
+      if (invalid) {
+        structuralFailures.set(graph.symbol.id, invalid);
+        break;
+      }
+    }
+  }
   return {
     graphs,
-    evaluate: evaluateNode,
-    evaluateSymbol: evaluateSemanticSymbol,
+    evaluate: (address) =>
+      structuralFailures.get(address.symbolId) ?? evaluateNode(address),
+    evaluateSymbol: (symbolId) =>
+      structuralFailures.get(symbolId) ?? evaluateSemanticSymbol(symbolId),
     location: (address) => {
       const graph = graphs.get(address.symbolId);
       return graph ? graphNodeLocation(graph, address.nodeKey) : undefined;

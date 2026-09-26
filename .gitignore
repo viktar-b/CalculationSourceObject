@@ -43,7 +43,7 @@ test-results/
 # Vercel local project link
 .vercel/
 
-prototypes/
+/prototypes/
 
 # Local tickets and specs
 .scratch/

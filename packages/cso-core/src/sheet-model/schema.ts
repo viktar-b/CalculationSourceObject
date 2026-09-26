@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { NumericValueSchema } from '../contracts/numbers.ts';
-import { glyphIdentity } from '../contracts/glyphs.ts';
+import {
+  SymbolDisplaySchema,
+  addSymbolDisplayIssues,
+} from '../contracts/glyphs.ts';
 import { parseNotation } from '../notation/parse.ts';
 import { supportedValueFunctionIds } from './functions.ts';
 
@@ -55,20 +58,16 @@ export const SheetValueTreeSchema = z
   })
   .strict();
 
-export const SheetSymbolSchema = z
-  .object({
-    id: IdSchema,
-    glyph: z.string(),
-    notationScope: z.string().min(1).optional(),
-    glyphCodeName: z.string().min(1).optional(),
-    description: z.string(),
-    unit: z.string().optional(),
-    comment: z.string().optional(),
-    valueTree: SheetValueTreeSchema,
-  })
+export const SheetSymbolSchema = SymbolDisplaySchema.safeExtend({
+  glyphCodeName: z.string().min(1).optional(),
+  description: z.string(),
+  unit: z.string().optional(),
+  comment: z.string().optional(),
+  valueTree: SheetValueTreeSchema,
+})
   .strict()
   .superRefine((symbol, ctx) => {
-    for (const field of ['glyph', 'unit'] as const) {
+    for (const field of ['unit'] as const) {
       const value = symbol[field];
       if (field === 'unit' && (value === undefined || value === '')) continue;
       const parsed = parseNotation(value ?? '');
@@ -397,23 +396,13 @@ const addSheetReferenceIssues = (
   addSectionItemIssues(sheet, sectionIds, symbolIds, ctx);
   addSymbolReferenceIssues(sheet, symbolIds, ctx);
 
-  const glyphs = new Map<string, string>();
-  for (const [symbolIndex, symbol] of sheet.symbols.entries()) {
-    const identity = glyphIdentity(symbol.glyph, symbol.notationScope);
-    const previous = glyphs.get(identity);
-    if (previous !== undefined && previous !== symbol.id) {
-      ctx.addIssue({
-        code: 'custom',
-        message: `Distinct quantities ${previous} and ${symbol.id} share glyph ${symbol.glyph}`,
-        path: ['symbols', symbolIndex, 'glyph'],
-        params: {
-          diagnosticCode: 'DUPLICATE_GLYPH',
-          symbolId: symbol.id,
-        },
-      });
-    }
-    glyphs.set(identity, symbol.id);
-  }
+  addSymbolDisplayIssues(
+    sheet.symbols.map((symbol, index) => ({
+      symbol,
+      path: ['symbols', index],
+    })),
+    ctx,
+  );
 };
 
 export const SheetDocumentSchema = SheetDocumentBaseSchema.superRefine(

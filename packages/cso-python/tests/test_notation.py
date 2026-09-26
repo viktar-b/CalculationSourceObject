@@ -21,7 +21,7 @@ class NotationTest(unittest.TestCase):
     def identity(self, source: str) -> str:
         parsed = parse_notation(source)
         self.assertTrue(parsed.ok, parsed)
-        return glyph_identity(source)
+        return glyph_identity({"glyph": source})
 
     def diagnostic(self, source: str):
         parsed = parse_notation(source)

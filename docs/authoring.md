@@ -93,7 +93,9 @@ Supported formulas include numeric literals, references, unary minus, arithmetic
 uses ties to even and returns an integer. Conditional expressions
 `value_if_true if comparison else value_if_false` support single numeric
 comparisons `<`, `<=`, `>` and `>=`, including nested conditionals. Only the
-selected branch is evaluated; both branches must have supported structure.
+selected branch is evaluated. Core checks every Value tree node, including
+dormant and disconnected nodes, for supported operations, operand roles,
+numeric literals, references and cycles before evaluation.
 Comparisons cannot be returned as numeric quantities. Legacy `given`, `calculation_call` and
 `documented_result` remain readable. `documented_result` is an explicitly
 unverified result and blocks verified PDF generation.

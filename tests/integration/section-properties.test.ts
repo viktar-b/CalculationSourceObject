@@ -1,9 +1,12 @@
+import { prepareExecutionDocument } from '@cs-object/react';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   ExecutionResponseSchema,
+  PreparedDocumentSchema,
+  SheetDocumentSchema,
   createSheetFromCalculationSourceObject,
   verifyExecution,
 } from '@cs-object/core';
@@ -47,7 +50,7 @@ function symbols(execution: ReturnType<typeof capture>) {
 
 it.each([
   ['hot-formed-I-sections', 8, 38, 'X', 18.11502650020568],
-  ['unequal-tapered-i-beam', 9, 90, 'Z_x', 38690.717308022955],
+  ['unequal-tapered-i-beam', 9, 91, 'Z_x', 38690.717308022955],
 ])(
   'verifies every quantity in the %s reference transcription',
   (slug, inputs, formulas, localId, expected) => {
@@ -95,7 +98,26 @@ it('preserves the tapered reference’s two Z_web quantities with axis scopes', 
   }).sheet;
   const webTerms = sheet.symbols.filter((s) => s.glyph === 'Z_{web}');
   expect(webTerms.map((s) => s.notationScope)).toEqual(['x-axis', 'y-axis']);
+  const document = prepareExecutionDocument({ execution, assets: [] });
+  expect(
+    PreparedDocumentSchema.safeParse(JSON.parse(JSON.stringify(document)))
+      .success,
+  ).toBe(true);
+  const displayed = document.sections.flatMap((section) =>
+    section.items.flatMap((item) =>
+      item.kind === 'symbol' && item.symbol.glyph === 'Z_{web}'
+        ? [item.symbol]
+        : [],
+    ),
+  );
+  expect(displayed.map((symbol) => symbol.notationScope)).toEqual([
+    'x-axis',
+    'y-axis',
+  ]);
+  displayed[1].notationScope = 'x-axis';
+  expect(PreparedDocumentSchema.safeParse(document).success).toBe(false);
   webTerms[1].notationScope = 'x-axis';
+  expect(SheetDocumentSchema.safeParse(sheet).success).toBe(false);
   const authored = symbols(execution).filter((s) => s.glyph === 'Z_{web}');
   authored[1].notationScope = 'x-axis';
   expect(
@@ -178,4 +200,98 @@ it('verifies the torsional index with documented large float products', () => {
   expect(verifyExecution({ execution }).checks.formulaConsistency.status).toBe(
     'failed',
   );
+});
+
+it.each([
+  ['nested predicate', 'INVALID_CONDITIONAL'],
+  ['numeric branch', 'NONNUMERIC_FORMULA'],
+  ['shared comparison operand', 'NONNUMERIC_FORMULA'],
+  ['shared comparison operand reversed', 'NONNUMERIC_FORMULA'],
+  ['string literal', 'NONNUMERIC_LITERAL'],
+  ['arity', 'INVALID_FUNCTION_ARITY'],
+  ['detached operation', 'UNSUPPORTED_FUNCTION'],
+  ['detached arity', 'INVALID_FUNCTION_ARITY'],
+  ['detached cycle', 'FORMULA_CYCLE'],
+])('rejects invalid %s throughout the Value tree', (change, code) => {
+  const execution = capture(conditionalSource('>'), { discriminant: 4 });
+  const root = symbols(execution).find(
+    (symbol) => symbol.description === 'Root',
+  );
+  if (!root) throw new Error('Missing root');
+  const nodes = root.valueTree.nodes;
+  const outer = nodes.find((node) => node.key === root.valueTree.rootKey);
+  const nested = nodes.find(
+    (node) => node.funcSpec?.id === 'fg.cnd' && node !== outer,
+  );
+  const predicate = nodes.find((node) => node.funcSpec?.id === 'fg.lt');
+  const squareRoot = nodes.find((node) => node.funcSpec?.id === 'fg.sqrt');
+  if (
+    !outer?.funcArgs ||
+    !nested?.funcArgs ||
+    !predicate?.funcArgs ||
+    !squareRoot
+  )
+    throw new Error('Missing conditional graph');
+  if (change === 'nested predicate') predicate.funcSpec = { id: 'fg.add' };
+  if (change === 'numeric branch') nested.funcArgs[1] = { key: predicate.key };
+  if (change.startsWith('shared comparison operand')) {
+    const literal = nodes.find((node) => node.key === nested.funcArgs?.[1].key);
+    if (!literal) throw new Error('Missing negative branch');
+    literal.mode = 'FUNCTION';
+    literal.funcSpec = { id: 'fg.uminus' };
+    delete literal.literal;
+    literal.funcArgs = [{ key: predicate.key }];
+    if (change.endsWith('reversed')) nodes.reverse();
+  }
+  if (change === 'string literal') {
+    const literal = nodes.find(
+      (node) =>
+        node.mode === 'LITERAL' &&
+        node.literal?.kind === 'number' &&
+        node.literal.value === -1,
+    );
+    if (!literal) throw new Error('Missing dormant literal');
+    literal.literal = { kind: 'string', value: 'one' };
+  }
+  if (change === 'arity') predicate.funcArgs = [];
+  if (change.startsWith('detached ')) {
+    const detached = structuredClone(squareRoot);
+    detached.key = 'detached';
+    if (change === 'detached operation') detached.funcSpec = { id: 'fg.log' };
+    else if (change === 'detached arity') detached.funcArgs = [];
+    else detached.funcArgs = [{ key: detached.key }];
+    nodes.push(detached);
+  }
+  const report = verifyExecution({ execution });
+  expect(report.ok, JSON.stringify(report.diagnostics)).toBe(false);
+  expect(
+    report.diagnostics.some((item) => item.code === code),
+    JSON.stringify(report.diagnostics),
+  ).toBe(true);
+});
+
+it('checks dormant division structurally and reports division by zero only when selected', () => {
+  const path = conditionalSource('>');
+  writeFileSync(
+    path,
+    readFileSync(path, 'utf8').replace(
+      'math.sqrt(discriminant)',
+      '1.0 / discriminant',
+    ),
+  );
+  const execution = capture(path, { discriminant: 0 });
+  expect(verifyExecution({ execution }).ok).toBe(true);
+  const root = symbols(execution).find(
+    (symbol) => symbol.description === 'Root',
+  );
+  const comparison = root?.valueTree.nodes.find(
+    (node) => node.funcSpec?.id === 'fg.gt',
+  );
+  if (!comparison) throw new Error('Missing comparison');
+  comparison.funcSpec = { id: 'fg.ge' };
+  const report = verifyExecution({ execution });
+  expect(report.ok).toBe(false);
+  expect(
+    report.diagnostics.some((item) => item.code === 'DIVISION_BY_ZERO'),
+  ).toBe(true);
 });

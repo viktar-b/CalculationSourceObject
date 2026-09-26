@@ -20,6 +20,8 @@ _Avoid_: calling a rendered sheet the complete calculation source.
 
 **Symbol**:
 A named quantity with a displayed glyph, descriptive metadata, and a value.
+Its display identity combines normalized glyph notation with its authored
+notation scope; it is separate from the symbol reference identity.
 
 **Value tree**:
 A formula represented by literal values, symbol references, and function
@@ -34,7 +36,7 @@ The reviewable presentation of a calculation's rows, mathematical notation,
 substitutions, units, explanations, and results.
 
 **Calculation report**:
-The reviewable engineering narrative for one source revision and resolved input
+The reviewable engineering narrative for one source revision, selected function and resolved input
 set, including assumptions, references, formulas, units and results. HTML and
 PDF can present the same report; the verification report is a separate record.
 

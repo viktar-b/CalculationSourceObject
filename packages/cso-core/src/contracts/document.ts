@@ -10,7 +10,7 @@ import {
   sha256Bytes,
 } from './common.ts';
 import { ExecutionPayloadSchema, executionBindingFrom } from './execution.ts';
-import { glyphIdentity } from './glyphs.ts';
+import { addSymbolDisplayIssues } from './glyphs.ts';
 
 type HistoricalJsonValue = z.infer<ReturnType<typeof z.json>>;
 
@@ -551,7 +551,7 @@ const validateSymbols = (document: PreparedDocument, ctx: z.RefinementCtx) => {
     ),
   ];
   const symbolIds = new Set<string>();
-  const glyphs = new Map<string, string>();
+  addSymbolDisplayIssues(definitions, ctx);
   for (const { symbol, path } of definitions) {
     if (document.source.kind === 'execution') {
       validateSymbolIdentity(symbol, ctx, path);
@@ -565,18 +565,6 @@ const validateSymbols = (document: PreparedDocument, ctx: z.RefinementCtx) => {
       );
     }
     symbolIds.add(symbol.id);
-    const glyph = glyphIdentity(symbol.glyph);
-    const previous = glyphs.get(glyph);
-    if (previous !== undefined && previous !== symbol.id) {
-      addIssue(
-        ctx,
-        'DUPLICATE_GLYPH',
-        `Distinct quantities ${previous} and ${symbol.id} share glyph ${symbol.glyph}`,
-        [...path, 'glyph'],
-        { symbolId: symbol.id },
-      );
-    }
-    glyphs.set(glyph, symbol.id);
   }
   const references = [
     ...document.sections.flatMap((section, sectionIndex) =>

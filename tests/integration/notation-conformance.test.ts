@@ -168,3 +168,32 @@ describe('cross-language notation conformance', () => {
     expect(leftIdentity === rightIdentity).toBe(equal);
   });
 });
+
+test('scoped Symbol display identities have identical Python and TypeScript encoding', async () => {
+  const { symbolDisplayIdentity } = await import(
+    '../../packages/cso-core/src/contracts/glyphs.ts'
+  );
+  const symbols = [
+    { glyph: 'Z_web' },
+    { glyph: 'Z_{web}' },
+    { glyph: 'Z_web', notationScope: 'x-axis' },
+    { glyph: 'Z_{web}', notationScope: 'x-axis' },
+    { glyph: 'Z_{web}', notationScope: 'y-axis' },
+    { glyph: 'α', notationScope: '𐐀' },
+  ];
+  const result = spawnSync(
+    process.env.PYTHON ?? 'python3',
+    [
+      '-I',
+      '-c',
+      'import json, sys; from cso_python.glyphs import glyph_identity; print(json.dumps([glyph_identity(symbol) for symbol in json.load(sys.stdin)]))',
+    ],
+    { input: JSON.stringify(symbols), encoding: 'utf8' },
+  );
+  expect(result.status, result.stderr).toBe(0);
+  const identities = z.array(z.string()).parse(JSON.parse(result.stdout));
+  expect(identities).toEqual(symbols.map(symbolDisplayIdentity));
+  expect(identities[0]).toBe(identities[1]);
+  expect(identities[2]).toBe(identities[3]);
+  expect(identities[3]).not.toBe(identities[4]);
+});

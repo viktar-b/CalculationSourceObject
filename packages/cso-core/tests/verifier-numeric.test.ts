@@ -388,3 +388,21 @@ it('reports opposite extreme finite floats without emitting a non-finite JSON er
     compared.comparison,
   );
 });
+
+it('normalizes the selected integer zero in max and preserves float signed zero', () => {
+  expect(evaluateOperation('fg.max', [-0, 0], ['int', 'int'])).toEqual({
+    ok: true,
+    value: 0,
+    numericKind: 'int',
+  });
+  expect(evaluateOperation('fg.max', [-1, -0], ['int', 'int'])).toEqual({
+    ok: true,
+    value: 0,
+    numericKind: 'int',
+  });
+  expect(evaluateOperation('fg.max', [-0, 0], ['float', 'float'])).toEqual({
+    ok: true,
+    value: -0,
+    numericKind: 'float',
+  });
+});

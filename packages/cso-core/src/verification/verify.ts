@@ -723,6 +723,10 @@ const checkBinding = ({
           check: 'inputConsistency',
           invocationId: invocation.id,
           location: binding.parameterLocation,
+          ...callChainFields(evaluator, invocation.id),
+          ...(bindingLocations(binding).length > 0
+            ? { relatedLocations: [...bindingLocations(binding)] }
+            : {}),
         },
       ],
     };

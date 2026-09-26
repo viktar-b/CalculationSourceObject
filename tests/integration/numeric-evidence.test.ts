@@ -141,6 +141,7 @@ it('rejects a rounded untyped reference through both core and CLI', () => {
     referenceVersion: '1',
     cases: [reference],
   }).replace('"quantity":9007199254740992', '"quantity":9007199254740993');
+  expect(text).toContain('"quantity":9007199254740993');
   const parsed = JSON.parse(text);
   expect(parsed.cases[0].binding.resolvedInputs.quantity).toBe(
     execution.entry.resolvedInputs.quantity,

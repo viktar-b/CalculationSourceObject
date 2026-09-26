@@ -18,9 +18,12 @@ const binding = {
 };
 
 describe('numeric evidence at public contract seams', () => {
-  it.each([CalculationSourceLiteralSchema, SheetLiteralSchema])(
-    'validates numeric kinds on literals and cached results',
-    (schema) => {
+  it.each([
+    { name: 'calculation-source', schema: CalculationSourceLiteralSchema },
+    { name: 'sheet-model', schema: SheetLiteralSchema },
+  ])(
+    '$name validates numeric kinds on literals and cached results',
+    ({ schema }) => {
       for (const literal of [
         { kind: 'number', value: 1.5, numericKind: 'int' },
         { kind: 'number', value: 1e20, numericKind: 'int' },

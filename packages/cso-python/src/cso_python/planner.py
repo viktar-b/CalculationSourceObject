@@ -541,7 +541,9 @@ class Planner:
                         ),
                     },
                 )
-            elif authoring_name(node) in {"pi", "math.pi"}:
+            elif authoring_name(node) == "math.pi" or (
+                authoring_name(node) == "pi" and "pi" in inv.module.imported
+            ):
                 imported = "math" if authoring_name(node) == "math.pi" else "pi"
                 if imported not in inv.module.imported:
                     self.error(
@@ -613,6 +615,23 @@ class Planner:
                         node,
                         "UNSUPPORTED_SYNTAX",
                         "Unsupported formula call or arity",
+                    )
+                if name in {"round", "max"} and (
+                    name in inv.parameters
+                    or name in inv.module.imported
+                    or name in inv.module.functions
+                    or name in inv.module.aliases
+                    or name in inv.module.handles
+                    or any(
+                        isinstance(bound, ast.Name)
+                        and isinstance(bound.ctx, ast.Store)
+                        and bound.id == name
+                        for bound in ast.walk(inv.function)
+                    )
+                ):
+                    self.error(
+                        inv, node, "SHADOWED_HELPER",
+                        f"Formula helper {name} is shadowed by a Python binding",
                     )
                 imported = "math" if name.startswith("math.") else name
                 if (

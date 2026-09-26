@@ -1,3 +1,4 @@
+import { symbolDisplayFrom } from '../contracts/glyphs.ts';
 import { deriveGlyphCodeName } from '../sheet-model/glyphCodeName.ts';
 import { emptyLiteral } from '../sheet-model/literals.ts';
 import { SheetDocumentSchema } from '../sheet-model/schema.ts';
@@ -85,11 +86,7 @@ const convertSourceValueNode = (
 };
 
 const convertSourceSymbol = (symbol: CalculationSourceSymbol): SheetSymbol => ({
-  id: symbol.id,
-  glyph: symbol.glyph,
-  ...(symbol.notationScope === undefined
-    ? {}
-    : { notationScope: symbol.notationScope }),
+  ...symbolDisplayFrom(symbol),
   glyphCodeName: deriveGlyphCodeName({
     id: symbol.id,
     glyph: symbol.glyph,

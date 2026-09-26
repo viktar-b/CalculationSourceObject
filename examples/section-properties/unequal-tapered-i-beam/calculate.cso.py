@@ -1,4 +1,4 @@
-"""Numerical transcription of Enji’s unequal tapered i-beam template."""
+"""Section properties based on Enji’s template, with documented corrections."""
 
 import math
 from typing import Annotated
@@ -8,6 +8,7 @@ from cso_python import (
     section,
     symbol,
     document_section,
+    text,
 )
 
 
@@ -16,6 +17,7 @@ from cso_python import (
     title="Unequal tapered I-beam",
     metadata={
         "referenceUrl": "https://www.enji.io/templates/basic-section-properties/unequal-tapered-i-beam",
+        "corrections": ["Squared web parallel-axis distance", "Full symmetric taper y-axis inertia", "Linear bottom-taper width", "Translated section-origin coordinates"],
         "referenceExportSha256": "be2631bfc9179b680aa22ff7e58278743c959e8755cbecde5e41eb6c8ac7cfdf",
     },
 )
@@ -61,6 +63,10 @@ def calculate(
         float, symbol(glyph="Y_{0}", description="Lower section boundary", unit="mm")
     ] = 0,
 ) -> CalculationResults:
+    text(
+        id="reference-corrections",
+        content="Based on the Enji template with corrections to the web parallel-axis term, symmetric taper inertia and bottom-taper width. Y_0 translates absolute boundary and plastic-neutral-axis coordinates; centroid distances and section properties remain relative to the lower boundary. Independent polygon checks cover five plastic-neutral-axis regions. Human engineering approval is separate.",
+    )
     outer_flange_to_flange_depth: Annotated[
         float,
         symbol(
@@ -231,7 +237,7 @@ def calculate(
         symbol(
             id="y_top_flange",
             glyph="y_{top,flange}",
-            description="Top flange centroid",
+            description="Top flange centroid distance from the lower section boundary",
             unit="mm",
         ),
     ] = (
@@ -243,7 +249,7 @@ def calculate(
         symbol(
             id="y_top_trapz",
             glyph="y_{top,trapz}",
-            description="Top trapezoid centroid",
+            description="Top trapezoid centroid distance from the lower section boundary",
             unit="mm",
         ),
     ] = (
@@ -259,7 +265,7 @@ def calculate(
 
     web_centroid: Annotated[
         float,
-        symbol(id="y_web", glyph="y_{web}", description="Web centroid", unit="mm"),
+        symbol(id="y_web", glyph="y_{web}", description="Web centroid distance from the lower section boundary", unit="mm"),
     ] = (
         section_depth - inner_top_flange_thickness - 0.5 * web_depth
     )
@@ -269,7 +275,7 @@ def calculate(
         symbol(
             id="y_bot_trapz",
             glyph="y_{bot,trapz}",
-            description="Bottom trapezoid centroid",
+            description="Bottom trapezoid centroid distance from the lower section boundary",
             unit="mm",
         ),
     ] = outer_bot_flange_thickness + tapered_bot_flange_segment_vertical_length * (
@@ -285,7 +291,7 @@ def calculate(
         symbol(
             id="y_bot_flange",
             glyph="y_{bot,flange}",
-            description="Bottom flange centroid",
+            description="Bottom flange centroid distance from the lower section boundary",
             unit="mm",
         ),
     ] = (
@@ -360,7 +366,7 @@ def calculate(
         ),
     ] = web_area * web_depth**2 / 12 + web_area * (
         web_centroid - distance_to_centroid_y_axis_from_the_bottom_of_the_section
-    )
+    ) ** 2
 
     second_moment_of_area_about_the_x_axis_for_the_bottom_tapered_sections: Annotated[
         float,
@@ -479,14 +485,14 @@ def calculate(
             unit="mm^4",
         ),
     ] = (
-        1
+        2 * (1
         / 36
         * (inner_top_flange_thickness - outer_top_flange_thickness)
         * tapered_top_flange_segment_horizontal_length**3
         + tapered_top_flange_segment_horizontal_length
         * (inner_top_flange_thickness - outer_top_flange_thickness)
         / 2
-        * (web_thickness / 2 + tapered_top_flange_segment_horizontal_length / 3) ** 2
+        * (web_thickness / 2 + tapered_top_flange_segment_horizontal_length / 3) ** 2) + (inner_top_flange_thickness - outer_top_flange_thickness) * web_thickness**3 / 12
     )
 
     second_moment_of_area_about_the_y_axis_for_the_bottom_tapered_section: Annotated[
@@ -498,14 +504,14 @@ def calculate(
             unit="mm^4",
         ),
     ] = (
-        1
+        2 * (1
         / 36
         * (inner_bot_flange_thickness - outer_bot_flange_thickness)
         * tapered_bottom_flange_segment_horizontal_length**3
         + tapered_bottom_flange_segment_horizontal_length
         * (inner_bot_flange_thickness - outer_bot_flange_thickness)
         / 2
-        * (web_thickness / 2 + tapered_bottom_flange_segment_horizontal_length / 3) ** 2
+        * (web_thickness / 2 + tapered_bottom_flange_segment_horizontal_length / 3) ** 2) + (inner_bot_flange_thickness - outer_bot_flange_thickness) * web_thickness**3 / 12
     )
 
     second_moment_of_area_about_y_axis: Annotated[
@@ -673,7 +679,7 @@ def calculate(
                 description="Lower trapezoid-flange boundary",
                 unit="mm",
             ),
-        ] = outer_bot_flange_thickness
+        ] = lower_section_boundary + (outer_bot_flange_thickness)
 
         lower_trapezoid_web_boundary: Annotated[
             float,
@@ -683,7 +689,7 @@ def calculate(
                 description="Lower trapezoid-web boundary",
                 unit="mm",
             ),
-        ] = inner_bot_flange_thickness
+        ] = lower_section_boundary + (inner_bot_flange_thickness)
 
         upper_trapezoid_web_boundary: Annotated[
             float,
@@ -694,7 +700,7 @@ def calculate(
                 unit="mm",
             ),
         ] = (
-            section_depth - inner_top_flange_thickness
+            lower_section_boundary + (section_depth - inner_top_flange_thickness)
         )
 
         upper_trapezoid_flange_boundary: Annotated[
@@ -706,7 +712,7 @@ def calculate(
                 unit="mm",
             ),
         ] = (
-            section_depth - outer_top_flange_thickness
+            lower_section_boundary + (section_depth - outer_top_flange_thickness)
         )
 
         upper_section_boundary: Annotated[
@@ -714,7 +720,7 @@ def calculate(
             symbol(
                 id="Y_5", glyph="Y_{5}", description="Upper section boundary", unit="mm"
             ),
-        ] = section_depth
+        ] = lower_section_boundary + (section_depth)
 
         area_boundary_bottom_flange: Annotated[
             float,
@@ -828,7 +834,7 @@ def calculate(
                 unit="mm",
             ),
         ] = (
-            half_of_section_area / width_of_bot_flange
+            lower_section_boundary + (half_of_section_area / width_of_bot_flange)
         )
 
         candidate_for_bottom_trapezoid: Annotated[
@@ -844,7 +850,7 @@ def calculate(
             + (-width_of_bot_flange + math.sqrt(bottom_quadratic_discriminant))
             / bottom_trapezoid_gradient
             if bottom_quadratic_discriminant >= 0
-            else -1
+            else lower_section_boundary - 1
         )
 
         candidate_for_web: Annotated[
@@ -873,7 +879,7 @@ def calculate(
             + (-web_thickness + math.sqrt(top_quadratic_discriminant))
             / top_trapezoid_gradient
             if top_quadratic_discriminant >= 0
-            else -1
+            else lower_section_boundary - 1
         )
 
         candidate_for_top_flange: Annotated[
@@ -915,6 +921,15 @@ def calculate(
             )
         )
 
+        distance_to_plastic_neutral_axis_from_lower_boundary: Annotated[
+            float,
+            symbol(
+                glyph="y_{p,local}",
+                description="Plastic neutral axis distance from the lower section boundary",
+                unit="mm",
+            ),
+        ] = plastic_neutral_axis_location - lower_section_boundary
+
         bottom_flange_term: Annotated[
             float,
             symbol(
@@ -927,12 +942,12 @@ def calculate(
             width_of_bot_flange
             / 2
             * (
-                plastic_neutral_axis_location**2
-                + (outer_bot_flange_thickness - plastic_neutral_axis_location) ** 2
+                distance_to_plastic_neutral_axis_from_lower_boundary**2
+                + (outer_bot_flange_thickness - distance_to_plastic_neutral_axis_from_lower_boundary) ** 2
             )
-            if plastic_neutral_axis_location < outer_bot_flange_thickness
+            if distance_to_plastic_neutral_axis_from_lower_boundary < outer_bot_flange_thickness
             else bottom_flange_area
-            * (plastic_neutral_axis_location - outer_bot_flange_thickness / 2)
+            * (distance_to_plastic_neutral_axis_from_lower_boundary - outer_bot_flange_thickness / 2)
         )
 
         the_width_at_the_pna_level_when_inside_the_bottom_trapezoid: Annotated[
@@ -943,12 +958,7 @@ def calculate(
                 description="The width at the PNA level when inside the bottom trapezoid",
                 unit="mm",
             ),
-        ] = width_of_bot_flange + (
-            plastic_neutral_axis_location - outer_bot_flange_thickness
-        ) * (
-            (plastic_neutral_axis_location - outer_bot_flange_thickness)
-            / tapered_bot_flange_segment_vertical_length
-        )
+        ] = width_of_bot_flange + (distance_to_plastic_neutral_axis_from_lower_boundary - outer_bot_flange_thickness) * bottom_trapezoid_gradient
 
         area_bottom_wedge: Annotated[
             float,
@@ -964,7 +974,7 @@ def calculate(
                 + the_width_at_the_pna_level_when_inside_the_bottom_trapezoid
             )
             / 2
-            * (plastic_neutral_axis_location - outer_bot_flange_thickness)
+            * (distance_to_plastic_neutral_axis_from_lower_boundary - outer_bot_flange_thickness)
         )
 
         lever_arm_bottom_wedge: Annotated[
@@ -976,7 +986,7 @@ def calculate(
                 unit="mm",
             ),
         ] = (
-            (plastic_neutral_axis_location - outer_bot_flange_thickness)
+            (distance_to_plastic_neutral_axis_from_lower_boundary - outer_bot_flange_thickness)
             / 3
             * (
                 (
@@ -1016,7 +1026,7 @@ def calculate(
                 + web_thickness
             )
             / 2
-            * (inner_bot_flange_thickness - plastic_neutral_axis_location)
+            * (inner_bot_flange_thickness - distance_to_plastic_neutral_axis_from_lower_boundary)
         )
 
         lever_arm_top_wedge: Annotated[
@@ -1028,7 +1038,7 @@ def calculate(
                 unit="mm",
             ),
         ] = (
-            (inner_bot_flange_thickness - plastic_neutral_axis_location)
+            (inner_bot_flange_thickness - distance_to_plastic_neutral_axis_from_lower_boundary)
             / 3
             * (
                 (
@@ -1064,12 +1074,12 @@ def calculate(
             ),
         ] = (
             bottom_trapezoid_area
-            * (plastic_neutral_axis_location - bottom_trapezoid_centroid)
-            if plastic_neutral_axis_location > inner_bot_flange_thickness
+            * (distance_to_plastic_neutral_axis_from_lower_boundary - bottom_trapezoid_centroid)
+            if distance_to_plastic_neutral_axis_from_lower_boundary > inner_bot_flange_thickness
             else (
                 bottom_trapezoid_area
-                * (bottom_trapezoid_centroid - plastic_neutral_axis_location)
-                if plastic_neutral_axis_location < outer_bot_flange_thickness
+                * (bottom_trapezoid_centroid - distance_to_plastic_neutral_axis_from_lower_boundary)
+                if distance_to_plastic_neutral_axis_from_lower_boundary < outer_bot_flange_thickness
                 else bottom_wedge_term + top_wedge_term
             )
         )
@@ -1084,20 +1094,20 @@ def calculate(
                 notation_scope="x-axis",
             ),
         ] = (
-            web_area * (plastic_neutral_axis_location - web_centroid)
-            if plastic_neutral_axis_location
+            web_area * (distance_to_plastic_neutral_axis_from_lower_boundary - web_centroid)
+            if distance_to_plastic_neutral_axis_from_lower_boundary
             > section_depth - inner_top_flange_thickness
             else (
-                web_area * (web_centroid - plastic_neutral_axis_location)
-                if plastic_neutral_axis_location < inner_bot_flange_thickness
+                web_area * (web_centroid - distance_to_plastic_neutral_axis_from_lower_boundary)
+                if distance_to_plastic_neutral_axis_from_lower_boundary < inner_bot_flange_thickness
                 else web_thickness
                 / 2
                 * (
-                    (plastic_neutral_axis_location - inner_bot_flange_thickness) ** 2
+                    (distance_to_plastic_neutral_axis_from_lower_boundary - inner_bot_flange_thickness) ** 2
                     + (
                         section_depth
                         - inner_top_flange_thickness
-                        - plastic_neutral_axis_location
+                        - distance_to_plastic_neutral_axis_from_lower_boundary
                     )
                     ** 2
                 )
@@ -1114,7 +1124,7 @@ def calculate(
             ),
         ] = web_thickness + (width_of_top_flange - web_thickness) * (
             (
-                plastic_neutral_axis_location
+                distance_to_plastic_neutral_axis_from_lower_boundary
                 - (section_depth - inner_top_flange_thickness)
             )
             / tapered_top_flange_segment_vertical_length
@@ -1132,7 +1142,7 @@ def calculate(
             (web_thickness + the_width_at_the_pna_level_when_inside_the_top_trapezoid)
             / 2
             * (
-                plastic_neutral_axis_location
+                distance_to_plastic_neutral_axis_from_lower_boundary
                 - (section_depth - inner_top_flange_thickness)
             )
         )
@@ -1147,7 +1157,7 @@ def calculate(
             ),
         ] = (
             (
-                plastic_neutral_axis_location
+                distance_to_plastic_neutral_axis_from_lower_boundary
                 - (section_depth - inner_top_flange_thickness)
             )
             / 3
@@ -1193,7 +1203,7 @@ def calculate(
             * (
                 section_depth
                 - outer_top_flange_thickness
-                - plastic_neutral_axis_location
+                - distance_to_plastic_neutral_axis_from_lower_boundary
             )
         )
 
@@ -1206,7 +1216,7 @@ def calculate(
                 unit="mm",
             ),
         ] = (
-            (section_depth - outer_top_flange_thickness - plastic_neutral_axis_location)
+            (section_depth - outer_top_flange_thickness - distance_to_plastic_neutral_axis_from_lower_boundary)
             / 3
             * (
                 (
@@ -1243,13 +1253,13 @@ def calculate(
             ),
         ] = (
             top_trapezoid_area
-            * (plastic_neutral_axis_location - top_trapezoid_centroid)
-            if plastic_neutral_axis_location
+            * (distance_to_plastic_neutral_axis_from_lower_boundary - top_trapezoid_centroid)
+            if distance_to_plastic_neutral_axis_from_lower_boundary
             > section_depth - outer_top_flange_thickness
             else (
                 top_trapezoid_area
-                * (top_trapezoid_centroid - plastic_neutral_axis_location)
-                if plastic_neutral_axis_location
+                * (top_trapezoid_centroid - distance_to_plastic_neutral_axis_from_lower_boundary)
+                if distance_to_plastic_neutral_axis_from_lower_boundary
                 < section_depth - inner_top_flange_thickness
                 else bottom_wedge_term_component_z_bw_top_trapz
                 + top_wedge_term_component_z_tw_top_trapz
@@ -1265,16 +1275,16 @@ def calculate(
                 unit="mm^3",
             ),
         ] = (
-            top_flange_area * (top_flange_centroid - plastic_neutral_axis_location)
-            if plastic_neutral_axis_location
+            top_flange_area * (top_flange_centroid - distance_to_plastic_neutral_axis_from_lower_boundary)
+            if distance_to_plastic_neutral_axis_from_lower_boundary
             < section_depth - outer_top_flange_thickness
             else width_of_top_flange
             / 2
             * (
-                (section_depth - plastic_neutral_axis_location) ** 2
+                (section_depth - distance_to_plastic_neutral_axis_from_lower_boundary) ** 2
                 + (
                     outer_top_flange_thickness
-                    - (section_depth - plastic_neutral_axis_location)
+                    - (section_depth - distance_to_plastic_neutral_axis_from_lower_boundary)
                 )
                 ** 2
             )
@@ -1441,6 +1451,7 @@ def calculate(
         "candidate_for_top_trapezoid": candidate_for_top_trapezoid,
         "candidate_for_top_flange": candidate_for_top_flange,
         "plastic_neutral_axis_location": plastic_neutral_axis_location,
+        "distance_to_plastic_neutral_axis_from_lower_boundary": distance_to_plastic_neutral_axis_from_lower_boundary,
         "bottom_flange_term": bottom_flange_term,
         "the_width_at_the_pna_level_when_inside_the_bottom_trapezoid": the_width_at_the_pna_level_when_inside_the_bottom_trapezoid,
         "area_bottom_wedge": area_bottom_wedge,

@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { NumericValueSchema } from '../contracts/numbers.ts';
-import { glyphIdentity } from '../contracts/glyphs.ts';
+import {
+  SymbolDisplaySchema,
+  addSymbolDisplayIssues,
+} from '../contracts/glyphs.ts';
 import { parseNotation } from '../notation/parse.ts';
 import { supportedValueFunctionIds } from '../sheet-model/functions.ts';
 
@@ -197,22 +200,18 @@ export const CalculationSourceValueTreeSchema = z
     }
   });
 
-export const CalculationSourceSymbolSchema = z
-  .object({
-    id: IdSchema,
-    glyph: z.string(),
-    notationScope: z.string().min(1).optional(),
-    glyphPlaintext: z.string().optional(),
-    description: z.string().optional(),
-    unit: z.string().optional(),
-    comment: z.string().optional(),
-    aliases: z.unknown().optional(),
-    metadata: JsonObjectSchema.optional(),
-    valueTree: CalculationSourceValueTreeSchema,
-  })
+export const CalculationSourceSymbolSchema = SymbolDisplaySchema.safeExtend({
+  glyphPlaintext: z.string().optional(),
+  description: z.string().optional(),
+  unit: z.string().optional(),
+  comment: z.string().optional(),
+  aliases: z.unknown().optional(),
+  metadata: JsonObjectSchema.optional(),
+  valueTree: CalculationSourceValueTreeSchema,
+})
   .strict()
   .superRefine((symbol, ctx) => {
-    for (const field of ['glyph', 'unit'] as const) {
+    for (const field of ['unit'] as const) {
       const value = symbol[field];
       if (field === 'unit' && (value === undefined || value === '')) continue;
       const parsed = parseNotation(value ?? '');
@@ -545,7 +544,6 @@ const addDuplicateGlyphIssues = (
   document: CalculationSourceObjectForRefinement,
   ctx: z.RefinementCtx,
 ): void => {
-  const seen = new Map<string, string>();
   const definitions = [
     ...document.sections.flatMap((section, sectionIndex) =>
       section.items.flatMap((item, itemIndex) =>
@@ -553,14 +551,7 @@ const addDuplicateGlyphIssues = (
           ? [
               {
                 symbol: item.symbol,
-                path: [
-                  'sections',
-                  sectionIndex,
-                  'items',
-                  itemIndex,
-                  'symbol',
-                  'glyph',
-                ],
+                path: ['sections', sectionIndex, 'items', itemIndex, 'symbol'],
               },
             ]
           : [],
@@ -571,29 +562,14 @@ const addDuplicateGlyphIssues = (
         ? [
             {
               symbol: item.symbol,
-              path: ['detachedItems', itemIndex, 'symbol', 'glyph'],
+              path: ['detachedItems', itemIndex, 'symbol'],
             },
           ]
         : [],
     ),
   ];
 
-  for (const { symbol, path } of definitions) {
-    const identity = glyphIdentity(symbol.glyph, symbol.notationScope);
-    const previous = seen.get(identity);
-    if (previous !== undefined && previous !== symbol.id) {
-      ctx.addIssue({
-        code: 'custom',
-        message: `Distinct quantities ${previous} and ${symbol.id} share glyph ${symbol.glyph}`,
-        path,
-        params: {
-          diagnosticCode: 'DUPLICATE_GLYPH',
-          symbolId: symbol.id,
-        },
-      });
-    }
-    seen.set(identity, symbol.id);
-  }
+  addSymbolDisplayIssues(definitions, ctx);
 };
 
 const addDuplicateDetachedItemIssues = (

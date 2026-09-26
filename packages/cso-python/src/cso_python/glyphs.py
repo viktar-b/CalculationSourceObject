@@ -7,9 +7,13 @@ from .notation import source_notation_identity
 from .source import Invocation, SourceError, Symbol
 
 
-def glyph_identity(glyph: str, scope: str | None = None) -> str:
+def glyph_identity(symbol: dict) -> str:
     """Return the canonical display identity used for duplicate detection."""
-    return json.dumps([scope, source_notation_identity(glyph)], ensure_ascii=False)
+    return json.dumps(
+        [symbol.get("notationScope"), source_notation_identity(symbol["glyph"])],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
 
 
 def scoped_glyph(glyph: str, scope: str) -> str:
@@ -50,7 +54,7 @@ def qualify_glyphs(invocations: list[Invocation]) -> None:
     for inv in invocations:
         local: dict[str, Symbol] = {}
         for symbol in inv.symbols.values():
-            key = glyph_identity(symbol.cso["glyph"], symbol.cso.get("notationScope"))
+            key = glyph_identity(symbol.cso)
             if key in local:
                 duplicate(inv, symbol, local[key])
             local[key] = symbol
@@ -71,7 +75,7 @@ def qualify_glyphs(invocations: list[Invocation]) -> None:
     assigned: dict[str, Symbol] = {}
     for inv in invocations:
         for symbol in inv.symbols.values():
-            key = glyph_identity(symbol.cso["glyph"], symbol.cso.get("notationScope"))
+            key = glyph_identity(symbol.cso)
             if key in assigned:
                 duplicate(inv, symbol, assigned[key])
             assigned[key] = symbol
