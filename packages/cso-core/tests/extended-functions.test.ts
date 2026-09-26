@@ -6,7 +6,27 @@ import {
 
 describe('extended numeric functions', () => {
   it.each([
+    ['fg.abs', [-3], ['int'], 3, 'int'],
+    ['fg.abs', [-3.5], ['float'], 3.5, 'float'],
+    ['fg.abs', [-0], ['float'], 0, 'float'],
+    ['fg.abs', [-Number.MAX_VALUE], ['float'], Number.MAX_VALUE, 'float'],
     ['fg.exp', [0], ['int'], 1, 'float'],
+    ['fg.floor', [-1.2], ['float'], -2, 'int'],
+    ['fg.floor', [-0], ['float'], 0, 'int'],
+    [
+      'fg.floor',
+      [Number.MAX_SAFE_INTEGER],
+      ['float'],
+      Number.MAX_SAFE_INTEGER,
+      'int',
+    ],
+    [
+      'fg.floor',
+      [-Number.MAX_SAFE_INTEGER],
+      ['float'],
+      -Number.MAX_SAFE_INTEGER,
+      'int',
+    ],
     ['fg.log', [8, 2], ['float', 'int'], 3, 'float'],
     ['fg.min', [0, -0, 1], ['int', 'float', 'int'], 0, 'int'],
     ['fg.max', [-0, 0, -1], ['float', 'int', 'int'], -0, 'float'],
@@ -31,6 +51,13 @@ describe('extended numeric functions', () => {
   );
 
   it.each([
+    [
+      'fg.floor',
+      [Number.MAX_SAFE_INTEGER + 1],
+      ['float'],
+      'UNSUPPORTED_NUMERIC_RANGE',
+    ],
+    ['fg.floor', [Number.MAX_VALUE], ['float'], 'UNSUPPORTED_NUMERIC_RANGE'],
     ['fg.log', [0], ['int'], 'LOG_DOMAIN_ERROR'],
     ['fg.log', [2, 1], ['int', 'int'], 'DIVISION_BY_ZERO'],
     ['fg.exp', [1000], ['int'], 'NON_FINITE_NUMBER'],
@@ -64,6 +91,10 @@ describe('extended numeric functions', () => {
   });
 
   it.each([
+    ['fg.abs', 0],
+    ['fg.abs', 2],
+    ['fg.floor', 0],
+    ['fg.floor', 2],
     ['fg.log', 0],
     ['fg.log', 3],
     ['fg.exp', 2],

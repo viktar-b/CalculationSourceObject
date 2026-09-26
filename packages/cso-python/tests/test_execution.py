@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import math
 import shutil
 import subprocess
 import sys
@@ -127,7 +128,11 @@ class ExecutionTest(unittest.TestCase):
                 self.assertEqual(execution["authoring"]["outputs"][0]["value"], 3)
 
     def test_builtin_formula_helpers_reject_shadowing_before_execution(self):
-        for helper, call in [("max", "max(a, 3)"), ("round", "round(a)")]:
+        for helper, call in [
+            ("abs", "abs(a)"),
+            ("max", "max(a, 3)"),
+            ("round", "round(a)"),
+        ]:
             for scope in ["parameter", "earlier-local", "later-local", "module"]:
                 with self.subTest(helper=helper, scope=scope):
                     body = f'a: {SYMBOL} = 2\nb: {RESULT} = {call}\n'
@@ -143,6 +148,39 @@ class ExecutionTest(unittest.TestCase):
                         text += source(f'a: {SYMBOL} = 2\nreturn {{"a": a}}', parameters="", name=helper).removeprefix(IMPORTS)
                     self.entry.write_text(text)
                     self.reject_before_execution("SHADOWED_HELPER")
+
+    def test_abs_and_floor_preserve_runtime_numeric_kinds_and_zero_signs(self):
+        self.entry.write_text(
+            "import math\n"
+            + source(
+                'integer_abs: Annotated[int, symbol(glyph="a", description="Integer absolute value", unit="")] = abs(-3)\n'
+                'float_abs: Annotated[float, symbol(glyph="b", description="Float absolute value", unit="")] = abs(-0.0)\n'
+                'floor_value: Annotated[int, symbol(glyph="c", description="Floor", unit="")] = math.floor(-0.0)\n'
+                'return {"integer_abs": integer_abs, "float_abs": float_abs, "floor_value": floor_value}',
+                parameters="",
+            )
+        )
+        execution = self.success(self.run_case())
+        outputs = {
+            output["name"]: (output["value"], output["numericKind"])
+            for output in execution["authoring"]["outputs"]
+        }
+        self.assertEqual(outputs["integer_abs"], (3, "int"))
+        self.assertEqual(outputs["float_abs"], (0.0, "float"))
+        self.assertFalse(math.copysign(1.0, outputs["float_abs"][0]) < 0)
+        self.assertEqual(outputs["floor_value"], (0, "int"))
+
+    def test_floor_rejects_an_unsafe_integer_result(self):
+        self.entry.write_text(
+            "import math\n"
+            + source(
+                f'b: {RESULT} = math.floor(9007199254740992.0)\nreturn {{"b": b}}',
+                parameters="",
+            )
+        )
+        result = self.run_case()
+        self.assertFalse(result["ok"], result)
+        self.assertEqual(result["diagnostics"][0]["code"], "UNSUPPORTED_NUMERIC_RANGE")
 
     def test_float_kind_survives_json_and_large_intermediates(self):
         self.entry.write_text(

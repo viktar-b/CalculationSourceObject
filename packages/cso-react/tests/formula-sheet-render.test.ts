@@ -7,6 +7,7 @@ import { FormulaSheet } from '@cs-object/react';
 import React, { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
+import { renderSpecialValueFunction } from '../src/mathml/function-renderers.tsx';
 
 (
   globalThis as typeof globalThis & {
@@ -64,6 +65,15 @@ const htmlText = (html: string): string =>
     .replace(/<[^>]*>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+
+const absoluteValueMarkup = (value: React.ReactNode): string => {
+  const rendered = renderSpecialValueFunction({
+    functionId: 'fg.abs',
+    argReactNodes: [value],
+  });
+  if (!rendered) throw new Error('Expected an absolute-value renderer');
+  return renderToStaticMarkup(rendered).replace(/ style="[^"]*"/g, '');
+};
 
 describe('FormulaSheet rendering', () => {
   test('renders item indexes inline with the description text', () => {
@@ -155,9 +165,7 @@ test.each(['fg.pow', 'fg.uminus'])(
     expect(formulas.length).toBeGreaterThan(0);
     for (const formula of formulas) {
       expect(htmlText(formula)).toContain(
-        functionId === 'fg.pow'
-          ? '( 5.00 - 3.00 ) 2.00'
-          : '- ( 5.00 - 3.00 )',
+        functionId === 'fg.pow' ? '( 5.00 - 3.00 ) 2.00' : '- ( 5.00 - 3.00 )',
       );
       expect(formula.match(/<mo fence="true">\(<\/mo>/g)).toHaveLength(1);
       expect(formula.match(/<mo fence="true">\)<\/mo>/g)).toHaveLength(1);
@@ -551,3 +559,46 @@ test.each([
     ]);
   },
 );
+
+test('absolute-value bars enclose a compound argument', () => {
+  const markup = absoluteValueMarkup(
+    createElement(
+      'mrow',
+      null,
+      createElement('mn', null, '5'),
+      createElement('mo', null, '-'),
+      createElement('mn', null, '3'),
+    ),
+  );
+
+  expect(markup).toBe(
+    '<mrow><mo fence="true" stretchy="true">|</mo><mrow><mn>5</mn><mo>-</mo><mn>3</mn></mrow><mo fence="true" stretchy="true">|</mo></mrow>',
+  );
+});
+
+test('absolute-value bars enclose an entire fraction', () => {
+  const markup = absoluteValueMarkup(
+    createElement(
+      'mfrac',
+      null,
+      createElement('mn', null, '1'),
+      createElement('mn', null, '2'),
+    ),
+  );
+
+  expect(markup).toBe(
+    '<mrow><mo fence="true" stretchy="true">|</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mo fence="true" stretchy="true">|</mo></mrow>',
+  );
+});
+
+test('nested absolute values retain both pairs of bars', () => {
+  const inner = renderSpecialValueFunction({
+    functionId: 'fg.abs',
+    argReactNodes: [createElement('mn', null, '-2')],
+  });
+  if (!inner) throw new Error('Expected an inner absolute-value renderer');
+
+  expect(absoluteValueMarkup(inner)).toBe(
+    '<mrow><mo fence="true" stretchy="true">|</mo><mrow><mo fence="true" stretchy="true">|</mo><mn>-2</mn><mo fence="true" stretchy="true">|</mo></mrow><mo fence="true" stretchy="true">|</mo></mrow>',
+  );
+});

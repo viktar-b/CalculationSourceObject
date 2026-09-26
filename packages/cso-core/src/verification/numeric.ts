@@ -1,7 +1,7 @@
-import { roundToDigits } from './round.ts';
-import { numericValueIssue, type NumericKind } from '../contracts/numbers.ts';
 import type { Comparison, Diagnostic } from '../contracts/common.ts';
+import { type NumericKind, numericValueIssue } from '../contracts/numbers.ts';
 import type { NumericPolicy } from '../contracts/reports.ts';
+import { roundToDigits } from './round.ts';
 
 export type NumericResult =
   | {
@@ -343,8 +343,23 @@ const rounded = (
   return validateNumber(roundToDigits(value, digits, kinds?.[0]), kinds?.[0]);
 };
 
+const absoluteValue = (value: number, kind?: NumericKind): NumericResult =>
+  validateNumber(Math.abs(value), kind);
+
+const floorValue = (value: number): NumericResult =>
+  validateNumber(Math.floor(value) || 0, 'int');
+
 /** Own operation roles and evaluation together; rendering also accepts non-numeric argument forms. */
 const operations = new Map<string, Operation>([
+  [
+    'fg.abs',
+    {
+      kind: 'numeric',
+      operands: ['number'],
+      evaluate: (value) => absoluteValue(value),
+      typed: ([value], kinds) => absoluteValue(value, kinds[0]),
+    },
+  ],
   ['fg.add', binary(add, (a, b) => a + b)],
   ['fg.subtract', binary(subtract, (a, b) => a - b)],
   ['fg.multiply', binary(multiply, (a, b) => a * b)],
@@ -409,6 +424,15 @@ const operations = new Map<string, Operation>([
       operands: ['number'],
       evaluate: (a) => validateNumber(Math.ceil(a) || 0, 'int'),
       typed: ([a]) => validateNumber(Math.ceil(a) || 0, 'int'),
+    },
+  ],
+  [
+    'fg.floor',
+    {
+      kind: 'numeric',
+      operands: ['number'],
+      evaluate: floorValue,
+      typed: ([value]) => floorValue(value),
     },
   ],
   [

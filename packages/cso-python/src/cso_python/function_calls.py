@@ -25,8 +25,10 @@ class FunctionCall:
 
 
 FUNCTION_CALLS = (
+    FunctionCall("abs", "fg.abs", 1, module="builtins"),
     FunctionCall("sqrt", "fg.sqrt", 1),
     FunctionCall("ceil", "fg.ceil", 1),
+    FunctionCall("floor", "fg.floor", 1),
     FunctionCall("round", "fg.round", max_arity=2, module="builtins"),
     FunctionCall("max", "fg.max", min_arity=2, max_arity=None, module="builtins"),
     FunctionCall("min", "fg.min", min_arity=2, max_arity=None, module="builtins"),

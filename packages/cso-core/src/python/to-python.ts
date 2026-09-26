@@ -1,3 +1,4 @@
+import { assertNever } from '../shared/assertNever.ts';
 import { SheetDocumentSchema } from '../sheet-model/schema.ts';
 import type {
   SheetDocument,
@@ -6,10 +7,9 @@ import type {
   SheetValueNode,
   SheetValueTree,
 } from '../sheet-model/types.ts';
-import { assertNever } from '../shared/assertNever.ts';
 import {
-  createSheetFromValueTreeJson,
   type Calculation,
+  createSheetFromValueTreeJson,
   type ValueTreeSheetOptions,
 } from '../value-tree-json/to-sheet.ts';
 
@@ -83,6 +83,14 @@ const pythonReservedWords = new Set([
   'yield',
 ]);
 
+const pythonRuntimeIdentifiers = new Set([
+  'abs',
+  'math',
+  'max',
+  'min',
+  'round',
+]);
+
 const toPythonIdentifier = (value: string, fallback: string): string => {
   const sanitized = value
     .toLowerCase()
@@ -94,7 +102,8 @@ const toPythonIdentifier = (value: string, fallback: string): string => {
     ? `_${withFallback}`
     : withFallback;
 
-  return pythonReservedWords.has(safeLeadingCharacter)
+  return pythonReservedWords.has(safeLeadingCharacter) ||
+    pythonRuntimeIdentifiers.has(safeLeadingCharacter)
     ? `${safeLeadingCharacter}_value`
     : safeLeadingCharacter;
 };
@@ -366,6 +375,10 @@ const comparisonOptions = {
 const functionExpressionRenderers: Readonly<
   Record<string, FunctionExpressionRenderer>
 > = {
+  'fg.abs': (args) => {
+    requireArgCount('fg.abs', args, 1);
+    return pythonCallExpression('fg.abs', args, 'abs');
+  },
   'fg.acos': (args) => mathSingleArgCall('fg.acos', args, 'acos'),
   'fg.asin': (args) => mathSingleArgCall('fg.asin', args, 'asin'),
   'fg.atan': (args) => mathSingleArgCall('fg.atan', args, 'atan'),
@@ -394,6 +407,7 @@ const functionExpressionRenderers: Readonly<
       ...comparisonOptions,
     }),
   'fg.exp': (args) => mathSingleArgCall('fg.exp', args, 'exp'),
+  'fg.floor': (args) => mathSingleArgCall('fg.floor', args, 'floor'),
   'fg.ge': (args) =>
     binaryExpression('fg.ge', args, '>=', PythonPrecedence.Compare, {
       ...comparisonOptions,

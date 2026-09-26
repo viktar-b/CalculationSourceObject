@@ -5,8 +5,9 @@
  * helpers in this file cover the functions whose notation needs real MathML
  * structure: fractions, powers, square roots, unary minus, and condition tables.
  */
-import { MATHML_FONT_SIZE } from './constants.ts';
+
 import type { ReactElement, ReactNode } from 'react';
+import { MATHML_FONT_SIZE } from './constants.ts';
 
 interface SpecialValueFunctionRenderProps {
   readonly functionId: string;
@@ -94,6 +95,24 @@ const SquareRootFunctionMathml = ({
   );
 };
 
+const AbsoluteValueFunctionMathml = ({
+  value,
+}: {
+  readonly value: ReactNode;
+}): ReactElement => {
+  return (
+    <mrow style={fontSizeStyle}>
+      <mo fence="true" stretchy="true">
+        |
+      </mo>
+      {value}
+      <mo fence="true" stretchy="true">
+        |
+      </mo>
+    </mrow>
+  );
+};
+
 const UnaryMinusFunctionMathml = ({
   value,
 }: {
@@ -111,6 +130,10 @@ export const renderSpecialValueFunction = ({
   functionId,
   argReactNodes,
 }: SpecialValueFunctionRenderProps): ReactElement | undefined => {
+  if (functionId === 'fg.abs' && argReactNodes.length === 1) {
+    return <AbsoluteValueFunctionMathml value={argReactNodes[0]} />;
+  }
+
   if (functionId === 'fg.sqrt' && argReactNodes.length === 1) {
     return <SquareRootFunctionMathml value={argReactNodes[0]} />;
   }
