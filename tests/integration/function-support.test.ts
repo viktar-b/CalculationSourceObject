@@ -26,35 +26,42 @@ import { z } from 'zod';
 
 Object.assign(globalThis, { React });
 const python = process.env.PYTHON ?? 'python3';
-const declarations = z
-  .array(
-    z.object({
-      name: z.string(),
-      function_id: z.string(),
-      min_arity: z.number().int().positive(),
-      max_arity: z.number().int().positive().nullable(),
-      module: z.enum(['math', 'builtins']),
-      spellings: z.array(z.string()).nonempty(),
-    }),
-  )
-  .parse(
-    JSON.parse(
-      execFileSync(
-        python,
-        [
-          '-I',
-          '-c',
-          `
+const declarationSchema = z
+  .object({
+    name: z.string(),
+    function_id: z.string(),
+    min_arity: z.number().int().nonnegative(),
+    max_arity: z.number().int().nonnegative().nullable(),
+    module: z.enum(['math', 'builtins']),
+    spellings: z.array(z.string()).nonempty(),
+  })
+  .superRefine((call, context) => {
+    if (call.max_arity !== null && call.max_arity < call.min_arity) {
+      context.addIssue({
+        code: 'custom',
+        message: 'max_arity must be greater than or equal to min_arity',
+        path: ['max_arity'],
+      });
+    }
+  });
+const declarations = z.array(declarationSchema).parse(
+  JSON.parse(
+    execFileSync(
+      python,
+      [
+        '-I',
+        '-c',
+        `
 import json
 from dataclasses import asdict
 from cso_python.function_calls import FUNCTION_CALLS
 print(json.dumps([dict(asdict(call), spellings=call.spellings) for call in FUNCTION_CALLS]))
 `,
-        ],
-        { encoding: 'utf8' },
-      ),
+      ],
+      { encoding: 'utf8' },
     ),
-  );
+  ),
+);
 
 // Expected values are analytic identities or existing builtin semantics, not capture outputs.
 const referenceCases: Record<
@@ -78,6 +85,8 @@ const referenceCases: Record<
   asin: { args: [0.5], expected: Math.PI / 6, kind: 'float' },
   acos: { args: [0.5], expected: Math.PI / 3, kind: 'float' },
   atan: { args: [1], expected: Math.PI / 4, kind: 'float' },
+  atan2: { args: [1, 1], expected: Math.PI / 4, kind: 'float' },
+  hypot: { args: [], expected: 0, kind: 'float' },
   sinh: { args: [Math.LN2], expected: 0.75, kind: 'float' },
   cosh: { args: [Math.LN2], expected: 1.25, kind: 'float' },
   tanh: { args: [Math.LN2], expected: 0.6, kind: 'float' },
@@ -253,7 +262,7 @@ it.each(declarations)(
       );
       const { execution, output } = successfulCapture(
         `${spelling}(${args.join(', ')})`,
-        floatLiteral(sample.args[0]),
+        sample.args[0] === undefined ? undefined : floatLiteral(sample.args[0]),
         imports,
       );
       expect(output.numericKind).toBe(sample.kind);
@@ -280,7 +289,9 @@ it.each(declarations)(
           ? '<msqrt>'
           : call.name === 'abs'
             ? 'stretchy="true">|</mo>'
-            : `>${spec?.glyph}</`,
+            : call.name === 'atan2'
+              ? '<mi>atan</mi><mn>2</mn>'
+              : `>${spec?.glyph}</`,
       );
       const { code, result } = exportReplay(execution, output.symbolId);
       expect(code).toContain(
@@ -289,13 +300,19 @@ it.each(declarations)(
       expect(result.kind).toBe(sample.kind);
       expect(result.value).toBe(output.value);
 
-      if (!callNode?.funcArgs?.[0]) throw new Error('Missing function operand');
-      const firstArg = callNode.funcArgs[0];
-      const originalArgs = callNode.funcArgs;
-      for (const arity of [
-        call.min_arity - 1,
+      const invalidArities = [
+        ...(call.min_arity > 0 ? [call.min_arity - 1] : []),
         ...(call.max_arity === null ? [] : [call.max_arity + 1]),
-      ]) {
+      ];
+      if (invalidArities.length > 0 && !callNode?.funcArgs?.[0]) {
+        throw new Error('Missing function operand');
+      }
+      const firstArg = callNode?.funcArgs?.[0];
+      const originalArgs = callNode?.funcArgs;
+      for (const arity of invalidArities) {
+        if (!callNode || !firstArg || !originalArgs) {
+          throw new Error('Missing function call');
+        }
         callNode.funcArgs = Array.from({ length: arity }, () => ({
           key: firstArg.key,
         }));
@@ -309,6 +326,29 @@ it.each(declarations)(
     }
   },
 );
+
+it('rejects malformed atan2 arity in a dormant branch', () => {
+  const { execution } = successfulCapture(
+    'math.atan2(quantity, 1) if quantity < 0 else 1.0',
+  );
+  const atan2 = execution.cso.sections
+    .flatMap((section) =>
+      section.items.flatMap((item) =>
+        item.kind === 'symbol' ? item.symbol.valueTree.nodes : [],
+      ),
+    )
+    .find((node) => node.funcSpec?.id === 'fg.atan2');
+  if (!atan2?.funcArgs?.[0]) throw new Error('Missing dormant atan2 call');
+  atan2.funcArgs = [atan2.funcArgs[0]];
+
+  const report = verifyExecution({ execution });
+  expect(report.ok).toBe(false);
+  expect(
+    report.diagnostics.some(
+      (diagnostic) => diagnostic.code === 'INVALID_FUNCTION_ARITY',
+    ),
+  ).toBe(true);
+});
 
 it.each([
   ['math.sin(math.radians(quantity))', '30.0', 0.5],
@@ -572,6 +612,20 @@ const extendedCases = [
   ['abs(quantity)', '-1.7976931348623157e308', 1.7976931348623157e308, 'float'],
   ['math.floor(quantity)', '-1.2', -2, 'int'],
   ['math.floor(quantity)', '-0.0', 0, 'int'],
+  ['math.atan2(1, 1)', '0.5', Math.PI / 4, 'float'],
+  ['math.atan2(1, -1)', '0.5', (3 * Math.PI) / 4, 'float'],
+  ['math.atan2(-1, -1)', '0.5', (-3 * Math.PI) / 4, 'float'],
+  ['math.atan2(-1, 1)', '0.5', -Math.PI / 4, 'float'],
+  ['math.atan2(1, 0)', '0.5', Math.PI / 2, 'float'],
+  ['math.atan2(-1, 0)', '0.5', -Math.PI / 2, 'float'],
+  ['math.hypot()', '0.5', 0, 'float'],
+  ['math.hypot(quantity)', '-0.0', 0, 'float'],
+  ['math.hypot(3, 4)', '0.5', 5, 'float'],
+  ['math.hypot(2, 3, 6)', '0.5', 7, 'float'],
+  ['math.hypot(1, 2, 2, 4, 12)', '0.5', 13, 'float'],
+  ['math.hypot(3e154, 4e154)', '0.5', 5e154, 'float'],
+  ['math.hypot(3e-200, 4e-200)', '0.5', 5e-200, 'float'],
+  ['math.hypot(5e-324, 5e-324)', '0.5', 5e-324, 'float'],
   [
     'math.floor(quantity)',
     '9007199254740991.0',
@@ -634,6 +688,48 @@ it.each(extendedCases)(
 );
 
 it.each([
+  ['hypot()', 0],
+  ['hypot(-3.5)', 3.5],
+  ['hypot(2, 3, 6)', 7],
+] as const)(
+  'imported %s captures, verifies and replays',
+  (expression, value) => {
+    const { execution, output } = successfulCapture(
+      expression,
+      undefined,
+      'from math import hypot',
+    );
+    expect(output.value).toBe(value);
+    expect(output.numericKind).toBe('float');
+    expect(verifyExecution({ execution }).ok).toBe(true);
+    expect(exportReplay(execution, output.symbolId).result).toEqual({
+      value,
+      kind: 'float',
+    });
+  },
+);
+
+it.each([
+  ['math.atan2(-0.0, -0.0)', -Math.PI],
+  ['math.atan2(-0.0, 0.0)', -0],
+  ['math.atan2(0.0, -0.0)', Math.PI],
+  ['math.atan2(0.0, 0.0)', 0],
+] as const)(
+  '%s preserves signed-zero quadrant behavior',
+  (expression, value) => {
+    const { execution, output } = successfulCapture(expression);
+    expect(output.value).toBe(value);
+    expect(output.numericKind).toBe('float');
+    const report = verifyExecution({ execution });
+    expect(report.ok, JSON.stringify(report.diagnostics)).toBe(true);
+    expect(exportReplay(execution, output.symbolId).result).toEqual({
+      value,
+      kind: 'float',
+    });
+  },
+);
+
+it.each([
   'math.log(0)',
   'math.log(-1)',
   'math.log(2, 1)',
@@ -641,6 +737,7 @@ it.each([
   'math.exp(1000)',
   'math.floor(9007199254740992.0)',
   'math.floor(1.7976931348623157e308)',
+  'math.hypot(1.7976931348623157e308, 1.7976931348623157e308)',
   'round(quantity, 2.0)',
   'round(1.7976931348623157e308, -308)',
 ])(
@@ -679,6 +776,8 @@ it.each([
 it.each([
   ['abs', 'abs(quantity)'],
   ['floor', 'math.floor(quantity)'],
+  ['atan2', 'math.atan2(quantity, 1)'],
+  ['hypot', 'math.hypot(quantity)'],
 ] as const)('%s rejects a comparison operand', (name, expression) => {
   const { execution } = successfulCapture(expression);
   const valueTree = execution.cso.sections
@@ -704,7 +803,10 @@ it.each([
     funcSpec: { id: 'fg.lt' },
     funcArgs: [operand, operand],
   });
-  target.funcArgs = [{ key: `${name}-comparison` }];
+  target.funcArgs = [
+    { key: `${name}-comparison` },
+    ...target.funcArgs.slice(1),
+  ];
 
   const report = verifyExecution({ execution });
   expect(report.ok).toBe(false);

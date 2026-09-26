@@ -182,6 +182,65 @@ class ExecutionTest(unittest.TestCase):
         self.assertFalse(result["ok"], result)
         self.assertEqual(result["diagnostics"][0]["code"], "UNSUPPORTED_NUMERIC_RANGE")
 
+    def test_atan2_and_hypot_capture_zero_one_and_many_arguments(self):
+        self.entry.write_text(
+            "import math\n"
+            + source(
+                'angle: Annotated[float, symbol(glyph="theta", description="Angle", unit="rad")] = math.atan2(-0.0, -0.0)\n'
+                'empty_norm: Annotated[float, symbol(glyph="h_{empty}", description="Empty norm", unit="")] = math.hypot()\n'
+                'unary_norm: Annotated[float, symbol(glyph="h_{one}", description="Unary norm", unit="")] = math.hypot(-0.0)\n'
+                'magnitude_norm: Annotated[float, symbol(glyph="h_{magnitude}", description="Magnitude norm", unit="")] = math.hypot(-3.5)\n'
+                'vector_norm: Annotated[float, symbol(glyph="h_{vec}", description="Vector norm", unit="")] = math.hypot(2.0, 3.0, 6.0)\n'
+                'return {"angle": angle, "empty_norm": empty_norm, "unary_norm": unary_norm, "magnitude_norm": magnitude_norm, "vector_norm": vector_norm}',
+                parameters="",
+            )
+        )
+        execution = self.success(self.run_case())
+        outputs = {
+            output["name"]: (output["value"], output["numericKind"])
+            for output in execution["authoring"]["outputs"]
+        }
+        self.assertEqual(outputs["angle"], (-math.pi, "float"))
+        self.assertEqual(outputs["empty_norm"], (0.0, "float"))
+        self.assertEqual(outputs["unary_norm"], (0.0, "float"))
+        self.assertEqual(outputs["magnitude_norm"], (3.5, "float"))
+        self.assertEqual(outputs["vector_norm"], (7.0, "float"))
+        self.assertGreater(math.copysign(1.0, outputs["empty_norm"][0]), 0)
+        self.assertGreater(math.copysign(1.0, outputs["unary_norm"][0]), 0)
+
+        arities = {}
+        for item in execution["cso"]["sections"][0]["items"]:
+            if item["kind"] != "symbol":
+                continue
+            for node in item["symbol"]["valueTree"]["nodes"]:
+                function_id = node.get("funcSpec", {}).get("id")
+                if function_id in {"fg.atan2", "fg.hypot"}:
+                    arities[item["symbol"]["metadata"]["localId"]] = len(
+                        node["funcArgs"]
+                    )
+        self.assertEqual(
+            arities,
+            {
+                "angle": 2,
+                "empty_norm": 0,
+                "unary_norm": 1,
+                "magnitude_norm": 1,
+                "vector_norm": 3,
+            },
+        )
+
+    def test_hypot_rejects_a_non_finite_result(self):
+        self.entry.write_text(
+            "import math\n"
+            + source(
+                f'b: {RESULT} = math.hypot(1.7976931348623157e308, 1.7976931348623157e308)\nreturn {{"b": b}}',
+                parameters="",
+            )
+        )
+        result = self.run_case()
+        self.assertFalse(result["ok"], result)
+        self.assertEqual(result["diagnostics"][0]["code"], "NON_FINITE_VALUE")
+
     def test_float_kind_survives_json_and_large_intermediates(self):
         self.entry.write_text(
             source(

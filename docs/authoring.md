@@ -130,6 +130,13 @@ Floating-point `tan(math.pi / 2)` follows Python's finite approximation rather
 than treating the input as the exact mathematical pole. See
 [Python's math semantics](https://docs.python.org/3/library/math.html#trigonometric-functions).
 
+Both `atan2(y, x)` and `math.atan2(y, x)` take two positional numeric arguments
+and return a float angle in radians with Python's quadrant and signed-zero
+behavior. Both `hypot()` and `math.hypot()` accept any number of positional
+numeric coordinates and return their Euclidean norm as a float. The empty call
+returns `0.0`.
+Iterable and keyword forms are not supported. Non-finite results are rejected.
+
 Conditional expressions
 `value_if_true if comparison else value_if_false` support numeric
 comparisons `<`, `<=`, `>`, `>=`, `==`, and `!=`, including nested conditionals.

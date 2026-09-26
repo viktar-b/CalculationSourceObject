@@ -36,7 +36,10 @@ def calculate(quantity: Annotated[float, symbol(glyph="q_{{in}}", description="I
         for call in FUNCTION_CALLS:
             for spelling in call.spellings:
                 imports = f"from math import {call.name}\nimport math" if call.module == "math" else ""
-                counts = [call.min_arity - 1] + ([call.max_arity + 1] if call.max_arity is not None else [])
+                counts = (
+                    ([call.min_arity - 1] if call.min_arity > 0 else [])
+                    + ([call.max_arity + 1] if call.max_arity is not None else [])
+                )
                 for args in [*(", ".join(["quantity"] * count) for count in counts), "quantity=quantity"]:
                     with self.subTest(function=spelling, args=args):
                         self.reject(f"{spelling}({args})", imports, code="UNSUPPORTED_SYNTAX")
@@ -46,16 +49,31 @@ def calculate(quantity: Annotated[float, symbol(glyph="q_{{in}}", description="I
             if call.module != "math":
                 continue
             for spelling in call.spellings:
+                args = ", ".join(["quantity"] * call.min_arity)
+                expression = f"{spelling}({args})"
                 with self.subTest(function=spelling, issue="missing import"):
-                    self.reject(f"{spelling}(quantity)", code="UNSUPPORTED_SYNTAX")
+                    self.reject(expression, code="UNSUPPORTED_SYNTAX")
                 imported = "math" if spelling.startswith("math.") else call.name
                 imports = "import math" if imported == "math" else f"from math import {call.name}"
                 with self.subTest(function=spelling, issue="local shadowing"):
                     self.reject(
-                        f"{spelling}(quantity)",
+                        expression,
                         imports,
                         f'    {imported}: Annotated[float, symbol(glyph="q_{{shadow}}", description="Shadow", unit="")] = 1.0\n',
                         code="DUPLICATE_IDENTITY",
+                    )
+
+    def test_hypot_rejects_iterables_and_starred_arguments_before_execution(self):
+        for spelling, imports in [
+            ("hypot", "from math import hypot"),
+            ("math.hypot", "import math"),
+        ]:
+            for arguments in ["[quantity]", "*(quantity,)"]:
+                with self.subTest(function=spelling, arguments=arguments):
+                    self.reject(
+                        f"{spelling}({arguments})",
+                        imports,
+                        code="UNSUPPORTED_SYNTAX",
                     )
 
     def test_unlisted_math_functions_remain_unavailable(self):

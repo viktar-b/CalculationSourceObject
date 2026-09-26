@@ -1,6 +1,6 @@
 import {
-  SheetDocumentSchema,
   type SheetDocument,
+  SheetDocumentSchema,
   type SheetValueNode,
 } from '@cs-object/core';
 import { FormulaSheet } from '@cs-object/react';
@@ -8,6 +8,7 @@ import React, { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 import { renderSpecialValueFunction } from '../src/mathml/function-renderers.tsx';
+import { ValueTreeMathmlRenderer } from '../src/mathml/symbol-value/ValueTreeMathmlRenderer.tsx';
 
 (
   globalThis as typeof globalThis & {
@@ -73,6 +74,41 @@ const absoluteValueMarkup = (value: React.ReactNode): string => {
   });
   if (!rendered) throw new Error('Expected an absolute-value renderer');
   return renderToStaticMarkup(rendered).replace(/ style="[^"]*"/g, '');
+};
+
+const namedFunctionMarkup = (
+  functionId: string,
+  values: readonly number[],
+): string => {
+  const valueTree: SheetDocument['symbols'][number]['valueTree'] = {
+    rootKey: 'root',
+    result: { kind: 'empty' },
+    nodes: [
+      {
+        key: 'root',
+        kind: 'function',
+        functionId,
+        argKeys: values.map((_, index) => `arg-${index}`),
+      },
+      ...values.map((value, index) => ({
+        key: `arg-${index}`,
+        kind: 'literal' as const,
+        value: { kind: 'number' as const, value },
+      })),
+    ],
+  };
+  const functionSheet = SheetDocumentSchema.parse({
+    ...sheet,
+    symbols: [{ ...sheet.symbols[0], valueTree }],
+  });
+  return renderToStaticMarkup(
+    createElement(ValueTreeMathmlRenderer, {
+      sheet: functionSheet,
+      valueTree: functionSheet.symbols[0].valueTree,
+      viewOptions: {},
+      noRootContainer: true,
+    }),
+  );
 };
 
 describe('FormulaSheet rendering', () => {
@@ -602,3 +638,47 @@ test('nested absolute values retain both pairs of bars', () => {
     '<mrow><mo fence="true" stretchy="true">|</mo><mrow><mo fence="true" stretchy="true">|</mo><mn>-2</mn><mo fence="true" stretchy="true">|</mo></mrow><mo fence="true" stretchy="true">|</mo></mrow>',
   );
 });
+
+test.each([
+  ['fg.hypot', [], 0],
+  ['fg.hypot', [3], 0],
+  ['fg.hypot', [2, 3, 6], 2],
+  ['fg.atan2', [1, -1], 1],
+] as const)(
+  '%s renders arguments with complete fences',
+  (id, values, separators) => {
+    const markup = namedFunctionMarkup(id, values);
+
+    expect(markup.match(/<mo fence="true">\(<\/mo>/g)).toHaveLength(1);
+    expect(markup.match(/<mo fence="true">\)<\/mo>/g)).toHaveLength(1);
+    expect(markup.match(/<mo separator="true">,<\/mo>/g) ?? []).toHaveLength(
+      separators,
+    );
+    expect(htmlText(markup)).toContain(
+      [
+        id === 'fg.atan2' ? 'atan 2' : id.slice(3),
+        '(',
+        ...(values.length > 0
+          ? [values.map((value) => value.toFixed(2)).join(' , ')]
+          : []),
+        ')',
+      ].join(' '),
+    );
+  },
+);
+
+test.each(['fg.pi', 'fg.noop', 'fg.stub'])(
+  '%s omits fences when empty',
+  (id) => {
+    const markup = namedFunctionMarkup(id, []);
+    expect(markup).not.toContain('fence="true"');
+  },
+);
+
+test.each(['fg.noop', 'fg.stub'])(
+  '%s retains fences for nonempty content',
+  (id) => {
+    const markup = namedFunctionMarkup(id, [1]);
+    expect(markup.match(/<mo fence="true">/g)).toHaveLength(2);
+  },
+);

@@ -42,9 +42,11 @@ FUNCTION_CALLS = (
     FunctionCall("asin", "fg.asin", 1),
     FunctionCall("acos", "fg.acos", 1),
     FunctionCall("atan", "fg.atan", 1),
+    FunctionCall("atan2", "fg.atan2", 2, 2),
     FunctionCall("sinh", "fg.sinh", 1),
     FunctionCall("cosh", "fg.cosh", 1),
     FunctionCall("tanh", "fg.tanh", 1),
+    FunctionCall("hypot", "fg.hypot", 0, None),
 )
 
 CALLS = {spelling: call for call in FUNCTION_CALLS for spelling in call.spellings}

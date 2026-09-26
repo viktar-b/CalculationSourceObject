@@ -220,6 +220,7 @@ type Operation = (
       readonly kind: 'numeric';
       readonly operands: readonly OperandRole[];
       readonly evaluate: (...values: number[]) => NumericResult;
+      readonly evaluateValues?: (values: readonly number[]) => NumericResult;
       readonly typed: TypedEvaluation;
     }
   | {
@@ -256,15 +257,45 @@ const binary = (
       : validateNumber(approximate(left, right), 'float'),
 });
 
-const floatUnary = (calculate: (value: number) => number): Operation => {
-  const evaluate = (value: number) => validateNumber(calculate(value), 'float');
+const floatOperation = (
+  operands: readonly OperandRole[],
+  calculate: (values: readonly number[]) => number,
+  arity?: Arity,
+): Operation => {
+  const evaluateValues = (values: readonly number[]) =>
+    validateNumber(calculate(values), 'float');
   return {
     kind: 'numeric',
-    operands: ['number'],
-    evaluate,
-    typed: ([value]) => evaluate(value),
+    operands,
+    ...(arity === undefined ? {} : { arity }),
+    evaluate: (...values) => evaluateValues(values),
+    evaluateValues,
+    typed: evaluateValues,
   };
 };
+
+function hypot(values: readonly number[]): number {
+  const chunkSize = 1024;
+  if (values.length <= chunkSize) return Math.hypot(...values);
+
+  let scale = 0;
+  for (const value of values) scale = Math.max(scale, Math.abs(value));
+  if (scale === 0) return 0;
+
+  // Scale once so successive chunks do not repeatedly round subnormal norms.
+  // Bounded native calls also avoid the engine's call-argument limit.
+  let norm = 0;
+  for (let start = 0; start < values.length; start += chunkSize) {
+    const chunk = values
+      .slice(start, start + chunkSize)
+      .map((value) => value / scale);
+    norm = Math.hypot(norm, ...chunk);
+  }
+  return norm * scale;
+}
+
+const floatUnary = (calculate: (value: number) => number): Operation =>
+  floatOperation(['number'], ([value]) => calculate(value));
 
 const inverseUnitInterval = (
   name: string,
@@ -359,6 +390,10 @@ const operations = new Map<string, Operation>([
       evaluate: (value) => absoluteValue(value),
       typed: ([value], kinds) => absoluteValue(value, kinds[0]),
     },
+  ],
+  [
+    'fg.atan2',
+    floatOperation(['number', 'number'], ([y, x]) => Math.atan2(y, x)),
   ],
   ['fg.add', binary(add, (a, b) => a + b)],
   ['fg.subtract', binary(subtract, (a, b) => a - b)],
@@ -455,6 +490,13 @@ const operations = new Map<string, Operation>([
       evaluate: logarithm,
       typed: ([value, base]) => logarithm(value, base),
     },
+  ],
+  [
+    'fg.hypot',
+    floatOperation(['number'], hypot, {
+      min: 0,
+      max: null,
+    }),
   ],
   [
     'fg.and',
@@ -630,12 +672,17 @@ export function evaluateOperation(
         'Conditional evaluation requires a formula graph.',
       );
     case 'numeric': {
+      const normalizedOperands = operands.map((operand, index) =>
+        numericKinds?.[index] === 'int' && operand === 0 ? 0 : operand,
+      );
       const kinds = numericKinds?.filter(
         (kind): kind is NumericKind => kind !== undefined,
       );
       return kinds !== undefined && kinds.length === operands.length
-        ? operation.typed(operands, kinds)
-        : operation.evaluate(...operands);
+        ? operation.typed(normalizedOperands, kinds)
+        : operation.evaluateValues
+          ? operation.evaluateValues(normalizedOperands)
+          : operation.evaluate(...normalizedOperands);
     }
     default: {
       const exhaustive: never = operation;

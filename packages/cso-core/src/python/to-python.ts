@@ -294,15 +294,26 @@ const logicalExpression = (
   };
 };
 
-const mathSingleArgCall = (
+const mathCallExpression = (
   functionId: string,
   args: readonly PythonExpression[],
   name: string,
+  arity: { readonly min: number; readonly max: number | null } = {
+    min: 1,
+    max: 1,
+  },
 ): PythonExpression => {
-  requireArgCount(functionId, args, 1);
+  if (
+    args.length < arity.min ||
+    (arity.max !== null && args.length > arity.max)
+  ) {
+    throw new Error(
+      `Cannot export function '${functionId}' with ${args.length} args to Python`,
+    );
+  }
 
   return {
-    code: `math.${name}(${args[0].code})`,
+    code: `math.${name}(${args.map((arg) => arg.code).join(', ')})`,
     precedence: PythonPrecedence.Call,
     usesMath: true,
   };
@@ -379,14 +390,16 @@ const functionExpressionRenderers: Readonly<
     requireArgCount('fg.abs', args, 1);
     return pythonCallExpression('fg.abs', args, 'abs');
   },
-  'fg.acos': (args) => mathSingleArgCall('fg.acos', args, 'acos'),
-  'fg.asin': (args) => mathSingleArgCall('fg.asin', args, 'asin'),
-  'fg.atan': (args) => mathSingleArgCall('fg.atan', args, 'atan'),
+  'fg.acos': (args) => mathCallExpression('fg.acos', args, 'acos'),
+  'fg.asin': (args) => mathCallExpression('fg.asin', args, 'asin'),
+  'fg.atan': (args) => mathCallExpression('fg.atan', args, 'atan'),
+  'fg.atan2': (args) =>
+    mathCallExpression('fg.atan2', args, 'atan2', { min: 2, max: 2 }),
   'fg.add': (args) =>
     binaryExpression('fg.add', args, '+', PythonPrecedence.AddSubtract),
   'fg.and': (args) =>
     logicalExpression('fg.and', args, 'and', PythonPrecedence.LogicalAnd),
-  'fg.ceil': (args) => mathSingleArgCall('fg.ceil', args, 'ceil'),
+  'fg.ceil': (args) => mathCallExpression('fg.ceil', args, 'ceil'),
   'fg.cnd': (args) => {
     requireArgCount('fg.cnd', args, 3);
     return {
@@ -395,9 +408,9 @@ const functionExpressionRenderers: Readonly<
       usesMath: combineMathUsage(args),
     };
   },
-  'fg.deg': (args) => mathSingleArgCall('fg.deg', args, 'degrees'),
-  'fg.cos': (args) => mathSingleArgCall('fg.cos', args, 'cos'),
-  'fg.cosh': (args) => mathSingleArgCall('fg.cosh', args, 'cosh'),
+  'fg.deg': (args) => mathCallExpression('fg.deg', args, 'degrees'),
+  'fg.cos': (args) => mathCallExpression('fg.cos', args, 'cos'),
+  'fg.cosh': (args) => mathCallExpression('fg.cosh', args, 'cosh'),
   'fg.divide': (args) =>
     binaryExpression('fg.divide', args, '/', PythonPrecedence.MultiplyDivide, {
       parenthesizeEqualRight: true,
@@ -406,8 +419,8 @@ const functionExpressionRenderers: Readonly<
     binaryExpression('fg.eq', args, '==', PythonPrecedence.Compare, {
       ...comparisonOptions,
     }),
-  'fg.exp': (args) => mathSingleArgCall('fg.exp', args, 'exp'),
-  'fg.floor': (args) => mathSingleArgCall('fg.floor', args, 'floor'),
+  'fg.exp': (args) => mathCallExpression('fg.exp', args, 'exp'),
+  'fg.floor': (args) => mathCallExpression('fg.floor', args, 'floor'),
   'fg.ge': (args) =>
     binaryExpression('fg.ge', args, '>=', PythonPrecedence.Compare, {
       ...comparisonOptions,
@@ -422,6 +435,8 @@ const functionExpressionRenderers: Readonly<
     }),
   'fg.log': (args) =>
     optionalSecondArgCallExpression('fg.log', args, 'math.log', true),
+  'fg.hypot': (args) =>
+    mathCallExpression('fg.hypot', args, 'hypot', { min: 0, max: null }),
   'fg.lt': (args) =>
     binaryExpression('fg.lt', args, '<', PythonPrecedence.Compare, {
       ...comparisonOptions,
@@ -449,7 +464,7 @@ const functionExpressionRenderers: Readonly<
     binaryExpression('fg.pow', args, '**', PythonPrecedence.Power, {
       parenthesizeEqualLeft: true,
     }),
-  'fg.rad': (args) => mathSingleArgCall('fg.rad', args, 'radians'),
+  'fg.rad': (args) => mathCallExpression('fg.rad', args, 'radians'),
   'fg.round': (args) =>
     optionalSecondArgCallExpression(
       'fg.round',
@@ -457,11 +472,11 @@ const functionExpressionRenderers: Readonly<
       'round',
       combineMathUsage(args),
     ),
-  'fg.sqrt': (args) => mathSingleArgCall('fg.sqrt', args, 'sqrt'),
-  'fg.sin': (args) => mathSingleArgCall('fg.sin', args, 'sin'),
-  'fg.sinh': (args) => mathSingleArgCall('fg.sinh', args, 'sinh'),
-  'fg.tan': (args) => mathSingleArgCall('fg.tan', args, 'tan'),
-  'fg.tanh': (args) => mathSingleArgCall('fg.tanh', args, 'tanh'),
+  'fg.sqrt': (args) => mathCallExpression('fg.sqrt', args, 'sqrt'),
+  'fg.sin': (args) => mathCallExpression('fg.sin', args, 'sin'),
+  'fg.sinh': (args) => mathCallExpression('fg.sinh', args, 'sinh'),
+  'fg.tan': (args) => mathCallExpression('fg.tan', args, 'tan'),
+  'fg.tanh': (args) => mathCallExpression('fg.tanh', args, 'tanh'),
   'fg.stub': passthroughExpression,
   'fg.subtract': (args) =>
     binaryExpression('fg.subtract', args, '-', PythonPrecedence.AddSubtract, {
