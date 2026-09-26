@@ -16,8 +16,9 @@ the [rendering guide](../../docs/rendering.md#notation) owns extension points.
    an owning module and no caller needs a parallel list of rules.
 3. Check display and Python export separately. Their vocabulary can be broader
    than verified authoring support. Reuse the generic function renderer when
-   its notation is sufficient. Done when a new operation is admitted, evaluated,
-   displayed and exported through the intended public interfaces.
+   its notation is sufficient. Done when the operation works through each
+   intended public interface. Display-only or export-only support does not
+   require admission to verified authoring.
 4. Extend the existing [function support contract](../../tests/integration/function-support.test.ts)
    for calls, or the relevant graph integration cases for operators. Keep
    independently authored expected values. Cover numeric kinds, signed zero,

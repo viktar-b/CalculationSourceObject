@@ -5,7 +5,7 @@ under the task's `.scratch/` directory using the
 [local tracker](../../docs/agents/issue-tracker.md).
 
 1. Record the PR head and local revision, then collect review threads and check
-   results. Project tool responses to the needed IDs, locations, messages and
+   results. Filter tool responses to the needed IDs, locations, messages and
    states before printing them. Done when each finding is tied to a revision
    and the checkout under review matches it.
 2. Reproduce each actionable finding through the public interface it affects.
