@@ -89,9 +89,15 @@ for each invocation. See the
 
 Supported formulas include numeric literals, references, unary minus, arithmetic
 `+`, `-`, `*`, `/`, `**`, `sqrt` / `math.sqrt`, `math.pi` (or imported `pi`),
-`ceil` / `math.ceil`, `exp` / `math.exp`, and `log` / `math.log`.
+`ceil` / `math.ceil`, `floor` / `math.floor`, `exp` / `math.exp`,
+`log` / `math.log`, and the built-in `abs`.
 `log(value)` is the natural logarithm; `log(value, base)` accepts a positive base
 other than one. Values must be positive. `exp` rejects non-finite results.
+
+`abs(value)` preserves the input's actual numeric kind and changes negative zero
+to positive zero. `floor(value)` returns the greatest integer less than or equal
+to the value. Both functions accept one argument. Results remain subject to the
+finite-float and safe-int contracts.
 
 `min` and `max` take two or more positional numeric arguments. They retain the
 first selected operand on ties, including its actual numeric kind and signed zero.

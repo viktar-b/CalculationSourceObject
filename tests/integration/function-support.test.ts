@@ -1,15 +1,15 @@
 import {
   execFileSync,
-  spawnSync,
   type SpawnSyncReturns,
+  spawnSync,
 } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  ExecutionResponseSchema,
   createPythonFromSheetDocument,
   createSheetFromCalculationSourceObject,
+  ExecutionResponseSchema,
   getFunctionSpec,
   sheetFunctionSpecs,
   verifyExecution,
@@ -18,11 +18,11 @@ import {
   PreparedFormulaSheet,
   prepareExecutionDocument,
 } from '@cs-object/react';
+import { chromium } from 'playwright';
 import React, { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, expect, it } from 'vitest';
 import { z } from 'zod';
-import { chromium } from 'playwright';
 
 Object.assign(globalThis, { React });
 const python = process.env.PYTHON ?? 'python3';
@@ -61,8 +61,10 @@ const referenceCases: Record<
   string,
   { args: number[]; expected: number; kind: 'float' | 'int' }
 > = {
+  abs: { args: [-3.5], expected: 3.5, kind: 'float' },
   sqrt: { args: [9], expected: 3, kind: 'float' },
   ceil: { args: [1.2], expected: 2, kind: 'int' },
+  floor: { args: [-1.2], expected: -2, kind: 'int' },
   round: { args: [2.5], expected: 2, kind: 'int' },
   max: { args: [2, 1], expected: 2, kind: 'float' },
   min: { args: [2, 1], expected: 1, kind: 'float' },
@@ -274,7 +276,11 @@ it.each(declarations)(
       );
       expect(html).not.toContain('>?</');
       expect(html).toContain(
-        call.name === 'sqrt' ? '<msqrt>' : `>${spec?.glyph}</`,
+        call.name === 'sqrt'
+          ? '<msqrt>'
+          : call.name === 'abs'
+            ? 'stretchy="true">|</mo>'
+            : `>${spec?.glyph}</`,
       );
       const { code, result } = exportReplay(execution, output.symbolId);
       expect(code).toContain(
@@ -560,6 +566,24 @@ it.each(syntaxCases)(
 );
 
 const extendedCases = [
+  ['abs(quantity)', '-3', 3, 'int'],
+  ['abs(quantity)', '-3.5', 3.5, 'float'],
+  ['abs(quantity)', '-0.0', 0, 'float'],
+  ['abs(quantity)', '-1.7976931348623157e308', 1.7976931348623157e308, 'float'],
+  ['math.floor(quantity)', '-1.2', -2, 'int'],
+  ['math.floor(quantity)', '-0.0', 0, 'int'],
+  [
+    'math.floor(quantity)',
+    '9007199254740991.0',
+    Number.MAX_SAFE_INTEGER,
+    'int',
+  ],
+  [
+    'math.floor(quantity)',
+    '-9007199254740991.0',
+    -Number.MAX_SAFE_INTEGER,
+    'int',
+  ],
   ['(2 if quantity > 0 else 3) if quantity < 1 else 4', '2.0', 4, 'int'],
   ['math.log(quantity, 2)', '8.0', 3, 'float'],
   ['math.log(quantity, 0.5)', '1.0', -0, 'float'],
@@ -615,6 +639,8 @@ it.each([
   'math.log(2, 1)',
   'math.log(2, -1)',
   'math.exp(1000)',
+  'math.floor(9007199254740992.0)',
+  'math.floor(1.7976931348623157e308)',
   'round(quantity, 2.0)',
   'round(1.7976931348623157e308, -308)',
 ])(
@@ -643,11 +669,51 @@ it.each([
           'DIVISION_BY_ZERO',
           'NON_FINITE_NUMBER',
           'INVALID_INTEGER_OPERAND',
+          'UNSUPPORTED_NUMERIC_RANGE',
         ].includes(d.code),
       ),
     ).toBe(true);
   },
 );
+
+it.each([
+  ['abs', 'abs(quantity)'],
+  ['floor', 'math.floor(quantity)'],
+] as const)('%s rejects a comparison operand', (name, expression) => {
+  const { execution } = successfulCapture(expression);
+  const valueTree = execution.cso.sections
+    .flatMap((section) => section.items)
+    .find(
+      (item) =>
+        item.kind === 'symbol' &&
+        item.symbol.valueTree.nodes.some(
+          (node) => node.funcSpec?.id === `fg.${name}`,
+        ),
+    );
+  if (valueTree?.kind !== 'symbol') {
+    throw new Error(`Missing ${name} value tree`);
+  }
+  const target = valueTree.symbol.valueTree.nodes.find(
+    (node) => node.funcSpec?.id === `fg.${name}`,
+  );
+  if (!target?.funcArgs?.[0]) throw new Error(`Missing ${name} operand`);
+  const operand = target.funcArgs[0];
+  valueTree.symbol.valueTree.nodes.push({
+    key: `${name}-comparison`,
+    mode: 'FUNCTION',
+    funcSpec: { id: 'fg.lt' },
+    funcArgs: [operand, operand],
+  });
+  target.funcArgs = [{ key: `${name}-comparison` }];
+
+  const report = verifyExecution({ execution });
+  expect(report.ok).toBe(false);
+  expect(
+    report.diagnostics.some(
+      (diagnostic) => diagnostic.code === 'NONNUMERIC_FORMULA',
+    ),
+  ).toBe(true);
+});
 
 it.each(['arity', 'role', 'cycle'])(
   'validates dormant logical operands for %s errors before evaluation',

@@ -215,6 +215,68 @@ describe('Python export', () => {
     expect(code).toContain('"pass": pass_value');
   });
 
+  test('exports absolute value as a builtin and floor through math', () => {
+    const { sheet } = createSheetFromValueTreeJson(
+      {
+        title: 'Scalar functions',
+        sections: [
+          {
+            symbols: [
+              {
+                id: 'input-value',
+                result: -1.2,
+                valueTree: [{ key: 'input', literal: -1.2 }],
+              },
+              {
+                id: 'absolute-value',
+                result: 1.2,
+                valueTree: [
+                  {
+                    key: 'absolute',
+                    function: 'fg.abs',
+                    arguments: ['value'],
+                  },
+                  { key: 'value', symbol: 'input-value' },
+                ],
+              },
+              {
+                id: 'floor-value',
+                result: -2,
+                valueTree: [
+                  {
+                    key: 'floor',
+                    function: 'fg.floor',
+                    arguments: ['value'],
+                  },
+                  { key: 'value', symbol: 'input-value' },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      { id: 'scalar-functions', label: 'Scalar functions' },
+    );
+    const code = createPythonFromSheetDocument(sheet);
+
+    expect(code).toContain('import math');
+    expect(code).toContain('absolute_value = abs(input_value)');
+    expect(code).toContain('floor_value = math.floor(input_value)');
+
+    const absoluteRoot = sheet.symbols
+      .find((symbol) => symbol.id === 'absolute-value')
+      ?.valueTree.nodes.find((node) => node.key === 'absolute');
+    if (absoluteRoot?.kind !== 'function') {
+      throw new Error('Expected an absolute-value function node');
+    }
+    for (const argKeys of [[], ['value', 'value']]) {
+      absoluteRoot.argKeys = argKeys;
+      expect(() => createPythonFromSheetDocument(sheet)).toThrow(
+        `Cannot export function 'fg.abs' with ${argKeys.length} args to Python`,
+      );
+    }
+  });
+
   test('exports source fixture function ids used by canonical assets', () => {
     const code = createPythonFromSheetDocument({
       id: 'source-functions',

@@ -59,8 +59,8 @@ def calculate(quantity: Annotated[float, symbol(glyph="q_{{in}}", description="I
                     )
 
     def test_unlisted_math_functions_remain_unavailable(self):
-        self.reject("math.floor(quantity)", "import math", code="UNSUPPORTED_SYNTAX")
-        self.reject("floor(quantity)", "from math import floor", code="UNSUPPORTED_SYNTAX")
+        self.reject("math.fsum(quantity)", "import math", code="UNSUPPORTED_SYNTAX")
+        self.reject("fsum(quantity)", "from math import fsum", code="UNSUPPORTED_SYNTAX")
 
     def test_display_helpers_are_not_authoring_functions(self):
         import cso_python

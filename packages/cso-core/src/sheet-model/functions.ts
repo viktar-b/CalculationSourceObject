@@ -48,6 +48,7 @@ const binaryOperator = (
 });
 
 export const sheetFunctionSpecs = [
+  { id: 'fg.abs', glyph: 'abs' },
   { id: 'fg.acos', glyph: 'acos' },
   { id: 'fg.asin', glyph: 'asin' },
   { id: 'fg.atan', glyph: 'atan' },
@@ -97,6 +98,7 @@ export const sheetFunctionSpecs = [
     ),
   },
   { id: 'fg.exp', glyph: 'exp' },
+  { id: 'fg.floor', glyph: 'floor' },
   {
     id: 'fg.ge',
     glyph: '>=',
