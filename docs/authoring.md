@@ -90,7 +90,23 @@ for each invocation. See the
 Supported formulas include numeric literals, references, unary minus, arithmetic
 `+`, `-`, `*`, `/`, `**`, `sqrt` / `math.sqrt`, `math.pi` (or imported `pi`),
 `ceil` / `math.ceil`, one-argument `round`, and two-argument `max`. Python `round`
-uses ties to even and returns an integer. Conditional expressions
+uses ties to even and returns an integer.
+
+Trigonometry supports `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `sinh`, `cosh`,
+`tanh`, `radians` and `degrees`. Use `math.<name>(value)` after `import math`, or
+`<name>(value)` after `from math import <name>`. Each takes one positional numeric
+argument and returns a float, including when the input is an integer.
+Direct trig functions take radians; inverse trig functions return radians.
+`asin` and `acos` require an input in [-1, 1]. Hyperbolic functions take a
+dimensionless argument. `radians` converts degrees to radians; `degrees` does
+the reverse. Declare units explicitly; function calls do not infer or check
+units from symbol metadata. For example, `math.sin(math.radians(angle_degrees))`
+accepts an angle expressed in degrees. Non-finite inputs and results are rejected.
+Floating-point `tan(math.pi / 2)` follows Python's finite approximation rather
+than treating the input as the exact mathematical pole. See
+[Python's math semantics](https://docs.python.org/3/library/math.html#trigonometric-functions).
+
+Conditional expressions
 `value_if_true if comparison else value_if_false` support single numeric
 comparisons `<`, `<=`, `>` and `>=`, including nested conditionals. Only the
 selected branch is evaluated. Core checks every Value tree node, including

@@ -51,6 +51,70 @@ const beamDocument = {
 };
 
 describe('Python export', () => {
+  test.each([
+    [2, 'float', '2.0'],
+    [-0, 'float', '-0.0'],
+    [-0, 'int', '0'],
+    [-0, undefined, '0'],
+    [1e20, 'float', '100000000000000000000.0'],
+    [1e308, 'float', '1e+308'],
+    [2, 'int', '2'],
+  ] as const)(
+    'exports numeric literal %s with kind %s as %s',
+    (value, numericKind, expected) => {
+      const { sheet } = createSheetFromValueTreeJson(beamDocument, {
+        id: 'numbers',
+        label: 'Numbers',
+      });
+      const node = sheet.symbols[0].valueTree.nodes[0];
+      if (node.kind !== 'literal') throw new Error('Expected input literal');
+      node.value = { kind: 'number', value, numericKind };
+      expect(createPythonFromSheetDocument(sheet)).toContain(
+        `b = ${expected}\n`,
+      );
+    },
+  );
+
+  test.each([
+    [-0, 'float', '(-0.0) ** 2'],
+    [-2, 'float', '(-2.0) ** 2'],
+    [-2, 'int', '(-2) ** 2'],
+    [-2, undefined, '(-2) ** 2'],
+  ] as const)(
+    'groups a negative literal %s with kind %s as the base of %s',
+    (value, numericKind, expected) => {
+      const { sheet } = createSheetFromValueTreeJson(beamDocument, {
+        id: 'powers',
+        label: 'Powers',
+      });
+      sheet.symbols[0].valueTree = {
+        rootKey: 'power',
+        result: { kind: 'empty' },
+        nodes: [
+          {
+            key: 'power',
+            kind: 'function',
+            functionId: 'fg.pow',
+            argKeys: ['base', 'exponent'],
+          },
+          {
+            key: 'base',
+            kind: 'literal',
+            value: { kind: 'number', value, numericKind },
+          },
+          {
+            key: 'exponent',
+            kind: 'literal',
+            value: { kind: 'number', value: 2, numericKind: 'int' },
+          },
+        ],
+      };
+      expect(createPythonFromSheetDocument(sheet)).toContain(
+        `b = ${expected}\n`,
+      );
+    },
+  );
+
   test('normalizes long separator runs in public identifiers', () => {
     const separators = '_'.repeat(100_000);
     const calculation = createCalculationFromValueTreeJson(beamDocument, {

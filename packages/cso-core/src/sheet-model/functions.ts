@@ -48,6 +48,9 @@ const binaryOperator = (
 });
 
 export const sheetFunctionSpecs = [
+  { id: 'fg.acos', glyph: 'acos' },
+  { id: 'fg.asin', glyph: 'asin' },
+  { id: 'fg.atan', glyph: 'atan' },
   {
     id: 'fg.add',
     glyph: '+',
@@ -70,6 +73,8 @@ export const sheetFunctionSpecs = [
   },
   { id: 'fg.ceil', glyph: 'ceil' },
   { id: 'fg.cnd', glyph: 'if' },
+  { id: 'fg.cos', glyph: 'cos' },
+  { id: 'fg.cosh', glyph: 'cosh' },
   { id: 'fg.deg', glyph: 'deg' },
   {
     id: 'fg.divide',
@@ -168,7 +173,10 @@ export const sheetFunctionSpecs = [
       SheetOperatorAssociativity.Right,
     ),
   },
+  { id: 'fg.rad', glyph: 'radians' },
   { id: 'fg.round', glyph: 'round' },
+  { id: 'fg.sin', glyph: 'sin' },
+  { id: 'fg.sinh', glyph: 'sinh' },
   { id: 'fg.sqrt', glyph: 'sqrt' },
   { id: 'fg.stub', glyph: '' },
   {
@@ -182,6 +190,8 @@ export const sheetFunctionSpecs = [
     ),
   },
   { id: 'fg.uminus', glyph: '-' },
+  { id: 'fg.tan', glyph: 'tan' },
+  { id: 'fg.tanh', glyph: 'tanh' },
 ] as const satisfies readonly SheetFunctionSpec[];
 
 export const sheetFunctionSpecsById = new Map<string, SheetFunctionSpec>(

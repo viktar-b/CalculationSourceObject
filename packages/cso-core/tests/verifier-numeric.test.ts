@@ -74,12 +74,12 @@ describe('formula operations', () => {
   });
 
   it('rejects an unsupported function before operand validation', () => {
-    expect(validateOperation('fg.sin', 1)).toMatchObject({
+    expect(validateOperation('fg.exp', 1)).toMatchObject({
       ok: false,
       code: 'UNSUPPORTED_FUNCTION',
     });
     expect(
-      failureCode(evaluateOperation('fg.sin', [Number.POSITIVE_INFINITY])),
+      failureCode(evaluateOperation('fg.exp', [Number.POSITIVE_INFINITY])),
     ).toBe('UNSUPPORTED_FUNCTION');
   });
 
@@ -144,7 +144,7 @@ describe('formula operations', () => {
   });
 
   it('rejects functions outside the verified subset', () => {
-    expect(failureCode(evaluateOperation('fg.sin', [0]))).toBe(
+    expect(failureCode(evaluateOperation('fg.exp', [0]))).toBe(
       'UNSUPPORTED_FUNCTION',
     );
   });
