@@ -68,8 +68,16 @@ on PR creation, title edits and updates, without installing dependencies. Run
 uses the runner's Node runtime without checking out or executing repository code.
 Like other `pull_request` workflows, changes to the workflow itself require review.
 
+For pull requests that change only `.md` files, CI's `changes` job skips the
+three build/test jobs. Their check names remain present as skipped checks, which
+GitHub accepts for required jobs. Mixed changes and all other file types run the
+full suite. Pushes to `main`, manual runs, empty diffs and file-detection failures
+also run the full suite. `npm run test:ci` tests the workflow's detector against
+temporary Git repositories. PR title validation, dependency review and
+GitHub-managed CodeQL keep their own triggers.
+
 Keep all five check names stable and required in the `Protect main` ruleset.
-Do not add path filters or allow failures on required checks. PR code runs with
+Do not add workflow-level path filters or allow failures on required checks. PR code runs with
 read-only repository permissions in these workflows. External actions use full
 commit SHAs, enforced by the repository's Actions policy. Review any future
 reusable workflow references separately; that policy still permits tags for them.

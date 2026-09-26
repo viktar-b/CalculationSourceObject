@@ -21,7 +21,43 @@ env:
   NEXT_TELEMETRY_DISABLED: '1'
 
 jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      run_full: ${{ steps.classify.outputs.run_full }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Classify changed files
+        id: classify
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          run_full=true
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            # Disable rename detection so both the old and new paths are checked.
+            if git diff --name-only --no-renames -z "$BASE_SHA...$HEAD_SHA" -- > "$RUNNER_TEMP/changed-files"; then
+              if [[ -s "$RUNNER_TEMP/changed-files" ]]; then
+                run_full=false
+                while IFS= read -r -d '' path; do
+                  case "$path" in
+                    *.md) ;;
+                    *) run_full=true; break ;;
+                  esac
+                done < "$RUNNER_TEMP/changed-files"
+              fi
+            fi
+          fi
+          echo "run_full=$run_full" >> "$GITHUB_OUTPUT"
+
   quality:
+    needs: changes
+    # A detector failure must run the full suite, never silently skip required checks.
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.run_full != 'false') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -45,12 +81,15 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm audit --audit-level=high
       - run: npm run test:pr-title
+      - run: npm run test:ci
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
       - run: npm run build:demo
 
   isolation:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.run_full != 'false') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -79,6 +118,8 @@ jobs:
             ${{ runner.temp }}/cso-isolated-projects-*/*.log
 
   installed-packages:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.run_full != 'false') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
