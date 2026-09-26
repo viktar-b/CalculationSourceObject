@@ -115,5 +115,6 @@ Keep requirements and non-obvious reasons in one owning guide. Link to schemas,
 public exports, `--help` and behavior tests for details they already define.
 Update [the code map](code-map.md) only when responsibility or flow changes.
 Keep domain terms in [CONTEXT.md](../CONTEXT.md), accepted decisions in
-[ADRs](adr/), and create `docs/backlog.md` only for unresolved multi-session work.
+[ADRs](adr/), and keep local tickets and specs in `.scratch/` as described in
+[the issue tracker guide](agents/issue-tracker.md).
 Check local links and executable examples after moving or pruning docs.

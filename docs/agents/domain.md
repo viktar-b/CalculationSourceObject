@@ -1,6 +1,7 @@
 # Domain docs
 
 Use one shared root `CONTEXT.md` and `docs/adr/` across packages.
+Write ADRs using the [ADR template](../adr/template.md).
 
 Before exploring the codebase, read `CONTEXT.md` and the ADRs
 relevant to the work. Follow the additional reading requirements

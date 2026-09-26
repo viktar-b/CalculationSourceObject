@@ -29,6 +29,11 @@ applications, with a designated root and a documented result.
 The reviewable presentation of a calculation's rows, mathematical notation,
 substitutions, units, explanations, and results.
 
+**Calculation report**:
+The reviewable engineering narrative for one source revision and resolved input
+set, including assumptions, references, formulas, units and results. HTML and
+PDF can present the same report; the verification report is a separate record.
+
 **Source-to-document consistency**:
 Agreement between the authored calculation's runtime results and the values
 obtained by evaluating the documented formulas.

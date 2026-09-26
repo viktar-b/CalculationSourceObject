@@ -25,8 +25,9 @@ jobs at least weekly. Response targets run from detection or receipt of a report
 | Other vulnerability | Triage within seven days and record an owner, exposure assessment, next action and review date. |
 
 Keep undisclosed vulnerabilities and credential details in the private advisory
-or alert record. Track public, unresolved remediation work in
-[the backlog](docs/backlog.md), following the repository's issue-tracker rules.
+or alert record. Track non-sensitive remediation work through
+[the local issue tracker](docs/agents/issue-tracker.md), and publish the
+resolution in the advisory or relevant pull request.
 Record why a finding is dismissed; severity alone is not a dismissal reason.
 
 ## Failed automatic updates

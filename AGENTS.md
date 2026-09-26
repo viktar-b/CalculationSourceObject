@@ -42,16 +42,15 @@ Report failed or uncompleted checks separately from successful checks.
 
 Keep rules in one owning guide and point to code/tests for implementation facts.
 Use one shared `CONTEXT.md` glossary and `docs/adr/` for accepted decisions.
-When a workflow calls for an issue tracker, use `docs/backlog.md`. Create it
-only for unresolved work spanning sessions, recording status, blockers, scope
-and completion evidence. Remove resolved entries
-after moving lasting decisions into their owning guide or ADR.
+Keep local tickets and specs under `.scratch/`, following
+`docs/agents/issue-tracker.md`. Record lasting decisions in their owning guide
+or an ADR.
 
 ## Agent skills
 
 ### Issue tracker
 
-Track unresolved work spanning sessions in `docs/backlog.md`.
+Track local tickets and specs under `.scratch/`.
 See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
