@@ -64,7 +64,7 @@ const parameterMapSchema = <T>(valueSchema: z.ZodType<T>) =>
     .transform((entries): Record<string, T> => Object.fromEntries(entries));
 
 export const ResolvedInputsSchema = parameterMapSchema(SupportedNumberSchema);
-const FiniteInputsSchema = parameterMapSchema(z.number().finite());
+const FiniteInputsSchema = parameterMapSchema(z.number());
 const InputKindsSchema = parameterMapSchema(NumericKindSchema);
 const OptionalResolvedInputEvidenceSchema = z
   .strictObject({
@@ -178,15 +178,12 @@ export const VersionsSchema = z.strictObject({
 });
 export const ComparisonSchema = z
   .strictObject({
-    actual: z.number().finite(),
-    expected: z.number().finite(),
-    absoluteError: z.union([
-      z.number().finite().nonnegative(),
-      z.literal('overflow'),
-    ]),
+    actual: z.number(),
+    expected: z.number(),
+    absoluteError: z.union([z.number().nonnegative(), z.literal('overflow')]),
     absoluteTolerance: z.literal(1e-9),
     relativeTolerance: z.literal(1e-12),
-    formulaValue: z.number().finite().optional(),
+    formulaValue: z.number().optional(),
     referenceRevision: NonemptyStringSchema.optional(),
   })
   .refine(
