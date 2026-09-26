@@ -74,12 +74,12 @@ describe('formula operations', () => {
   });
 
   it('rejects an unsupported function before operand validation', () => {
-    expect(validateOperation('fg.exp', 1)).toMatchObject({
+    expect(validateOperation('fg.unknown', 1)).toMatchObject({
       ok: false,
       code: 'UNSUPPORTED_FUNCTION',
     });
     expect(
-      failureCode(evaluateOperation('fg.exp', [Number.POSITIVE_INFINITY])),
+      failureCode(evaluateOperation('fg.unknown', [Number.POSITIVE_INFINITY])),
     ).toBe('UNSUPPORTED_FUNCTION');
   });
 
@@ -144,7 +144,7 @@ describe('formula operations', () => {
   });
 
   it('rejects functions outside the verified subset', () => {
-    expect(failureCode(evaluateOperation('fg.exp', [0]))).toBe(
+    expect(failureCode(evaluateOperation('fg.unknown', [0]))).toBe(
       'UNSUPPORTED_FUNCTION',
     );
   });
@@ -353,9 +353,10 @@ describe('Python numeric kinds and template functions', () => {
     expect(failureCode(evaluateOperation('fg.round', [1e25], ['float']))).toBe(
       'UNSUPPORTED_NUMERIC_RANGE',
     );
-    expect(failureCode(evaluateOperation('fg.max', [1, 2, 3]))).toBe(
-      'INVALID_FUNCTION_ARITY',
-    );
+    expect(evaluateOperation('fg.max', [1, 2, 3])).toEqual({
+      ok: true,
+      value: 3,
+    });
   });
 });
 

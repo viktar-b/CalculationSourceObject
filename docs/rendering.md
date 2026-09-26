@@ -95,8 +95,13 @@ Apply the [authoring naming rules](authoring.md#names-and-notation) to new varia
 
 Formula structure comes from value-tree functions. [Function specs](../packages/cso-core/src/sheet-model/functions.ts)
 define IDs and precedence; [MathML renderers](../packages/cso-react/src/mathml/function-renderers.tsx)
-define layout. The numeric verifier supports a smaller subset than display and
-Python export. Rendering support alone is not numerical support.
+define layout. The 34 calculation operations have constrained Python forms and
+independent verification rules. The remaining `noop` and `stub` nodes retain
+rendering and Python export support for grouping and placeholders; they are not
+Python authoring functions or numerically verified operations. Logical `and` /
+`or` are verified only as predicates that join comparisons. The
+[authoring guide](authoring.md#supported-source-and-document-content) defines
+accepted argument forms and numerical roles.
 
 Declare each authored function once in Python's
 [function calls](../packages/cso-python/src/cso_python/function_calls.py) module.
@@ -106,7 +111,9 @@ behavior in its [operation registry](../packages/cso-core/src/verification/numer
 When adding a function, add its evaluator, display spec and Python export mapping.
 The [function support contract](../tests/integration/function-support.test.ts)
 reads every Python declaration from the installed wheel and exercises each
-spelling through capture, verification, rendering and export. Add an independent
+spelling through capture, verification, rendering and export. It classifies
+display-only nodes separately and checks their rendering/export compatibility
+without requiring Python authoring syntax. Add an independent
 reference case there and domain/edge cases in the owning packages. Display-only
 or export-only operations do not need an authoring declaration.
 

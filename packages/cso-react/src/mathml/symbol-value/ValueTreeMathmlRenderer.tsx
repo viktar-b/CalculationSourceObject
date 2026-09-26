@@ -177,6 +177,42 @@ const ValueTreeFunctionMathmlView = ({
   }
 
   const operator = getFunctionBinaryOperatorById(node.functionId);
+  if (
+    operator &&
+    argNodes.length > 2 &&
+    (node.functionId === 'fg.and' || node.functionId === 'fg.or')
+  ) {
+    return (
+      <mrow>
+        {argReactNodes.map((argument, index) => {
+          const child = argNodes[index];
+          const childOperator =
+            child.kind === 'function'
+              ? getFunctionBinaryOperatorById(child.functionId)
+              : undefined;
+          const grouped =
+            childOperator !== undefined &&
+            childOperator.priority < operator.priority;
+          return (
+            <mrow key={child.key}>
+              {index > 0 && (
+                <mo form="infix" lspace="0.3em" rspace="0.3em">
+                  {operator.glyph}
+                </mo>
+              )}
+              {grouped ? (
+                <SymbolValueGroupMathmlView cursor={undefined}>
+                  {[argument]}
+                </SymbolValueGroupMathmlView>
+              ) : (
+                argument
+              )}
+            </mrow>
+          );
+        })}
+      </mrow>
+    );
+  }
   if (operator && argNodes.length === 2) {
     const [argOperatorLeft, argOperatorRight] = argNodes.map((argNode) =>
       argNode.kind === 'function'

@@ -286,7 +286,7 @@ export const createFormulaEvaluator = (
           role === 'comparison' ? 'INVALID_CONDITIONAL' : 'NONNUMERIC_FORMULA',
         message:
           role === 'comparison'
-            ? 'A conditional test requires one numeric comparison.'
+            ? 'A conditional test requires numeric comparisons.'
             : 'A numeric operand cannot contain a comparison.',
       }),
     );
@@ -355,13 +355,17 @@ export const createFormulaEvaluator = (
           const target = { symbolId: address.symbolId, nodeKey: argument.key };
           const child = validateStructure(target, stack);
           if (!child.ok) return child;
-          const expected = resolved.operation.operands[index];
+          const declared = resolved.operation.operands[index];
+          const expected = declared === 'integer' ? 'number' : declared;
           if (child.role !== expected) return roleFailure(target, expected);
         }
         return {
           ok: true,
           role:
-            resolved.operation.kind === 'comparison' ? 'comparison' : 'number',
+            resolved.operation.kind === 'comparison' ||
+            resolved.operation.kind === 'logical'
+              ? 'comparison'
+              : 'number',
         };
       }
       default: {
@@ -472,42 +476,81 @@ export const createFormulaEvaluator = (
     );
   }
 
-  function evaluateConditional(
+  function evaluatePredicate(
     graph: FormulaGraph,
-    node: CalculationSourceValueNode,
+    key: string,
     stack: readonly NodeAddress[],
-  ): EvaluationResult {
-    const address = { symbolId: graph.symbol.id, nodeKey: node.key };
-    const args = node.funcArgs ?? [];
-    const test = graph.nodes.get(args[0].key);
+  ): boolean | EvaluationFailure {
+    const address = { symbolId: graph.symbol.id, nodeKey: key };
+    const test = graph.nodes.get(key);
     if (
       test?.mode !== 'FUNCTION' ||
       test.funcSpec == null ||
-      test.funcArgs?.length !== 2
-    ) {
-      return numericEvaluation(address, {
-        ok: false,
-        code: 'INVALID_CONDITIONAL',
-        message: 'A conditional test requires one numeric comparison.',
-      });
+      test.funcArgs === undefined
+    )
+      return failure(
+        diagnostic({
+          address,
+          code: 'INVALID_CONDITIONAL',
+          message: 'A conditional test requires numeric comparisons.',
+        }),
+      );
+    const shape = resolveOperation(test.funcSpec.id, test.funcArgs.length);
+    if (!shape.ok)
+      return failure(
+        diagnostic({ address, code: shape.code, message: shape.message }),
+      );
+    if (shape.operation.kind === 'logical') {
+      const isAnd = shape.operation.operator === 'and';
+      for (const argument of test.funcArgs) {
+        const selected = evaluatePredicate(graph, argument.key, stack);
+        if (typeof selected !== 'boolean') return selected;
+        if (selected !== isAnd) return selected;
+      }
+      return isAnd;
     }
+    if (shape.operation.kind !== 'comparison')
+      return failure(
+        diagnostic({
+          address,
+          code: 'INVALID_CONDITIONAL',
+          message: 'A conditional test requires numeric comparisons.',
+        }),
+      );
     const left = evaluateNode(
       { symbolId: graph.symbol.id, nodeKey: test.funcArgs[0].key },
       stack,
     );
+    if (!left.ok) return left;
     const right = evaluateNode(
       { symbolId: graph.symbol.id, nodeKey: test.funcArgs[1].key },
       stack,
     );
-    if (!left.ok) return left;
     if (!right.ok) return right;
     const selected = evaluateComparison(
       test.funcSpec.id,
       left.value,
       right.value,
     );
-    if (typeof selected !== 'boolean')
-      return numericEvaluation(address, selected);
+    return typeof selected === 'boolean'
+      ? selected
+      : failure(
+          diagnostic({
+            address,
+            code: selected.code,
+            message: selected.message,
+          }),
+        );
+  }
+
+  function evaluateConditional(
+    graph: FormulaGraph,
+    node: CalculationSourceValueNode,
+    stack: readonly NodeAddress[],
+  ): EvaluationResult {
+    const args = node.funcArgs ?? [];
+    const selected = evaluatePredicate(graph, args[0].key, stack);
+    if (typeof selected !== 'boolean') return selected;
     return evaluateNode(
       { symbolId: graph.symbol.id, nodeKey: args[selected ? 1 : 2].key },
       stack,

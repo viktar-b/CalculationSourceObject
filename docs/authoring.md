@@ -89,8 +89,24 @@ for each invocation. See the
 
 Supported formulas include numeric literals, references, unary minus, arithmetic
 `+`, `-`, `*`, `/`, `**`, `sqrt` / `math.sqrt`, `math.pi` (or imported `pi`),
-`ceil` / `math.ceil`, one-argument `round`, and two-argument `max`. Python `round`
-uses ties to even and returns an integer.
+`ceil` / `math.ceil`, `exp` / `math.exp`, and `log` / `math.log`.
+`log(value)` is the natural logarithm; `log(value, base)` accepts a positive base
+other than one. Values must be positive. `exp` rejects non-finite results.
+
+`min` and `max` take two or more positional numeric arguments. They retain the
+first selected operand on ties, including its actual numeric kind and signed zero.
+Iterable and keyword forms are not supported.
+
+`round(value)` uses ties to even and returns an integer. `round(value, digits)`
+requires integer `digits`, supports positive and negative digit counts, and
+preserves the input's actual numeric kind. Floating-point rounding operates on
+the represented binary64 value, so `round(2.675, 2)` is `2.67`. A float rounded
+to zero retains its sign. Results remain subject to the finite-float and safe-int
+contracts. See [Python's round semantics](https://docs.python.org/3/library/functions.html#round).
+
+`noop` and `stub` are FormulaSheet grouping and placeholder nodes used by
+rendering and Python export. They are not Python authoring functions and are
+outside numerical verification, including when they contain a numeric operand.
 
 Trigonometry supports `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `sinh`, `cosh`,
 `tanh`, `radians` and `degrees`. Use `math.<name>(value)` after `import math`, or
@@ -107,9 +123,17 @@ than treating the input as the exact mathematical pole. See
 [Python's math semantics](https://docs.python.org/3/library/math.html#trigonometric-functions).
 
 Conditional expressions
-`value_if_true if comparison else value_if_false` support single numeric
-comparisons `<`, `<=`, `>` and `>=`, including nested conditionals. Only the
-selected branch is evaluated. Core checks every Value tree node, including
+`value_if_true if comparison else value_if_false` support numeric
+comparisons `<`, `<=`, `>`, `>=`, `==`, and `!=`, including nested conditionals.
+Join comparisons with `and` / `or`, or use comparison chains such as
+`lower < quantity <= upper`. Evaluation proceeds left to right and stops when
+the result is decided; a chain evaluates its shared numeric operand once.
+Only the selected conditional branch is evaluated.
+
+`and` / `or` are supported only between comparisons in conditional tests.
+Numeric selection expressions such as `quantity or fallback`, mixed numeric and
+comparison operands, Boolean quantities and bare numeric conditional tests are
+rejected. Core checks every Value tree node, including
 dormant and disconnected nodes, for supported operations, operand roles,
 numeric literals, references and cycles before evaluation.
 Every captured literal must satisfy the numeric kind and range contract, even

@@ -32,7 +32,7 @@ const ConditionalFunctionMathml = ({
       <mo style={fontSizeStyle}>{'{'}</mo>
       <mtable columnalign={'left'} style={baseStyle}>
         <mtr style={fontSizeStyle}>
-          <mtd style={baseStyle}>{argTrue}</mtd>
+          <mtd style={{ ...baseStyle, paddingRight: '0.5em' }}>{argTrue}</mtd>
           <mtd style={baseStyle}>
             <mtext style={fontSizeStyle}>{'if '}</mtext>
             <mspace width={'5px'} />
@@ -40,7 +40,7 @@ const ConditionalFunctionMathml = ({
           </mtd>
         </mtr>
         <mtr style={fontSizeStyle}>
-          <mtd style={baseStyle}>{argFalse}</mtd>
+          <mtd style={{ ...baseStyle, paddingRight: '0.5em' }}>{argFalse}</mtd>
           <mtd style={baseStyle}>
             <mtext style={fontSizeStyle}>otherwise.</mtext>
           </mtd>

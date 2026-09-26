@@ -40,6 +40,9 @@ export interface IdentifierMathMLAttributes extends MathMLTokenAttributes {
 
 // Operator attributes (for mo)
 export interface OperatorMathMLAttributes extends MathMLTokenAttributes {
+  form?: 'prefix' | 'infix' | 'postfix' | undefined;
+  lspace?: string | undefined;
+  rspace?: string | undefined;
   fence?: 'true' | 'false' | undefined;
   separator?: 'true' | 'false' | undefined;
   stretchy?: 'true' | 'false' | undefined;

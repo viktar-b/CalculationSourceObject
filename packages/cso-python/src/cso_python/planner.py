@@ -37,7 +37,14 @@ OPS = {
     ast.Pow: "fg.pow",
 }
 
-COMPARISONS = {ast.Lt: "fg.lt", ast.LtE: "fg.le", ast.Gt: "fg.gt", ast.GtE: "fg.ge"}
+COMPARISONS = {
+    ast.Lt: "fg.lt",
+    ast.LtE: "fg.le",
+    ast.Gt: "fg.gt",
+    ast.GtE: "fg.ge",
+    ast.Eq: "fg.eq",
+    ast.NotEq: "fg.ne",
+}
 
 
 class Planner:
@@ -515,12 +522,12 @@ class Planner:
                 },
             }
             nodes.append(item)
-            if condition and not isinstance(node, ast.Compare):
+            if condition and not isinstance(node, (ast.Compare, ast.BoolOp)):
                 self.error(
                     inv,
                     node,
                     "UNSUPPORTED_SYNTAX",
-                    "A conditional test requires one numeric comparison",
+                    "A conditional test requires numeric comparisons joined by and/or",
                 )
             if numeric_literal(node):
                 item.update(
@@ -553,26 +560,51 @@ class Planner:
                         {"key": lower(node.orelse)},
                     ],
                 )
-            elif isinstance(node, ast.Compare):
-                if (
-                    not condition
-                    or len(node.ops) != 1
-                    or type(node.ops[0]) not in COMPARISONS
-                ):
+            elif isinstance(node, ast.BoolOp):
+                if not condition:
                     self.error(
-                        inv,
-                        node,
-                        "UNSUPPORTED_SYNTAX",
-                        "Comparisons are supported only as single conditional tests",
+                        inv, node, "UNSUPPORTED_SYNTAX",
+                        "Logical operators are supported only in conditional tests",
                     )
                 item.update(
                     mode="FUNCTION",
-                    funcSpec={"id": COMPARISONS[type(node.ops[0])]},
+                    funcSpec={"id": "fg.and" if isinstance(node.op, ast.And) else "fg.or"},
                     funcArgs=[
-                        {"key": lower(node.left)},
-                        {"key": lower(node.comparators[0])},
+                        {"key": lower(value, condition=condition)}
+                        for value in node.values
                     ],
                 )
+            elif isinstance(node, ast.Compare):
+                if not condition or any(type(op) not in COMPARISONS for op in node.ops):
+                    self.error(
+                        inv, node, "UNSUPPORTED_SYNTAX",
+                        "Numeric comparisons are supported only in conditional tests",
+                    )
+                operand_keys = [
+                    lower(node.left),
+                    *(lower(value) for value in node.comparators),
+                ]
+                if len(node.ops) == 1:
+                    item.update(
+                        mode="FUNCTION", funcSpec={"id": COMPARISONS[type(node.ops[0])]},
+                        funcArgs=[{"key": value} for value in operand_keys],
+                    )
+                else:
+                    comparisons = []
+                    for index, op in enumerate(node.ops):
+                        comparison_key = f"n{len(nodes) + 1}"
+                        nodes.append({
+                            "key": comparison_key,
+                            "metadata": dict(item["metadata"]),
+                            "mode": "FUNCTION",
+                            "funcSpec": {"id": COMPARISONS[type(op)]},
+                            "funcArgs": [
+                                {"key": operand_keys[index]},
+                                {"key": operand_keys[index + 1]},
+                            ],
+                        })
+                        comparisons.append({"key": comparison_key})
+                    item.update(mode="FUNCTION", funcSpec={"id": "fg.and"}, funcArgs=comparisons)
             elif isinstance(node, (ast.Name, ast.Subscript)):
                 item.update(
                     mode="SYMBOL", symbol={"id": self.reference(inv, node).cso["id"]}
@@ -601,7 +633,10 @@ class Planner:
                 if (
                     name not in {"given", "documented_result", *CALLS}
                     or node.keywords
-                    or len(node.args) != (CALLS[name].arity if name in CALLS else 1)
+                    or (
+                        not CALLS[name].accepts_arity(len(node.args))
+                        if name in CALLS else len(node.args) != 1
+                    )
                 ):
                     self.error(
                         inv,

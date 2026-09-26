@@ -185,13 +185,14 @@ class ExecutionTest(unittest.TestCase):
         )
         self.reject_before_execution("DUPLICATE_GLYPH")
 
-    def test_rejects_unbounded_function_signatures_and_boolean_results(self):
+    def test_rejects_invalid_function_signatures_and_boolean_results(self):
         for expression in (
-            "round(a, 2)",
-            "max(a, 2, 3)",
+            "round(a, 2, 3)",
+            "max(a)",
             "a < 0",
             "1 if a else 0",
-            "1 if 0 < a < 2 else 0",
+            "1 if a < 0 and a else 0",
+            "a and a < 0",
         ):
             with self.subTest(expression=expression):
                 self.entry.write_text(
