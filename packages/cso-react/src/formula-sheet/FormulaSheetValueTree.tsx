@@ -9,6 +9,7 @@ import type { ReactElement } from 'react';
 import { AsciiMathView } from '../ascii-math/AsciiMathView.tsx';
 import { SymbolValueMathBlock } from '../mathml/SymbolValueMathBlock.tsx';
 import { SymbolValueMathmlView } from '../mathml/symbol-value/SymbolValueMathmlView.tsx';
+import { requiresExplicitOperandGroup } from '../mathml/symbol-value/operand-grouping.ts';
 
 interface FormulaSheetValueTreeProps {
   readonly sheet: SheetDocument;
@@ -81,10 +82,19 @@ export const FormulaSheetValueTree = ({
                   ? getFunctionBinaryOperatorById(node.functionId)
                   : undefined;
               const grouped =
-                operator !== undefined &&
-                (operator.priority < SheetOperatorPriority.AddSubtract ||
-                  (index > 0 &&
-                    operator.priority === SheetOperatorPriority.AddSubtract));
+                (operator !== undefined &&
+                  (operator.priority < SheetOperatorPriority.AddSubtract ||
+                    (index > 0 &&
+                      operator.priority === SheetOperatorPriority.AddSubtract))) ||
+                (node !== undefined &&
+                  requiresExplicitOperandGroup({
+                    sheet,
+                    node,
+                    numerical,
+                    literalsAsDrafts: true,
+                    parentFunctionId: 'fg.add',
+                    argumentIndex: index === 0 ? 0 : 1,
+                  }));
               return (
                 <span className="cso-formula-term" key={`${index}-${rootKey}`}>
                   <math display="inline">

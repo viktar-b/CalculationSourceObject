@@ -6,11 +6,13 @@
  * special MathML structures using the concrete leaf components in this folder.
  */
 import { renderSpecialValueFunction } from '../function-renderers.tsx';
+import { requiresExplicitOperandGroup } from './operand-grouping.ts';
+import { displayedLiteralDraft } from './literal-display.ts';
 import {
   getFunctionBinaryOperatorById,
   getFunctionSpec,
 } from '@cs-object/core';
-import { emptyLiteral, isSheetLiteralEmpty } from '@cs-object/core';
+import { emptyLiteral } from '@cs-object/core';
 import {
   getSymbolById,
   getValueNodeByKey,
@@ -85,11 +87,12 @@ const ValueTreeNodeMathmlView = ({
   viewOptions,
 }: ValueTreeNodeMathmlViewProps): ReactElement => {
   if (node.kind === 'literal') {
-    if (
-      (viewOptions.literalsAsDrafts || isSheetLiteralEmpty(node.value)) &&
-      (node.draft ?? '').length > 0
-    ) {
-      return <SymbolValueDraftMathmlView draft={node.draft ?? ''} />;
+    const draft = displayedLiteralDraft({
+      node,
+      literalsAsDrafts: viewOptions.literalsAsDrafts,
+    });
+    if (draft !== undefined) {
+      return <SymbolValueDraftMathmlView draft={draft} />;
     }
     return <SymbolValueLiteralMathmlView literal={node.value} />;
   }
@@ -144,21 +147,14 @@ const ValueTreeFunctionMathmlView = ({
         viewOptions={viewOptions}
       />
     );
-    const literal =
-      argNode.kind === 'literal'
-        ? argNode.value
-        : argNode.kind === 'symbol' && viewOptions.numerical
-          ? getSymbolById(sheet, argNode.symbolId)?.valueTree.result
-          : undefined;
-    const negative =
-      literal?.kind === 'number' &&
-      (literal.value < 0 || Object.is(literal.value, -0));
-    // Special MathML structures bypass the binary-operator grouping below.
-    const grouped =
-      index === 0 &&
-      ((node.functionId === 'fg.pow' &&
-        (argNode.kind === 'function' || negative)) ||
-        (node.functionId === 'fg.uminus' && argNode.kind === 'function'));
+    const grouped = requiresExplicitOperandGroup({
+      sheet,
+      node: argNode,
+      numerical: Boolean(viewOptions.numerical),
+      literalsAsDrafts: Boolean(viewOptions.literalsAsDrafts),
+      parentFunctionId: node.functionId,
+      argumentIndex: index,
+    });
     return grouped ? (
       <SymbolValueGroupMathmlView key={argNode.key} cursor={undefined}>
         {[rendered]}
