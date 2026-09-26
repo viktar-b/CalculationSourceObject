@@ -11,7 +11,7 @@ export function initialReport(command?: 'verify' | 'pdf'): CommandReport {
     numericPolicy: {
       absoluteTolerance: 1e-9,
       relativeTolerance: 1e-12,
-      numberDomain: 'finite-real-safe-integer',
+      numberDomain: 'finite-real-typed-safe-integer',
     },
     checks: {
       executionValidity: { status: 'not_applicable' },
@@ -46,7 +46,7 @@ export function usageReport(
     numericPolicy: {
       absoluteTolerance: 1e-9,
       relativeTolerance: 1e-12,
-      numberDomain: 'finite-real-safe-integer',
+      numberDomain: 'finite-real-typed-safe-integer',
     },
     checks: Object.fromEntries(
       [

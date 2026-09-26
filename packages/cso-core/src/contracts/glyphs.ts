@@ -5,11 +5,12 @@ const subscriptPattern = /^([^_^]+)_(?:\{([^{}]+)\}|([A-Za-z0-9]+))$/;
 const basePattern = /^(?:[A-Za-z0-9]+|\\[A-Za-z]+)$/;
 
 /** Return display identity for already validated glyph notation. */
-export const glyphIdentity = (glyph: string): string => {
+export const glyphIdentity = (glyph: string, scope?: string): string => {
   const parsed = parseNotation(glyph);
-  return parsed.ok
+  const identity = parsed.ok
     ? notationIdentity(parsed.value)
     : JSON.stringify(['invalid-notation', glyph]);
+  return JSON.stringify([scope ?? null, identity]);
 };
 
 export const scopedGlyph = (glyph: string, scope: string): string => {

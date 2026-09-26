@@ -93,7 +93,10 @@ export type Check = z.infer<typeof CheckSchema>;
 export const NumericPolicySchema = z.strictObject({
   absoluteTolerance: z.literal(1e-9),
   relativeTolerance: z.literal(1e-12),
-  numberDomain: z.literal('finite-real-safe-integer'),
+  numberDomain: z.enum([
+    'finite-real-safe-integer',
+    'finite-real-typed-safe-integer',
+  ]),
 });
 export type NumericPolicy = z.infer<typeof NumericPolicySchema>;
 

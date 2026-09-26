@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { NumericKindSchema } from '../contracts/numbers.ts';
 import { glyphIdentity } from '../contracts/glyphs.ts';
 import { parseNotation } from '../notation/parse.ts';
 import { supportedValueFunctionIds } from './functions.ts';
@@ -7,7 +8,13 @@ const IdSchema = z.string().min(1);
 
 export const SheetLiteralSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('empty') }).strict(),
-  z.object({ kind: z.literal('number'), value: z.number() }).strict(),
+  z
+    .object({
+      kind: z.literal('number'),
+      value: z.number(),
+      numericKind: NumericKindSchema.optional(),
+    })
+    .strict(),
   z.object({ kind: z.literal('string'), value: z.string() }).strict(),
   z.object({ kind: z.literal('boolean'), value: z.boolean() }).strict(),
 ]);
@@ -58,6 +65,7 @@ export const SheetSymbolSchema = z
   .object({
     id: IdSchema,
     glyph: z.string(),
+    notationScope: z.string().min(1).optional(),
     glyphCodeName: z.string().min(1).optional(),
     description: z.string(),
     unit: z.string().optional(),
@@ -397,7 +405,7 @@ const addSheetReferenceIssues = (
 
   const glyphs = new Map<string, string>();
   for (const [symbolIndex, symbol] of sheet.symbols.entries()) {
-    const identity = glyphIdentity(symbol.glyph);
+    const identity = glyphIdentity(symbol.glyph, symbol.notationScope);
     const previous = glyphs.get(identity);
     if (previous !== undefined && previous !== symbol.id) {
       ctx.addIssue({

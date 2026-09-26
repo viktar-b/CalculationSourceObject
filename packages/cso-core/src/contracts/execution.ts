@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { numericValueShape, refineNumericValue } from './numbers.ts';
 import { AuthoringEvidenceSchema } from './authoring.ts';
 import { scopedGlyph } from './glyphs.ts';
 import { CalculationSourceObjectSchema } from '../calculation-source/object-schema.ts';
@@ -14,7 +15,6 @@ import {
   ResolvedInputsSchema,
   SourceManifestSchema,
   SourceSpanSchema,
-  SupportedNumberSchema,
   VersionsSchema,
   collectCsoSymbols,
   namespacedId,
@@ -32,10 +32,11 @@ const IdentityStringSchema = NonemptyStringSchema.refine(
 const ParameterNameSchema = PythonIdentifierSchema;
 const LiteralSourceSchema = z
   .object({
-    value: SupportedNumberSchema,
+    ...numericValueShape,
     location: SourceSpanSchema,
   })
-  .strict();
+  .strict()
+  .superRefine(refineNumericValue);
 
 export const GivenSourceSchema = z.discriminatedUnion('kind', [
   z
@@ -46,7 +47,8 @@ export const GivenSourceSchema = z.discriminatedUnion('kind', [
     .strict(),
   z
     .object({ kind: z.literal('literal'), ...LiteralSourceSchema.shape })
-    .strict(),
+    .strict()
+    .superRefine(refineNumericValue),
 ]);
 
 const definitionIdentity = {
@@ -94,25 +96,28 @@ const EntrySuppliedBindingSchema = z
   .object({
     ...bindingIdentity,
     kind: z.literal('entrySupplied'),
-    value: SupportedNumberSchema,
+    ...numericValueShape,
   })
-  .strict();
+  .strict()
+  .superRefine(refineNumericValue);
 const ParsedDefaultBindingSchema = z
   .object({
     ...bindingIdentity,
     kind: z.literal('parsedDefault'),
-    value: SupportedNumberSchema,
+    ...numericValueShape,
     defaultLocation: SourceSpanSchema,
   })
-  .strict();
+  .strict()
+  .superRefine(refineNumericValue);
 const CallerLiteralBindingSchema = z
   .object({
     ...bindingIdentity,
     kind: z.literal('callerLiteral'),
-    value: SupportedNumberSchema,
+    ...numericValueShape,
     callerLocation: SourceSpanSchema,
   })
-  .strict();
+  .strict()
+  .superRefine(refineNumericValue);
 const CallerSymbolBindingSchema = z
   .object({
     ...bindingIdentity,
@@ -172,18 +177,20 @@ export const SymbolObservationSchema = z
     symbolId: IdentityStringSchema,
     invocationId: IdentityStringSchema,
     kind: z.enum(['input', 'constant', 'formula', 'unsupported']),
-    value: SupportedNumberSchema,
+    ...numericValueShape,
     definitionLocation: SourceSpanSchema,
   })
-  .strict();
+  .strict()
+  .superRefine(refineNumericValue);
 export const OperationObservationSchema = z
   .object({
     address: NodeAddressSchema,
     invocationId: IdentityStringSchema,
-    value: SupportedNumberSchema,
+    ...numericValueShape,
     location: SourceSpanSchema,
   })
-  .strict();
+  .strict()
+  .superRefine(refineNumericValue);
 
 const ExecutionPayloadBaseSchema = z
   .object({
@@ -232,7 +239,8 @@ const equalInputs = (
 ): boolean =>
   Object.keys(left).length === Object.keys(right).length &&
   Object.entries(left).every(
-    ([name, value]) => Object.hasOwn(right, name) && Object.is(right[name], value),
+    ([name, value]) =>
+      Object.hasOwn(right, name) && Object.is(right[name], value),
   );
 
 export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
@@ -1084,7 +1092,12 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
           );
         if (
           parameter.numericType === 'int' &&
-          !Number.isInteger(owner.resolvedInputs[parameter.parameterName])
+          (!Number.isInteger(owner.resolvedInputs[parameter.parameterName]) ||
+            execution.observations.some(
+              (observation) =>
+                observation.symbolId === parameter.symbolId &&
+                observation.numericKind === 'float',
+            ))
         )
           issue(
             'INPUT_TYPE_MISMATCH',

@@ -60,7 +60,7 @@ export const ResolvedInputsSchema = z
     }
     return Object.entries(value);
   })
-  .pipe(z.array(z.tuple([PythonIdentifierSchema, SupportedNumberSchema])))
+  .pipe(z.array(z.tuple([PythonIdentifierSchema, z.number().finite()])))
   .transform((entries): Record<string, number> => Object.fromEntries(entries));
 const PositionSchema = z.strictObject({
   line: z.number().int().min(1),
@@ -129,18 +129,23 @@ export const VersionsSchema = z.strictObject({
 });
 export const ComparisonSchema = z
   .strictObject({
-    actual: SupportedNumberSchema,
-    expected: SupportedNumberSchema,
-    absoluteError: z.number().finite().nonnegative(),
+    actual: z.number().finite(),
+    expected: z.number().finite(),
+    absoluteError: z.union([
+      z.number().finite().nonnegative(),
+      z.literal('overflow'),
+    ]),
     absoluteTolerance: z.literal(1e-9),
     relativeTolerance: z.literal(1e-12),
-    formulaValue: SupportedNumberSchema.optional(),
+    formulaValue: z.number().finite().optional(),
     referenceRevision: NonemptyStringSchema.optional(),
   })
   .refine(
     (comparison) =>
       comparison.absoluteError ===
-      Math.abs(comparison.actual - comparison.expected),
+      (Number.isFinite(Math.abs(comparison.actual - comparison.expected))
+        ? Math.abs(comparison.actual - comparison.expected)
+        : 'overflow'),
     {
       message:
         'Absolute error must equal the absolute difference of the compared values',

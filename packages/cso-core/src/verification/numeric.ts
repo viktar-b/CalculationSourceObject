@@ -1,8 +1,13 @@
+import type { NumericKind } from '../contracts/numbers.ts';
 import type { Comparison, Diagnostic } from '../contracts/common.ts';
 import type { NumericPolicy } from '../contracts/reports.ts';
 
 export type NumericResult =
-  | { readonly ok: true; readonly value: number }
+  | {
+      readonly ok: true;
+      readonly value: number;
+      readonly numericKind?: NumericKind;
+    }
   | {
       readonly ok: false;
       readonly code: string;
@@ -15,7 +20,7 @@ export type OperationValidationResult = { readonly ok: true } | NumericFailure;
 export const numericPolicy: NumericPolicy = Object.freeze({
   absoluteTolerance: 1e-9,
   relativeTolerance: 1e-12,
-  numberDomain: 'finite-real-safe-integer',
+  numberDomain: 'finite-real-typed-safe-integer',
 });
 
 const maximumSafeInteger = BigInt(Number.MAX_SAFE_INTEGER);
@@ -42,7 +47,10 @@ function failure(
   return { ok: false, code, message, valueDisplay };
 }
 
-export function validateNumber(value: number): NumericResult {
+export function validateNumber(
+  value: number,
+  numericKind?: NumericKind,
+): NumericResult {
   if (!Number.isFinite(value)) {
     return failure(
       'NON_FINITE_NUMBER',
@@ -50,14 +58,28 @@ export function validateNumber(value: number): NumericResult {
       numberDisplay(value),
     );
   }
-  if (Number.isInteger(value) && !Number.isSafeInteger(value)) {
+  if (numericKind === 'int' && !Number.isInteger(value)) {
+    return failure(
+      'NUMERIC_KIND_MISMATCH',
+      'Python int evidence requires an integer.',
+    );
+  }
+  if (
+    numericKind !== 'float' &&
+    Number.isInteger(value) &&
+    !Number.isSafeInteger(value)
+  ) {
     return failure(
       'UNSUPPORTED_NUMERIC_RANGE',
       `Integer-valued number ${String(value)} is outside the supported exact range.`,
       numberDisplay(value),
     );
   }
-  return { ok: true, value };
+  return {
+    ok: true,
+    value,
+    ...(numericKind === undefined ? {} : { numericKind }),
+  };
 }
 
 function unsafeInteger(value: bigint): NumericResult {
@@ -186,16 +208,27 @@ function unaryMinus(value: number): NumericResult {
   return validateNumber(-value);
 }
 
-type Operation =
-  | {
-      readonly arity: 1;
-      readonly evaluate: (operand: number) => NumericResult;
-    }
-  | {
-      readonly arity: 2;
-      readonly evaluate: (left: number, right: number) => NumericResult;
-    };
+/** Python's one-argument round uses ties to even and returns an int. */
+function roundInteger(value: number): number {
+  const lower = Math.floor(value);
+  const fraction = value - lower;
+  const rounded =
+    fraction < 0.5
+      ? lower
+      : fraction > 0.5
+        ? lower + 1
+        : lower % 2 === 0
+          ? lower
+          : lower + 1;
+  return rounded === 0 ? 0 : rounded;
+}
 
+type Operation = {
+  readonly arity: 0 | 1 | 2 | 3;
+  readonly evaluate: (...operands: number[]) => NumericResult;
+};
+const booleanResult = (): NumericFailure =>
+  failure('NONNUMERIC_FORMULA', 'Comparisons require a conditional test.');
 const operations = new Map<string, Operation>([
   ['fg.add', { arity: 2, evaluate: add }],
   ['fg.subtract', { arity: 2, evaluate: subtract }],
@@ -204,7 +237,128 @@ const operations = new Map<string, Operation>([
   ['fg.pow', { arity: 2, evaluate: power }],
   ['fg.sqrt', { arity: 1, evaluate: squareRoot }],
   ['fg.uminus', { arity: 1, evaluate: unaryMinus }],
+  ['fg.pi', { arity: 0, evaluate: () => validateNumber(Math.PI, 'float') }],
+  [
+    'fg.ceil',
+    {
+      arity: 1,
+      evaluate: (value) => validateNumber(Math.ceil(value) || 0, 'int'),
+    },
+  ],
+  [
+    'fg.round',
+    {
+      arity: 1,
+      evaluate: (value) => validateNumber(roundInteger(value), 'int'),
+    },
+  ],
+  [
+    'fg.max',
+    {
+      arity: 2,
+      evaluate: (left, right) => validateNumber(left >= right ? left : right),
+    },
+  ],
+  ['fg.lt', { arity: 2, evaluate: booleanResult }],
+  ['fg.le', { arity: 2, evaluate: booleanResult }],
+  ['fg.gt', { arity: 2, evaluate: booleanResult }],
+  ['fg.ge', { arity: 2, evaluate: booleanResult }],
+  [
+    'fg.cnd',
+    {
+      arity: 3,
+      evaluate: () =>
+        failure(
+          'INVALID_CONDITIONAL',
+          'Conditional evaluation requires a formula graph.',
+        ),
+    },
+  ],
 ]);
+
+export function evaluateComparison(
+  functionId: string,
+  left: number,
+  right: number,
+): boolean | NumericFailure {
+  switch (functionId) {
+    case 'fg.lt':
+      return left < right;
+    case 'fg.le':
+      return left <= right;
+    case 'fg.gt':
+      return left > right;
+    case 'fg.ge':
+      return left >= right;
+    default:
+      return failure(
+        'INVALID_CONDITIONAL',
+        'A conditional test requires one numeric comparison.',
+      );
+  }
+}
+
+function evaluateTypedOperation(
+  functionId: string,
+  operands: readonly number[],
+  kinds: readonly NumericKind[],
+): NumericResult {
+  const [left, right] = operands;
+  const integerOperands = kinds.every((kind) => kind === 'int');
+  const withKind = (result: NumericResult, kind: NumericKind): NumericResult =>
+    result.ok
+      ? {
+          ...result,
+          value: kind === 'int' && result.value === 0 ? 0 : result.value,
+          numericKind: kind,
+        }
+      : result;
+  switch (functionId) {
+    case 'fg.add':
+      return integerOperands
+        ? withKind(add(left, right), 'int')
+        : validateNumber(left + right, 'float');
+    case 'fg.subtract':
+      return integerOperands
+        ? withKind(subtract(left, right), 'int')
+        : validateNumber(left - right, 'float');
+    case 'fg.multiply':
+      return integerOperands
+        ? withKind(multiply(left, right), 'int')
+        : validateNumber(left * right, 'float');
+    case 'fg.divide':
+      return right === 0
+        ? divide(left, right)
+        : validateNumber(left / right, 'float');
+    case 'fg.pow':
+      if ((left === 0 && right < 0) || (left < 0 && !Number.isInteger(right)))
+        return power(left, right);
+      return integerOperands && right >= 0
+        ? withKind(power(left, right), 'int')
+        : validateNumber(left ** right, 'float');
+    case 'fg.sqrt':
+      return left < 0
+        ? squareRoot(left)
+        : validateNumber(Math.sqrt(left), 'float');
+    case 'fg.uminus':
+      return validateNumber(
+        kinds[0] === 'int' && left === 0 ? 0 : -left,
+        kinds[0],
+      );
+    case 'fg.pi':
+      return validateNumber(Math.PI, 'float');
+    case 'fg.ceil':
+      return validateNumber(Math.ceil(left) || 0, 'int');
+    case 'fg.round':
+      return validateNumber(roundInteger(left), 'int');
+    case 'fg.max':
+      return left >= right
+        ? validateNumber(left, kinds[0])
+        : validateNumber(right, kinds[1]);
+    default:
+      return booleanResult();
+  }
+}
 
 type ResolvedOperation =
   | { readonly ok: true; readonly operation: Operation }
@@ -241,21 +395,25 @@ export function validateOperation(
 export function evaluateOperation(
   functionId: string,
   operands: readonly number[],
+  numericKinds?: readonly (NumericKind | undefined)[],
 ): NumericResult {
   const resolved = resolveOperation(functionId, operands.length);
   if (!resolved.ok) {
     return resolved;
   }
-  for (const operand of operands) {
-    const validated = validateNumber(operand);
+  for (const [index, operand] of operands.entries()) {
+    const validated = validateNumber(operand, numericKinds?.[index]);
     if (!validated.ok) {
       return validated;
     }
   }
-  if (resolved.operation.arity === 1) {
-    return resolved.operation.evaluate(operands[0]);
+  const kinds = numericKinds?.filter(
+    (kind): kind is NumericKind => kind !== undefined,
+  );
+  if (kinds !== undefined && kinds.length === operands.length) {
+    return evaluateTypedOperation(functionId, operands, kinds);
   }
-  return resolved.operation.evaluate(operands[0], operands[1]);
+  return resolved.operation.evaluate(...operands);
 }
 
 export function compareNumbers(
@@ -273,7 +431,9 @@ export function compareNumbers(
     comparison: {
       actual,
       expected,
-      absoluteError,
+      absoluteError: Number.isFinite(absoluteError)
+        ? absoluteError
+        : 'overflow',
       absoluteTolerance: numericPolicy.absoluteTolerance,
       relativeTolerance: numericPolicy.relativeTolerance,
     },

@@ -16,7 +16,8 @@ and arbitrary abbreviations do not identify a quantity.
 Define displayed notation separately with `symbol(glyph=...)`. Use qualified
 glyphs such as `r"A_{rect}"`, `r"w_{pan}"` and `r"\rho_{mat}"` for variables,
 including diagram labels. Bare one-letter variable glyphs are not acceptable in
-new calculations. Standard units such as `m` and `kg` remain unchanged.
+new calculations. When reproducing an identified external calculation, preserve its
+reference glyphs and record the reference URL in calculation metadata. Standard units such as `m` and `kg` remain unchanged.
 
 Keep qualifiers compact and explain them in the document. `rect`, `fp` and `sp`
 can mean rectangle, first panel and second panel. Inspect glyphs at normal PDF
@@ -36,7 +37,11 @@ parameters and defaults, need signature metadata or a legacy annotated
 Numeric declarations are runtime promises. An `int` parameter, documented
 assignment or public output must contain a Python `int`; floats such as `1.0`
 are rejected. A `float` declaration accepts Python `int` and `float` values
-within the supported numeric range. Execution preserves values without coercion
+within the supported numeric range: exact integers fit ±(2**53 - 1), while
+Python floats may use the full finite binary64 range. Execution records actual
+`numericKind` separately from the declared annotation. Older captures without
+kind evidence retain the conservative integer-valued range limit. See
+[the numeric evidence decision](adr/0005-python-numeric-kind-evidence.md). Execution preserves values without coercion
 and rejects booleans. Use `float` when a formula can produce a fractional value,
 including Python division. See [the decision](adr/0003-runtime-numeric-declarations.md).
 
@@ -79,7 +84,13 @@ for each invocation. See the
 ## Supported source and document content
 
 Supported formulas include numeric literals, references, unary minus, arithmetic
-`+`, `-`, `*`, `/`, `**` and `sqrt`. Legacy `given`, `calculation_call` and
+`+`, `-`, `*`, `/`, `**`, `sqrt` / `math.sqrt`, `math.pi` (or imported `pi`),
+`ceil` / `math.ceil`, one-argument `round`, and two-argument `max`. Python `round`
+uses ties to even and returns an integer. Conditional expressions
+`value_if_true if comparison else value_if_false` support single numeric
+comparisons `<`, `<=`, `>` and `>=`, including nested conditionals. Only the
+selected branch is evaluated; both branches must have supported structure.
+Comparisons cannot be returned as numeric quantities. Legacy `given`, `calculation_call` and
 `documented_result` remain readable. `documented_result` is an explicitly
 unverified result and blocks verified PDF generation.
 
@@ -106,6 +117,12 @@ the caller's symbol. Reusing a glyph across invocations qualifies child glyphs
 with their call-binding paths: `first_panel` and `second_panel` produce
 `A_{rect,fp}` and `A_{rect,sp}`. Nested paths retain every scope. Duplicate glyphs
 inside one invocation and unresolved collisions fail, including colliding initials.
+
+For a reference that deliberately reuses notation in distinct contexts, declare
+`symbol(..., notation_scope="x-axis")` and `notation_scope="y-axis"`. This preserves
+the authored glyph and records the context as `notationScope` in CSO and sheet
+symbols. Explain each scope in descriptions or section titles. Duplicate glyphs
+within the same scope still fail; an unscoped symbol belongs to the default scope.
 
 [Python glyph qualification](../packages/cso-python/src/cso_python/glyphs.py) and
 [core glyph validation](../packages/cso-core/src/contracts/glyphs.ts) define the

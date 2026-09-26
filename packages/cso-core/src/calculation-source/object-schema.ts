@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { NumericKindSchema } from '../contracts/numbers.ts';
 import { glyphIdentity } from '../contracts/glyphs.ts';
 import { parseNotation } from '../notation/parse.ts';
 import { supportedValueFunctionIds } from '../sheet-model/functions.ts';
@@ -26,7 +27,13 @@ const JsonObjectSchema: z.ZodType<Record<string, unknown>> = z
 
 export const CalculationSourceLiteralSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('empty') }).strict(),
-  z.object({ kind: z.literal('number'), value: z.number() }).strict(),
+  z
+    .object({
+      kind: z.literal('number'),
+      value: z.number(),
+      numericKind: NumericKindSchema.optional(),
+    })
+    .strict(),
   z.object({ kind: z.literal('string'), value: z.string() }).strict(),
   z.object({ kind: z.literal('boolean'), value: z.boolean() }).strict(),
 ]);
@@ -200,6 +207,7 @@ export const CalculationSourceSymbolSchema = z
   .object({
     id: IdSchema,
     glyph: z.string(),
+    notationScope: z.string().min(1).optional(),
     glyphPlaintext: z.string().optional(),
     description: z.string().optional(),
     unit: z.string().optional(),
@@ -577,7 +585,7 @@ const addDuplicateGlyphIssues = (
   ];
 
   for (const { symbol, path } of definitions) {
-    const identity = glyphIdentity(symbol.glyph);
+    const identity = glyphIdentity(symbol.glyph, symbol.notationScope);
     const previous = seen.get(identity);
     if (previous !== undefined && previous !== symbol.id) {
       ctx.addIssue({

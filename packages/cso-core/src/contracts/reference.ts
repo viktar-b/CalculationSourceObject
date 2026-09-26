@@ -1,10 +1,10 @@
 import { z } from 'zod';
+import { numericValueShape, refineNumericValue } from './numbers.ts';
 import {
   ExecutionBindingSchema,
   executionBindingKey,
   collectCsoSymbols,
   NonemptyStringSchema,
-  SupportedNumberSchema,
 } from './common.ts';
 import { ExecutionPayloadSchema } from './execution.ts';
 import type { VerificationReport } from './reports.ts';
@@ -21,11 +21,13 @@ export const ReferenceCaseSchema = z
     }),
     binding: ReferenceBindingSchema,
     expected: z.array(
-      z.strictObject({
-        symbolId: NonemptyStringSchema,
-        value: SupportedNumberSchema,
-        unit: z.string(),
-      }),
+      z
+        .strictObject({
+          symbolId: NonemptyStringSchema,
+          ...numericValueShape,
+          unit: z.string(),
+        })
+        .superRefine(refineNumericValue),
     ),
   })
   .superRefine((reference, ctx) => {

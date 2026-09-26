@@ -57,3 +57,6 @@ runtime mismatch.
 
 - [Authoring guide](../authoring.md#inputs-and-reusable-calculations)
 - [Code map](../code-map.md)
+
+[ADR-0005](0005-python-numeric-kind-evidence.md) subsequently adds actual numeric-kind
+evidence to captures; the runtime declaration rules in this decision remain unchanged.

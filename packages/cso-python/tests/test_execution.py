@@ -62,6 +62,113 @@ class ExecutionTest(unittest.TestCase):
             self.assertEqual(result["diagnostics"][0]["code"], expected, result)
         return result
 
+    def test_template_math_and_lazy_conditions(self):
+        self.entry.write_text(
+            "import math\n"
+            + source(
+                f"a: {SYMBOL} = given(x)\n"
+                f"b: {RESULT} = max(round(a), math.ceil(a)) + math.pi if a >= 0 else (math.sqrt(a) if a > 0 else -1)\n"
+                'return {"b": b}',
+                parameters="x: float = -4.0",
+            )
+        )
+        execution = self.success(self.run_case())
+        self.assertEqual(execution["authoring"]["outputs"][0]["value"], -1)
+        nodes = execution["cso"]["sections"][0]["items"][1]["symbol"]["valueTree"][
+            "nodes"
+        ]
+        functions = {n["funcSpec"]["id"] for n in nodes if n["mode"] == "FUNCTION"}
+        self.assertEqual(
+            functions,
+            {
+                "fg.cnd",
+                "fg.ge",
+                "fg.gt",
+                "fg.max",
+                "fg.round",
+                "fg.ceil",
+                "fg.add",
+                "fg.pi",
+                "fg.sqrt",
+            },
+        )
+        positive = self.success(self.run_case({"x": 2.5}))
+        self.assertAlmostEqual(
+            positive["authoring"]["outputs"][0]["value"], 6.141592653589793
+        )
+
+    def test_imported_pi_is_supported_and_cannot_be_shadowed(self):
+        self.entry.write_text(
+            "from math import pi\n"
+            + source(f'a: {SYMBOL} = given(x)\nb: {RESULT} = pi * a\nreturn {{"b": b}}')
+        )
+        execution = self.success(self.run_case())
+        nodes = execution["cso"]["sections"][0]["items"][1]["symbol"]["valueTree"][
+            "nodes"
+        ]
+        self.assertTrue(any(n.get("funcSpec", {}).get("id") == "fg.pi" for n in nodes))
+        self.entry.write_text(
+            "from math import pi\n"
+            + source(
+                f'b: {RESULT} = pi + 1\nreturn {{"b": b}}',
+                parameters=f"pi: {SYMBOL} = 2.0",
+            )
+        )
+        self.reject_before_execution("UNSUPPORTED_SIGNATURE")
+
+    def test_float_kind_survives_json_and_large_intermediates(self):
+        self.entry.write_text(
+            source(
+                f"a: {SYMBOL} = given(x)\n"
+                f'b: {RESULT} = a * 100000.0\nreturn {{"b": b}}',
+                parameters="x: float = 1e20",
+            )
+        )
+        execution = self.success(self.run_case())
+        self.assertEqual(
+            execution["invocations"][0]["inputBindings"][0]["numericKind"], "float"
+        )
+        self.assertEqual(execution["observations"][1]["numericKind"], "float")
+        self.assertEqual(execution["observations"][1]["value"], 1e25)
+        self.entry.write_text(
+            source(f'a: {SYMBOL} = 9007199254740992\nreturn {{"a": a}}')
+        )
+        self.reject_before_execution("UNSUPPORTED_NUMERIC_RANGE")
+
+    def test_explicit_notation_scope_retains_reference_glyphs(self):
+        self.entry.write_text(
+            source(
+                'a: Annotated[float, symbol(glyph="Z_{web}", description="X web term", unit="mm^3", notation_scope="x")] = 1\n'
+                'b: Annotated[float, symbol(glyph="Z_{web}", description="Y web term", unit="mm^3", notation_scope="y")] = 2\n'
+                'return {"a": a, "b": b}',
+                parameters="",
+            )
+        )
+        execution = self.success(self.run_case())
+        symbols = [i["symbol"] for i in execution["cso"]["sections"][0]["items"]]
+        self.assertEqual([s["glyph"] for s in symbols], ["Z_{web}", "Z_{web}"])
+        self.assertEqual([s["notationScope"] for s in symbols], ["x", "y"])
+        self.entry.write_text(
+            self.entry.read_text().replace('notation_scope="y"', 'notation_scope="x"')
+        )
+        self.reject_before_execution("DUPLICATE_GLYPH")
+
+    def test_rejects_unbounded_function_signatures_and_boolean_results(self):
+        for expression in (
+            "round(a, 2)",
+            "max(a, 2, 3)",
+            "a < 0",
+            "1 if a else 0",
+            "1 if 0 < a < 2 else 0",
+        ):
+            with self.subTest(expression=expression):
+                self.entry.write_text(
+                    source(
+                        f'a: {SYMBOL} = given(x)\nb: {RESULT} = {expression}\nreturn {{"b": b}}'
+                    )
+                )
+                self.reject_before_execution("UNSUPPORTED_SYNTAX")
+
     def test_exact_bytes_namespace_bindings_and_observations(self):
         execution = self.success(self.run_case())
         self.assertEqual(
@@ -387,7 +494,9 @@ class ExecutionTest(unittest.TestCase):
         )
         self.success(self.run_case())
         namespace = {"__name__": "direct", "__file__": str(self.entry)}
-        exec(compile(self.entry.read_bytes(), str(self.entry), "exec"), namespace)  # noqa: S102
+        exec(
+            compile(self.entry.read_bytes(), str(self.entry), "exec"), namespace
+        )  # noqa: S102
         self.assertEqual(namespace["calculate"]()["b"], 8)
 
     def test_export_rejects_aliased_content_instead_of_dropping_it(self):

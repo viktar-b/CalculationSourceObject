@@ -87,6 +87,9 @@ const convertSourceValueNode = (
 const convertSourceSymbol = (symbol: CalculationSourceSymbol): SheetSymbol => ({
   id: symbol.id,
   glyph: symbol.glyph,
+  ...(symbol.notationScope === undefined
+    ? {}
+    : { notationScope: symbol.notationScope }),
   glyphCodeName: deriveGlyphCodeName({
     id: symbol.id,
     glyph: symbol.glyph,

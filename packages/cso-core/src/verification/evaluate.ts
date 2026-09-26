@@ -1,3 +1,4 @@
+import type { NumericKind } from '../contracts/numbers.ts';
 import type {
   CalculationSourceSymbol,
   CalculationSourceValueNode,
@@ -16,12 +17,17 @@ import type {
 import {
   type NumericResult,
   evaluateOperation,
+  evaluateComparison,
   validateNumber,
   validateOperation,
 } from './numeric.ts';
 
 export type EvaluationResult =
-  | { readonly ok: true; readonly value: number }
+  | {
+      readonly ok: true;
+      readonly value: number;
+      readonly numericKind?: NumericKind;
+    }
   | { readonly ok: false; readonly diagnostics: readonly Diagnostic[] };
 
 type EvaluationFailure = Extract<EvaluationResult, { readonly ok: false }>;
@@ -45,7 +51,11 @@ export interface FormulaEvaluator {
 
 type EvaluationState =
   | { readonly kind: 'visiting' }
-  | { readonly kind: 'resolved'; readonly value: number }
+  | {
+      readonly kind: 'resolved';
+      readonly value: number;
+      readonly numericKind?: NumericKind;
+    }
   | { readonly kind: 'failed'; readonly diagnostics: readonly Diagnostic[] };
 
 type StructureState =
@@ -97,7 +107,13 @@ const memoized = (
 ): EvaluationResult | undefined => {
   const state = states.get(key);
   if (state?.kind === 'resolved') {
-    return { ok: true, value: state.value };
+    return {
+      ok: true,
+      value: state.value,
+      ...(state.numericKind === undefined
+        ? {}
+        : { numericKind: state.numericKind }),
+    };
   }
   if (state?.kind === 'failed') {
     return { ok: false, diagnostics: state.diagnostics };
@@ -113,7 +129,13 @@ const store = (
   states.set(
     key,
     result.ok
-      ? { kind: 'resolved', value: result.value }
+      ? {
+          kind: 'resolved',
+          value: result.value,
+          ...(result.numericKind === undefined
+            ? {}
+            : { numericKind: result.numericKind }),
+        }
       : { kind: 'failed', diagnostics: result.diagnostics },
   );
   return result;
@@ -311,7 +333,44 @@ export const createFormulaEvaluator = (
     const graph = graphs.get(address.symbolId);
     const node = graph?.nodes.get(address.nodeKey);
     if (graph === undefined || node === undefined) {
-      return undefined;
+      return failure(
+        diagnostic({
+          address,
+          code: 'MISSING_FORMULA_OPERAND',
+          message:
+            'Conditional formula structure contains an unresolved operand.',
+        }),
+      );
+    }
+    if (node.mode === 'FUNCTION') {
+      if (node.funcSpec == null || node.funcArgs === undefined) {
+        return failure(
+          diagnostic({
+            address,
+            code: 'MISSING_FUNCTION_PAYLOAD',
+            message:
+              'Conditional formula structure has an incomplete function.',
+          }),
+        );
+      }
+      const shape = validateOperation(node.funcSpec.id, node.funcArgs.length);
+      if (!shape.ok)
+        return failure(
+          diagnostic({ address, code: shape.code, message: shape.message }),
+        );
+    }
+    if (
+      node.mode === 'SYMBOL' &&
+      (node.symbol == null || !graphs.has(node.symbol.id))
+    ) {
+      return failure(
+        diagnostic({
+          address,
+          code: 'UNRESOLVED_SYMBOL_REFERENCE',
+          message:
+            'Conditional formula structure contains an unresolved symbol.',
+        }),
+      );
     }
 
     structureStates.set(key, { kind: 'visiting' });
@@ -357,7 +416,10 @@ export const createFormulaEvaluator = (
         }),
       );
     }
-    return numericEvaluation(address, validateNumber(node.literal.value));
+    return numericEvaluation(
+      address,
+      validateNumber(node.literal.value, node.literal.numericKind),
+    );
   }
 
   function evaluateSymbolReference(
@@ -419,6 +481,9 @@ export const createFormulaEvaluator = (
     if (!shape.ok) {
       return numericEvaluation(address, shape);
     }
+    if (node.funcSpec.id === 'fg.cnd') {
+      return evaluateConditional(graph, node, stack);
+    }
     const results = node.funcArgs.map((argument) =>
       evaluateNode({ symbolId: graph.symbol.id, nodeKey: argument.key }, stack),
     );
@@ -433,7 +498,55 @@ export const createFormulaEvaluator = (
     );
     return numericEvaluation(
       address,
-      evaluateOperation(node.funcSpec.id, operands),
+      evaluateOperation(
+        node.funcSpec.id,
+        operands,
+        results.flatMap((result) => (result.ok ? [result.numericKind] : [])),
+      ),
+    );
+  }
+
+  function evaluateConditional(
+    graph: FormulaGraph,
+    node: CalculationSourceValueNode,
+    stack: readonly NodeAddress[],
+  ): EvaluationResult {
+    const address = { symbolId: graph.symbol.id, nodeKey: node.key };
+    const structuralFailure = validateStructure(address);
+    if (structuralFailure !== undefined) return structuralFailure;
+    const args = node.funcArgs ?? [];
+    const test = graph.nodes.get(args[0].key);
+    if (
+      test?.mode !== 'FUNCTION' ||
+      test.funcSpec == null ||
+      test.funcArgs?.length !== 2
+    ) {
+      return numericEvaluation(address, {
+        ok: false,
+        code: 'INVALID_CONDITIONAL',
+        message: 'A conditional test requires one numeric comparison.',
+      });
+    }
+    const left = evaluateNode(
+      { symbolId: graph.symbol.id, nodeKey: test.funcArgs[0].key },
+      stack,
+    );
+    const right = evaluateNode(
+      { symbolId: graph.symbol.id, nodeKey: test.funcArgs[1].key },
+      stack,
+    );
+    if (!left.ok) return left;
+    if (!right.ok) return right;
+    const selected = evaluateComparison(
+      test.funcSpec.id,
+      left.value,
+      right.value,
+    );
+    if (typeof selected !== 'boolean')
+      return numericEvaluation(address, selected);
+    return evaluateNode(
+      { symbolId: graph.symbol.id, nodeKey: args[selected ? 1 : 2].key },
+      stack,
     );
   }
 
@@ -520,7 +633,10 @@ export const createFormulaEvaluator = (
     if (definition.givenSource.kind === 'literal') {
       return numericEvaluation(
         address,
-        validateNumber(definition.givenSource.value),
+        validateNumber(
+          definition.givenSource.value,
+          definition.givenSource.numericKind,
+        ),
       );
     }
     const parameterName = definition.givenSource.parameterName;
@@ -539,7 +655,10 @@ export const createFormulaEvaluator = (
     if (binding.kind === 'callerSymbol') {
       return evaluateSemanticSymbol(binding.source.symbolId, stack);
     }
-    return numericEvaluation(address, validateNumber(binding.value));
+    return numericEvaluation(
+      address,
+      validateNumber(binding.value, binding.numericKind),
+    );
   }
 
   function evaluateSemanticSymbol(
@@ -583,7 +702,10 @@ export const createFormulaEvaluator = (
       case 'constant':
         result = numericEvaluation(
           address,
-          validateNumber(definition.literal.value),
+          validateNumber(
+            definition.literal.value,
+            definition.literal.numericKind,
+          ),
         );
         break;
       case 'formula': {
