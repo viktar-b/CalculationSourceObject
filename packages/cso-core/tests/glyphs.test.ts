@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
-import { glyphIdentity, scopedGlyph } from '../src/contracts/glyphs.ts';
+import { symbolDisplayIdentity, scopedGlyph } from '../src/contracts/glyphs.ts';
+const glyphIdentity = (glyph: string) => symbolDisplayIdentity({ glyph });
 it('preserves existing scripts and distinguishes full nested call paths', () => {
   expect(scopedGlyph('A_s', 'a,child')).toBe('A_{s,a,child}');
   expect(scopedGlyph('A_{s}', 'b,child')).toBe('A_{s,b,child}');

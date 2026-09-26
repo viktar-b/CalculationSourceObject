@@ -10,10 +10,7 @@ import {
   getFunctionBinaryOperatorById,
   getFunctionSpec,
 } from '@cs-object/core';
-import {
-  emptyLiteral,
-  isSheetLiteralEmpty,
-} from '@cs-object/core';
+import { emptyLiteral, isSheetLiteralEmpty } from '@cs-object/core';
 import {
   getSymbolById,
   getValueNodeByKey,
@@ -137,15 +134,39 @@ const ValueTreeFunctionMathmlView = ({
   const argNodes = node.argKeys.map((argKey) =>
     getValueNodeByKey(valueTree, argKey),
   );
-  const argReactNodes = argNodes.map((argNode) => (
-    <ValueTreeNodeMathmlView
-      key={argNode.key}
-      sheet={sheet}
-      valueTree={valueTree}
-      node={argNode}
-      viewOptions={viewOptions}
-    />
-  ));
+  const argReactNodes = argNodes.map((argNode, index) => {
+    const rendered = (
+      <ValueTreeNodeMathmlView
+        key={argNode.key}
+        sheet={sheet}
+        valueTree={valueTree}
+        node={argNode}
+        viewOptions={viewOptions}
+      />
+    );
+    const literal =
+      argNode.kind === 'literal'
+        ? argNode.value
+        : argNode.kind === 'symbol' && viewOptions.numerical
+          ? getSymbolById(sheet, argNode.symbolId)?.valueTree.result
+          : undefined;
+    const negative =
+      literal?.kind === 'number' &&
+      (literal.value < 0 || Object.is(literal.value, -0));
+    // Special MathML structures bypass the binary-operator grouping below.
+    const grouped =
+      index === 0 &&
+      ((node.functionId === 'fg.pow' &&
+        (argNode.kind === 'function' || negative)) ||
+        (node.functionId === 'fg.uminus' && argNode.kind === 'function'));
+    return grouped ? (
+      <SymbolValueGroupMathmlView key={argNode.key} cursor={undefined}>
+        {[rendered]}
+      </SymbolValueGroupMathmlView>
+    ) : (
+      rendered
+    );
+  });
 
   const specialFunction = renderSpecialValueFunction({
     functionId: node.functionId,

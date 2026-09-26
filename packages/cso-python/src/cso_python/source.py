@@ -27,23 +27,27 @@ HELPERS = {
 IMPORTS = {
     "__future__": {"annotations"},
     "typing": {"Annotated", "Any", "TypeAlias"},
-    "math": {"sqrt", "isclose"},
+    "math": {"sqrt", "ceil", "pi", "isclose"},
     "cso_python": HELPERS,
 }
 
 
 def authoring_name(node: ast.AST) -> str | None:
-    """Recognize bare imports and the one supported qualified helper."""
+    """Recognize bare imports and supported qualified math names."""
     if isinstance(node, ast.Name):
         return node.id
     if (
         isinstance(node, ast.Attribute)
         and isinstance(node.value, ast.Name)
         and node.value.id == "math"
-        and node.attr == "sqrt"
+        and node.attr in {"sqrt", "ceil", "pi"}
     ):
-        return "math.sqrt"
+        return "math." + node.attr
     return None
+
+
+def numeric_kind(value: int | float) -> str:
+    return "int" if type(value) is int else "float"
 
 
 def compact(value: Any) -> str:
@@ -101,15 +105,13 @@ def number(
         code = "UNSUPPORTED_RESULT"
     elif isinstance(value, float) and not math.isfinite(value):
         code = "NON_FINITE_VALUE"
-    elif (isinstance(value, int) or value.is_integer()) and abs(value) > 2**53 - 1:
+    elif isinstance(value, int) and abs(value) > 2**53 - 1:
         code = "UNSUPPORTED_NUMERIC_RANGE"
     if code:
         kind = (
             "python-int"
             if type(value) is int
-            else "python-float"
-            if type(value) is float
-            else "unsupported"
+            else "python-float" if type(value) is float else "unsupported"
         )
         display = (
             hex(value)

@@ -42,3 +42,8 @@ test-results/
 
 # Vercel local project link
 .vercel/
+
+/prototypes/
+
+# Local tickets and specs
+.scratch/

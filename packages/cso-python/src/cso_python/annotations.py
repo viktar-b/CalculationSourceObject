@@ -40,7 +40,15 @@ def annotation(
         spec = kwargs(
             node.slice.elts[1],
             module,
-            {"id", "root_key", "glyph", "description", "unit", "comment"},
+            {
+                "id",
+                "root_key",
+                "glyph",
+                "description",
+                "unit",
+                "comment",
+                "notation_scope",
+            },
             {"glyph", "description", "unit"},
         )
         return Annotation(base.numeric_type, spec)

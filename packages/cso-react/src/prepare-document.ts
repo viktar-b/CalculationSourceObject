@@ -1,4 +1,5 @@
 import {
+  executionBindingFrom,
   AssetRecordSchema,
   BoundPreparedDocumentSchema,
   type CalculationSourceObject,
@@ -533,11 +534,7 @@ export const prepareExecutionDocument = (
     context: [],
     source: {
       kind: 'execution',
-      entryModuleId: execution.entry.moduleId,
-      entrySourceHash: execution.entry.sourceHash,
-      sourceClosureHash: execution.sourceClosureHash,
-      function: execution.entry.function,
-      resolvedInputs: execution.entry.resolvedInputs,
+      ...executionBindingFrom(execution),
     },
     sourceMetadata: cso.source.metadata,
     title: cso.title,

@@ -128,6 +128,7 @@ export {
 export { assertNever } from './shared/assertNever.ts';
 export { formatNumerical } from './shared/formatNumerical.ts';
 
+export { symbolDisplayIdentity } from './contracts/glyphs.ts';
 export { notationIdentity } from './notation/identity.ts';
 export { parseNotation } from './notation/parse.ts';
 export type {
@@ -176,6 +177,7 @@ export {
   type Versions,
 } from './contracts/common.ts';
 export {
+  executionBindingFrom,
   ExecutionPayloadSchema,
   ExecutionResponseSchema,
   GivenSourceSchema,

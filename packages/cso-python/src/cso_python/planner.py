@@ -24,6 +24,7 @@ from .source import (
     literal,
     number,
     numeric_literal,
+    numeric_kind,
     span,
 )
 
@@ -33,6 +34,16 @@ OPS = {
     ast.Mult: "fg.multiply",
     ast.Div: "fg.divide",
     ast.Pow: "fg.pow",
+}
+
+COMPARISONS = {ast.Lt: "fg.lt", ast.LtE: "fg.le", ast.Gt: "fg.gt", ast.GtE: "fg.ge"}
+CALLS = {
+    "sqrt": ("fg.sqrt", 1),
+    "math.sqrt": ("fg.sqrt", 1),
+    "ceil": ("fg.ceil", 1),
+    "math.ceil": ("fg.ceil", 1),
+    "round": ("fg.round", 1),
+    "max": ("fg.max", 2),
 }
 
 
@@ -300,7 +311,12 @@ class Planner:
                 value = number(provided[name], stage="usage")
                 rec.update(kind="entrySupplied", value=value)
                 record["resolvedInputs"][name] = value
+            if "value" in rec:
+                rec["numericKind"] = numeric_kind(rec["value"])
             record["inputBindings"].append(rec)
+        record["resolvedInputKinds"] = {
+            name: numeric_kind(value) for name, value in record["resolvedInputs"].items()
+        }
         self.invocations.append(inv)
         self.sections.append(section_obj)
         for name, param in parameters.items():
@@ -414,6 +430,11 @@ class Planner:
         }
         cso = {
             "id": sid,
+            **(
+                {"notationScope": spec["notation_scope"]}
+                if "notation_scope" in spec
+                else {}
+            ),
             "glyph": spec["glyph"],
             "glyphPlaintext": spec["glyph"],
             "description": spec["description"],
@@ -425,7 +446,11 @@ class Planner:
                     {
                         "key": "n1",
                         "mode": "LITERAL",
-                        "literal": {"kind": "number", "value": binding["value"]},
+                        "literal": {
+                            "kind": "number",
+                            "value": binding["value"],
+                            "numericKind": binding["numericKind"],
+                        },
                     }
                 ],
             },
@@ -487,7 +512,7 @@ class Planner:
     ) -> list[Json]:
         nodes: list[Json] = []
 
-        def lower(node: ast.expr) -> str:
+        def lower(node: ast.expr, *, condition: bool = False) -> str:
             key = f"n{len(nodes) + 1}"
             item: Json = {
                 "key": key,
@@ -497,16 +522,63 @@ class Planner:
                 },
             }
             nodes.append(item)
+            if condition and not isinstance(node, ast.Compare):
+                self.error(
+                    inv,
+                    node,
+                    "UNSUPPORTED_SYNTAX",
+                    "A conditional test requires one numeric comparison",
+                )
             if numeric_literal(node):
                 item.update(
                     draft=str(literal(node, inv.module.id)),
                     mode="LITERAL",
                     literal={
                         "kind": "number",
+                        "numericKind": numeric_kind(literal(node, inv.module.id)),
                         "value": number(
                             literal(node, inv.module.id), span(inv.module.id, node)
                         ),
                     },
+                )
+            elif authoring_name(node) == "math.pi" or (
+                authoring_name(node) == "pi" and "pi" in inv.module.imported
+            ):
+                imported = "math" if authoring_name(node) == "math.pi" else "pi"
+                if imported not in inv.module.imported:
+                    self.error(
+                        inv, node, "UNSUPPORTED_SYNTAX", "Unimported math constant"
+                    )
+                item.update(mode="FUNCTION", funcSpec={"id": "fg.pi"}, funcArgs=[])
+            elif isinstance(node, ast.IfExp):
+                item.update(
+                    mode="FUNCTION",
+                    funcSpec={"id": "fg.cnd"},
+                    funcArgs=[
+                        {"key": lower(node.test, condition=True)},
+                        {"key": lower(node.body)},
+                        {"key": lower(node.orelse)},
+                    ],
+                )
+            elif isinstance(node, ast.Compare):
+                if (
+                    not condition
+                    or len(node.ops) != 1
+                    or type(node.ops[0]) not in COMPARISONS
+                ):
+                    self.error(
+                        inv,
+                        node,
+                        "UNSUPPORTED_SYNTAX",
+                        "Comparisons are supported only as single conditional tests",
+                    )
+                item.update(
+                    mode="FUNCTION",
+                    funcSpec={"id": COMPARISONS[type(node.ops[0])]},
+                    funcArgs=[
+                        {"key": lower(node.left)},
+                        {"key": lower(node.comparators[0])},
+                    ],
                 )
             elif isinstance(node, (ast.Name, ast.Subscript)):
                 item.update(
@@ -534,9 +606,9 @@ class Planner:
             elif isinstance(node, ast.Call):
                 name = authoring_name(node.func)
                 if (
-                    name not in {"given", "documented_result", "sqrt", "math.sqrt"}
+                    name not in {"given", "documented_result", *CALLS}
                     or node.keywords
-                    or len(node.args) != 1
+                    or len(node.args) != (CALLS[name][1] if name in CALLS else 1)
                 ):
                     self.error(
                         inv,
@@ -544,8 +616,28 @@ class Planner:
                         "UNSUPPORTED_SYNTAX",
                         "Unsupported formula call or arity",
                     )
-                imported = "math" if name == "math.sqrt" else name
-                if imported not in inv.module.imported:
+                if name in {"round", "max"} and (
+                    name in inv.parameters
+                    or name in inv.module.imported
+                    or name in inv.module.functions
+                    or name in inv.module.aliases
+                    or name in inv.module.handles
+                    or any(
+                        isinstance(bound, ast.Name)
+                        and isinstance(bound.ctx, ast.Store)
+                        and bound.id == name
+                        for bound in ast.walk(inv.function)
+                    )
+                ):
+                    self.error(
+                        inv, node, "SHADOWED_HELPER",
+                        f"Formula helper {name} is shadowed by a Python binding",
+                    )
+                imported = "math" if name.startswith("math.") else name
+                if (
+                    imported not in {"round", "max"}
+                    and imported not in inv.module.imported
+                ):
                     self.error(
                         inv, node, "UNSUPPORTED_SYNTAX", f"Unimported helper {name}"
                     )
@@ -572,13 +664,20 @@ class Planner:
                         else:
                             item.update(
                                 mode="LITERAL",
-                                literal={"kind": "number", "value": binding["value"]},
+                                literal={
+                                    "kind": "number",
+                                    "value": binding["value"],
+                                    "numericKind": binding["numericKind"],
+                                },
                             )
                     elif numeric_literal(arg):
                         item.update(
                             mode="LITERAL",
                             literal={
                                 "kind": "number",
+                                "numericKind": numeric_kind(
+                                    literal(arg, inv.module.id)
+                                ),
                                 "value": number(
                                     literal(arg, inv.module.id),
                                     span(inv.module.id, arg),
@@ -606,8 +705,8 @@ class Planner:
                 else:
                     item.update(
                         mode="FUNCTION",
-                        funcSpec={"id": "fg.sqrt"},
-                        funcArgs=[{"key": lower(arg)}],
+                        funcSpec={"id": CALLS[name][0]},
+                        funcArgs=[{"key": lower(argument)} for argument in node.args],
                     )
             else:
                 self.error(
@@ -708,9 +807,7 @@ class Planner:
                         "DUPLICATE_IDENTITY",
                         "Symbols need unique simple names distinct from imports",
                     )
-                declared = symbol_annotation(
-                    node, inv.module.id, inv.module.aliases
-                )
+                declared = symbol_annotation(node, inv.module.id, inv.module.aliases)
                 spec = declared.metadata
                 name = node.target.id
                 local = spec.get("id", name)
@@ -757,6 +854,7 @@ class Planner:
                         else {
                             "kind": "literal",
                             "value": literal(arg, inv.module.id),
+                            "numericKind": numeric_kind(literal(arg, inv.module.id)),
                             "location": span(inv.module.id, arg),
                         }
                     )
@@ -766,6 +864,7 @@ class Planner:
                         kind="constant",
                         literal={
                             "value": literal(expr, inv.module.id),
+                            "numericKind": numeric_kind(literal(expr, inv.module.id)),
                             "location": span(inv.module.id, expr),
                         },
                     )
@@ -782,6 +881,11 @@ class Planner:
                     )
                 symbol = {
                     "id": sid,
+                    **(
+                        {"notationScope": spec["notation_scope"]}
+                        if "notation_scope" in spec
+                        else {}
+                    ),
                     "glyph": spec["glyph"],
                     "glyphPlaintext": spec["glyph"],
                     "description": spec["description"],

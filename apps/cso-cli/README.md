@@ -39,12 +39,22 @@ Hidden documented intermediates remain covered. V1 has no public-output evidence
 so its output check is not applicable.
 
 The [numeric implementation](../../packages/cso-core/src/verification/numeric.ts)
-uses finite real numbers with integer-valued inputs, intermediates and results
-within the safe integer range. Its fixed comparison is:
+uses finite binary64 floats and exact Python integers within the safe integer
+range. New captures retain actual numeric kinds through literals, bindings,
+observations and public outputs. Core propagates kinds independently through
+formulas; division and square roots produce floats. Older captures without kind
+evidence retain the conservative integer-valued range limit. Conditional formulas
+evaluate only their selected branch after checking the complete graph structure.
+The [authoring guide](../../docs/authoring.md#supported-source-and-document-content)
+lists supported functions. The fixed comparison is:
 
 ```text
 abs(actual - expected) <= max(1e-9, 1e-12 * max(abs(actual), abs(expected)))
 ```
+
+An absolute difference outside the finite binary64 range is reported as
+`absoluteError: "overflow"` and fails agreement. Reference expected values may
+include `numericKind: "float"` for finite values beyond the safe integer range.
 
 Mismatch diagnostics retain compared values, error, tolerances, symbol and
 available source location. The absolute tolerance applies in the declared unit.

@@ -1,3 +1,4 @@
+import type { NumericKind } from '../contracts/numbers.ts';
 import { z } from 'zod';
 import {
   type CalculationSourceLiteral,
@@ -12,8 +13,10 @@ import {
   SourceSpanSchema,
   collectCsoSymbols,
   executionBindingKey,
+  resolvedInputKind,
 } from '../contracts/common.ts';
 import {
+  executionBindingFrom,
   type ExecutionPayload,
   ExecutionPayloadSchema,
   type InputBinding,
@@ -68,8 +71,11 @@ interface BindingCheck {
   readonly diagnostics: readonly Diagnostic[];
 }
 
-const validatedEvaluation = (value: number): EvaluationResult => {
-  const validated = validateNumber(value);
+const validatedEvaluation = (
+  value: number,
+  numericKind?: NumericKind,
+): EvaluationResult => {
+  const validated = validateNumber(value, numericKind);
   return validated.ok
     ? validated
     : {
@@ -304,13 +310,7 @@ const applyReferenceIssueContext = (
       if (
         binding.success &&
         executionBindingKey(binding.data) ===
-          executionBindingKey({
-            entryModuleId: referenceExecution.entry.moduleId,
-            entrySourceHash: referenceExecution.entry.sourceHash,
-            sourceClosureHash: referenceExecution.sourceClosureHash,
-            function: referenceExecution.entry.function,
-            resolvedInputs: referenceExecution.entry.resolvedInputs,
-          })
+          executionBindingKey(executionBindingFrom(referenceExecution))
       ) {
         execution = referenceExecution;
       }
@@ -665,17 +665,19 @@ const bindingLocations = (
 
 const checkBinding = ({
   binding,
+  entry,
   evaluator,
   invocation,
 }: {
   readonly binding: InputBinding;
+  readonly entry: ExecutionPayload['entry'];
   readonly evaluator: FormulaEvaluator;
   readonly invocation: Invocation;
 }): BindingCheck => {
   const expected =
     binding.kind === 'callerSymbol'
       ? evaluator.evaluateSymbol(binding.source.symbolId)
-      : validatedEvaluation(binding.value);
+      : validatedEvaluation(binding.value, binding.numericKind);
   if (!expected.ok) {
     const diagnostics = 'diagnostics' in expected ? expected.diagnostics : [];
     return {
@@ -699,6 +701,36 @@ const checkBinding = ({
     };
   }
 
+  const capturedKind = resolvedInputKind(invocation, binding.parameterName);
+  const entryKind =
+    invocation.id === 'root'
+      ? resolvedInputKind(entry, binding.parameterName)
+      : undefined;
+  if (
+    expected.numericKind !== undefined &&
+    [capturedKind, entryKind].some(
+      (kind) => kind !== undefined && kind !== expected.numericKind,
+    )
+  ) {
+    return {
+      expected,
+      passed: false,
+      diagnostics: [
+        {
+          code: 'INPUT_NUMERIC_KIND_MISMATCH',
+          message: `Resolved input '${binding.parameterName}' differs from its authoritative numeric kind.`,
+          stage: 'verification',
+          check: 'inputConsistency',
+          invocationId: invocation.id,
+          location: binding.parameterLocation,
+          ...callChainFields(evaluator, invocation.id),
+          ...(bindingLocations(binding).length > 0
+            ? { relatedLocations: [...bindingLocations(binding)] }
+            : {}),
+        },
+      ],
+    };
+  }
   const resolved = invocation.resolvedInputs[binding.parameterName];
   const comparison = compareNumbers(resolved, expected.value);
   if (comparison.matches) {
@@ -744,7 +776,7 @@ const numericLiteral = (
       ],
     };
   }
-  const validated = validateNumber(literal.value);
+  const validated = validateNumber(literal.value, literal.numericKind);
   return validated.ok
     ? validated
     : {
@@ -955,9 +987,15 @@ const resolveDefinitionSourceValue = ({
   let passed = true;
   let expected: EvaluationResult;
   if (definition.kind === 'constant') {
-    expected = validatedEvaluation(definition.literal.value);
+    expected = validatedEvaluation(
+      definition.literal.value,
+      definition.literal.numericKind,
+    );
   } else if (definition.givenSource.kind === 'literal') {
-    expected = validatedEvaluation(definition.givenSource.value);
+    expected = validatedEvaluation(
+      definition.givenSource.value,
+      definition.givenSource.numericKind,
+    );
   } else {
     const key = JSON.stringify([
       invocation.id,
@@ -1169,7 +1207,15 @@ const verifyDefinitions = ({
   for (const invocation of execution.invocations) {
     for (const binding of invocation.inputBindings) {
       const key = JSON.stringify([invocation.id, binding.parameterName]);
-      bindingChecks.set(key, checkBinding({ binding, evaluator, invocation }));
+      bindingChecks.set(
+        key,
+        checkBinding({
+          binding,
+          entry: execution.entry,
+          evaluator,
+          invocation,
+        }),
+      );
     }
   }
 
@@ -1311,13 +1357,7 @@ const verifyReferences = ({
       }),
     };
   }
-  const bindingKey = executionBindingKey({
-    entryModuleId: execution.entry.moduleId,
-    entrySourceHash: execution.entry.sourceHash,
-    sourceClosureHash: execution.sourceClosureHash,
-    function: execution.entry.function,
-    resolvedInputs: execution.entry.resolvedInputs,
-  });
+  const bindingKey = executionBindingKey(executionBindingFrom(execution));
   const reference = parsed.data.find(
     (candidate) => executionBindingKey(candidate.binding) === bindingKey,
   );

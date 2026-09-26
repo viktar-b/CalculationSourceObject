@@ -118,7 +118,7 @@ test('prepares the canonical width-2 document with its execution and verificatio
     );
     expect(
       symbols.find(({ glyph }) => glyph === 'A_{tot}')?.valueTree.result,
-    ).toEqual({ kind: 'number', value: 14 });
+    ).toEqual({ kind: 'number', value: 14, numericKind: 'int' });
     const volume = symbols.find(({ glyph }) => glyph === 'V_{mat}')?.valueTree
       .result;
     const mass = symbols.find(({ glyph }) => glyph === 'm_{mat}')?.valueTree

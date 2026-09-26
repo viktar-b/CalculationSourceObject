@@ -702,6 +702,25 @@ describe('verifyExecution', () => {
     }
   });
 
+  test('retains the caller context for a nested input kind mismatch', () => {
+    const execution = fixtureExecution('child-defaults-success');
+    const child = execution.invocations.find((invocation) => 'parentInvocationId' in invocation);
+    if (!child || !('callSite' in child)) throw new Error('Missing child');
+    const binding = child.inputBindings.find((item) => item.kind === 'callerLiteral');
+    if (!binding || binding.kind !== 'callerLiteral') throw new Error('Missing caller literal');
+    binding.numericKind = 'float';
+    child.resolvedInputKinds = { [binding.parameterName]: 'int' };
+    const report = verifyExecution({ execution });
+    expect(report.ok).toBe(false);
+    expect(report.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'INPUT_NUMERIC_KIND_MISMATCH',
+      invocationId: child.id,
+      location: binding.parameterLocation,
+      callChain: [child.callSite],
+      relatedLocations: [binding.callerLocation],
+    }));
+  });
+
   test('rejects extreme finite values before constructing comparisons', () => {
     for (const value of [1e308, -1e308]) {
       for (const target of ['runtime', 'literal', 'cache', 'reference']) {
@@ -733,12 +752,13 @@ describe('verifyExecution', () => {
         expect(report.ok).toBe(false);
         const diagnostic = required(
           report.diagnostics.find(
-            (item) => item.code === 'UNSUPPORTED_NUMERIC_RANGE',
+            (item) =>
+              item.code === 'UNSUPPORTED_NUMERIC_RANGE' &&
+              item.valueDisplay?.text === String(value),
           ),
           `Missing range diagnostic for ${target}.`,
         );
         expect(diagnostic.comparison).toBeUndefined();
-        expect(diagnostic.valueDisplay?.text).toBe(String(value));
       }
     }
   });

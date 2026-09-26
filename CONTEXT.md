@@ -20,14 +20,25 @@ _Avoid_: calling a rendered sheet the complete calculation source.
 
 **Symbol**:
 A named quantity with a displayed glyph, descriptive metadata, and a value.
+Its display identity combines normalized glyph notation with its authored
+notation scope; it is separate from the symbol reference identity.
 
 **Value tree**:
 A formula represented by literal values, symbol references, and function
 applications, with a designated root and a documented result.
 
+**Numeric evidence**:
+A recorded quantity's value and, when captured, its actual integer or
+floating-point kind. Its kind is distinct from the quantity's declared type.
+
 **FormulaSheet**:
 The reviewable presentation of a calculation's rows, mathematical notation,
 substitutions, units, explanations, and results.
+
+**Calculation report**:
+The reviewable engineering narrative for one source revision, selected function and resolved input
+set, including assumptions, references, formulas, units and results. HTML and
+PDF can present the same report; the verification report is a separate record.
 
 **Source-to-document consistency**:
 Agreement between the authored calculation's runtime results and the values

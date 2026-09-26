@@ -18,7 +18,7 @@ describe('numeric verification policy', () => {
     expect(numericPolicy).toEqual({
       absoluteTolerance: 1e-9,
       relativeTolerance: 1e-12,
-      numberDomain: 'finite-real-safe-integer',
+      numberDomain: 'finite-real-typed-safe-integer',
     });
     expect(Object.isFrozen(numericPolicy)).toBe(true);
   });
@@ -255,4 +255,154 @@ describe('numeric comparisons', () => {
       expect(compareNumbers(actual, expected).matches).toBe(matches);
     },
   );
+});
+
+describe('Python numeric kinds and template functions', () => {
+  it('permits large finite floats while preserving exact integer limits', () => {
+    expect(validateNumber(1e25, 'float')).toMatchObject({
+      ok: true,
+      numericKind: 'float',
+    });
+    expect(failureCode(validateNumber(1e25, 'int'))).toBe(
+      'UNSUPPORTED_NUMERIC_RANGE',
+    );
+    expect(failureCode(validateNumber(1.5, 'int'))).toBe(
+      'NUMERIC_KIND_MISMATCH',
+    );
+    expect(
+      evaluateOperation('fg.multiply', [1e20, 1e5], ['float', 'int']),
+    ).toMatchObject({ ok: true, value: 1e25, numericKind: 'float' });
+    expect(
+      failureCode(
+        evaluateOperation(
+          'fg.multiply',
+          [Number.MAX_SAFE_INTEGER, 2],
+          ['int', 'int'],
+        ),
+      ),
+    ).toBe('UNSUPPORTED_NUMERIC_RANGE');
+    expect(failureCode(evaluateOperation('fg.multiply', [1e20, 1e5]))).toBe(
+      'UNSUPPORTED_NUMERIC_RANGE',
+    );
+    expect(
+      failureCode(
+        evaluateOperation('fg.multiply', [1e308, 2], ['float', 'int']),
+      ),
+    ).toBe('NON_FINITE_NUMBER');
+  });
+
+  it('propagates Python result kinds, including integer operands to true division', () => {
+    expect(evaluateOperation('fg.divide', [6, 2], ['int', 'int'])).toEqual({
+      ok: true,
+      value: 3,
+      numericKind: 'float',
+    });
+    expect(evaluateOperation('fg.pow', [10, 20], ['float', 'int'])).toEqual({
+      ok: true,
+      value: 1e20,
+      numericKind: 'float',
+    });
+    expect(
+      failureCode(evaluateOperation('fg.pow', [10, 20], ['int', 'int'])),
+    ).toBe('UNSUPPORTED_NUMERIC_RANGE');
+    expect(evaluateOperation('fg.sqrt', [4], ['int'])).toEqual({
+      ok: true,
+      value: 2,
+      numericKind: 'float',
+    });
+    expect(evaluateOperation('fg.max', [2, 2], ['float', 'int'])).toEqual({
+      ok: true,
+      value: 2,
+      numericKind: 'float',
+    });
+  });
+
+  it.each([
+    [0.5, 0],
+    [1.5, 2],
+    [2.5, 2],
+    [3.5, 4],
+    [-0.5, 0],
+    [-1.5, -2],
+    [-2.5, -2],
+    [2.5000000000000004, 3],
+  ])('rounds %s to the Python integer %s', (value, expected) => {
+    expect(evaluateOperation('fg.round', [value], ['float'])).toEqual({
+      ok: true,
+      value: expected,
+      numericKind: 'int',
+    });
+  });
+
+  it('supports pi, ceiling and max with bounded signatures', () => {
+    expect(evaluateOperation('fg.pi', [])).toEqual({
+      ok: true,
+      value: Math.PI,
+      numericKind: 'float',
+    });
+    expect(evaluateOperation('fg.ceil', [-1.2], ['float'])).toEqual({
+      ok: true,
+      value: -1,
+      numericKind: 'int',
+    });
+    expect(evaluateOperation('fg.max', [-1, 2], ['int', 'float'])).toEqual({
+      ok: true,
+      value: 2,
+      numericKind: 'float',
+    });
+    expect(failureCode(evaluateOperation('fg.round', [1e25], ['float']))).toBe(
+      'UNSUPPORTED_NUMERIC_RANGE',
+    );
+    expect(failureCode(evaluateOperation('fg.max', [1, 2, 3]))).toBe(
+      'INVALID_FUNCTION_ARITY',
+    );
+  });
+});
+
+it('preserves float signed zero while normalizing exact integer zero', () => {
+  expect(evaluateOperation('fg.multiply', [0, -1], ['int', 'int'])).toEqual({
+    ok: true,
+    value: 0,
+    numericKind: 'int',
+  });
+  expect(evaluateOperation('fg.uminus', [0], ['int'])).toEqual({
+    ok: true,
+    value: 0,
+    numericKind: 'int',
+  });
+  expect(evaluateOperation('fg.uminus', [0], ['float'])).toEqual({
+    ok: true,
+    value: -0,
+    numericKind: 'float',
+  });
+});
+
+it('reports opposite extreme finite floats without emitting a non-finite JSON error', () => {
+  const compared = compareNumbers(Number.MAX_VALUE, -Number.MAX_VALUE);
+  expect(compared.matches).toBe(false);
+  expect(compared.comparison.absoluteError).toBe('overflow');
+  expect(ComparisonSchema.parse(compared.comparison)).toEqual(
+    compared.comparison,
+  );
+  expect(JSON.parse(JSON.stringify(compared.comparison))).toEqual(
+    compared.comparison,
+  );
+});
+
+it('normalizes the selected integer zero in max and preserves float signed zero', () => {
+  expect(evaluateOperation('fg.max', [-0, 0], ['int', 'int'])).toEqual({
+    ok: true,
+    value: 0,
+    numericKind: 'int',
+  });
+  expect(evaluateOperation('fg.max', [-1, -0], ['int', 'int'])).toEqual({
+    ok: true,
+    value: 0,
+    numericKind: 'int',
+  });
+  expect(evaluateOperation('fg.max', [-0, 0], ['float', 'float'])).toEqual({
+    ok: true,
+    value: -0,
+    numericKind: 'float',
+  });
 });

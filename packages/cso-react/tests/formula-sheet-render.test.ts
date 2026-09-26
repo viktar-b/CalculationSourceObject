@@ -1,4 +1,4 @@
-import type { SheetDocument } from '@cs-object/core';
+import { SheetDocumentSchema, type SheetDocument } from '@cs-object/core';
 import { FormulaSheet } from '@cs-object/react';
 import React, { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -93,4 +93,108 @@ describe('FormulaSheet rendering', () => {
     expect(text).toContain('0. Side length');
     expect(text).toContain('1. Side length');
   });
+});
+
+test.each(['fg.pow', 'fg.uminus'])(
+  'preserves a compound operand in %s MathML',
+  (functionId) => {
+    const compound = SheetDocumentSchema.parse({
+      ...sheet,
+      symbols: [
+        {
+          ...sheet.symbols[0],
+          valueTree: {
+            rootKey: 'root',
+            result: { kind: 'number', value: functionId === 'fg.pow' ? 4 : -2 },
+            nodes: [
+              {
+                key: 'root',
+                kind: 'function',
+                functionId,
+                argKeys:
+                  functionId === 'fg.pow'
+                    ? ['difference', 'exponent']
+                    : ['difference'],
+              },
+              {
+                key: 'difference',
+                kind: 'function',
+                functionId: 'fg.subtract',
+                argKeys: ['left', 'right'],
+              },
+              {
+                key: 'left',
+                kind: 'literal',
+                value: { kind: 'number', value: 5 },
+              },
+              {
+                key: 'right',
+                kind: 'literal',
+                value: { kind: 'number', value: 3 },
+              },
+              {
+                key: 'exponent',
+                kind: 'literal',
+                value: { kind: 'number', value: 2 },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const markup = renderToStaticMarkup(
+      createElement(FormulaSheet, { sheet: compound }),
+    );
+    const formulas = (
+      markup.match(/<math\b[^>]*>[\s\S]*?<\/math>/g) ?? []
+    ).filter((math) => htmlText(math).includes('5.00'));
+    expect(formulas.length).toBeGreaterThan(0);
+    for (const formula of formulas) {
+      expect(htmlText(formula)).toContain(
+        functionId === 'fg.pow'
+          ? '( 5.00 - 3.00 ) 2.00'
+          : '- ( 5.00 - 3.00 )',
+      );
+      expect(formula.match(/<mo fence="true">\(<\/mo>/g)).toHaveLength(1);
+      expect(formula.match(/<mo fence="true">\)<\/mo>/g)).toHaveLength(1);
+    }
+  },
+);
+
+test('fences a negative literal power base', () => {
+  const negative = SheetDocumentSchema.parse({
+    ...sheet,
+    symbols: [
+      {
+        ...sheet.symbols[0],
+        valueTree: {
+          rootKey: 'root',
+          result: { kind: 'number', value: 4 },
+          nodes: [
+            {
+              key: 'root',
+              kind: 'function',
+              functionId: 'fg.pow',
+              argKeys: ['base', 'exponent'],
+            },
+            {
+              key: 'base',
+              kind: 'literal',
+              value: { kind: 'number', value: -2 },
+            },
+            {
+              key: 'exponent',
+              kind: 'literal',
+              value: { kind: 'number', value: 2 },
+            },
+          ],
+        },
+      },
+    ],
+  });
+  expect(
+    htmlText(
+      renderToStaticMarkup(createElement(FormulaSheet, { sheet: negative })),
+    ),
+  ).toContain('( -2.00 ) 2.00');
 });

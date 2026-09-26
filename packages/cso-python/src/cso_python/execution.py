@@ -17,7 +17,15 @@ from typing import Any
 from .exporter import authored_output_to_stderr
 from .glyphs import qualify_glyphs
 from .planner import Planner
-from .source import Invocation, Json, SourceError, number, span, syntax_location
+from .source import (
+    numeric_kind,
+    Invocation,
+    Json,
+    SourceError,
+    number,
+    span,
+    syntax_location,
+)
 
 ACTIVE: contextvars.ContextVar[Any] = contextvars.ContextVar(
     "cso_execution", default=None
@@ -73,14 +81,18 @@ class Execution:
         return self.planner.unchanged()
 
     def run_root(self, inputs: Json) -> Json:
-        supplied = {name: number(value, stage="usage") for name, value in inputs.items()}
+        supplied = {
+            name: number(value, stage="usage") for name, value in inputs.items()
+        }
         self.observations.clear()
         for invocation in self.planner.invocations:
             invocation.record["resolvedInputs"] = {}
+            invocation.record["resolvedInputKinds"] = {}
             for symbol in invocation.symbols.values():
                 symbol.cso["valueTree"].pop("result", None)
             for output in invocation.output_records:
                 output.pop("value", None)
+                output.pop("numericKind", None)
         return self.run(self.root, supplied)
 
     def instrument(self, module):
@@ -142,9 +154,14 @@ class Execution:
                 },
                 "invocationId": invocation.id,
                 "value": value,
+                "numericKind": numeric_kind(value),
             }
         )
-        symbol.cso["valueTree"]["result"] = {"kind": "number", "value": value}
+        symbol.cso["valueTree"]["result"] = {
+            "kind": "number",
+            "value": value,
+            "numericKind": numeric_kind(value),
+        }
 
     def load_module(self, module):
         if module.path in self.modules:
@@ -165,7 +182,9 @@ class Execution:
             return builtins.__import__(name, globals, locals, fromlist, level)
 
         namespace["__builtins__"] = {**vars(builtins), "__import__": imported}
-        exec(self.code[module.path], namespace)  # noqa: S102 - preflighted, captured trusted local source
+        exec(
+            self.code[module.path], namespace
+        )  # noqa: S102 - preflighted, captured trusted local source
         return namespace
 
     def run(self, invocation: Invocation, inputs: Json) -> Json:
@@ -210,10 +229,15 @@ class Execution:
             )
             for name, param in invocation.parameters.items()
         }
+        invocation.record["resolvedInputKinds"] = {
+            name: numeric_kind(value)
+            for name, value in invocation.record["resolvedInputs"].items()
+        }
         for binding in invocation.record["inputBindings"]:
             name = binding["parameterName"]
             if binding["kind"] == "entrySupplied":
                 binding["value"] = invocation.record["resolvedInputs"][name]
+                binding["numericKind"] = numeric_kind(binding["value"])
             symbol = invocation.parameter_symbols[name]
             if (
                 any(candidate is symbol for candidate in invocation.symbols.values())
@@ -221,6 +245,9 @@ class Execution:
             ):
                 symbol.cso["valueTree"]["nodes"][0]["literal"]["value"] = (
                     invocation.record["resolvedInputs"][name]
+                )
+                symbol.cso["valueTree"]["nodes"][0]["literal"]["numericKind"] = (
+                    invocation.record["resolvedInputKinds"][name]
                 )
         token = ACTIVE.set((self, invocation, iter(invocation.calls.values())))
         try:
@@ -256,6 +283,7 @@ class Execution:
                     code="OUTPUT_TYPE_MISMATCH",
                     subject=f"Output {output['name']!r}",
                 )
+                output["numericKind"] = numeric_kind(output["value"])
             return result
         except SourceError:
             raise
@@ -292,7 +320,11 @@ class Execution:
                         use for inv in self.planner.invocations for use in inv.uses
                     ],
                     "outputDeclarations": [
-                        {k: v for k, v in output.items() if k != "value"}
+                        {
+                            k: v
+                            for k, v in output.items()
+                            if k not in {"value", "numericKind"}
+                        }
                         for inv in self.planner.invocations
                         for output in inv.output_records
                     ],
@@ -318,6 +350,7 @@ class Execution:
                     "function": root.function.name,
                     "invocationId": "root",
                     "resolvedInputs": root.record["resolvedInputs"],
+                    "resolvedInputKinds": root.record["resolvedInputKinds"],
                 },
                 "sourceManifest": manifest,
                 "sourceClosureHash": capture.closure_hash(),
@@ -376,6 +409,7 @@ def execute(source: Path, function: str, inputs: Json) -> Json:
                     execution.planner.capture.closure_hash()
                 )
                 provenance["resolvedInputs"] = execution.root.record["resolvedInputs"]
+                provenance["resolvedInputKinds"] = execution.root.record["resolvedInputKinds"]
         return {
             "protocolVersion": "2",
             "ok": False,
@@ -515,7 +549,5 @@ def execute_from_argv(argv: list[str]) -> int:
     return (
         0
         if response["ok"]
-        else 2
-        if any(d["stage"] == "usage" for d in response["diagnostics"])
-        else 1
+        else 2 if any(d["stage"] == "usage" for d in response["diagnostics"]) else 1
     )

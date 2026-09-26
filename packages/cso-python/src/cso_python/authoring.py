@@ -34,6 +34,7 @@ class SymbolSpec:
     comment: str = ""
     id: str | None = None
     root_key: str | None = None
+    notation_scope: str | None = None
 
 
 def calculation(
@@ -86,6 +87,7 @@ def symbol(
     comment: str = "",
     id: str | None = None,
     root_key: str | None = None,
+    notation_scope: str | None = None,
 ) -> SymbolSpec:
     """Declare CalculationSourceObject symbol metadata for source parsing."""
 
@@ -96,6 +98,7 @@ def symbol(
         comment=comment,
         id=id,
         root_key=root_key,
+        notation_scope=notation_scope,
     )
 
 

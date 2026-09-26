@@ -1,9 +1,6 @@
 import { z } from 'zod';
-import {
-  NodeAddressSchema,
-  SourceSpanSchema,
-  SupportedNumberSchema,
-} from './common.ts';
+import { NumericValueSchema } from './numbers.ts';
+import { NodeAddressSchema, SourceSpanSchema } from './common.ts';
 
 const SourceSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('local') }),
@@ -51,13 +48,12 @@ export const AuthoringEvidenceSchema = z.strictObject({
     }),
   ),
   outputs: z.array(
-    z.strictObject({
+    NumericValueSchema.safeExtend({
       invocationId: z.string().min(1),
       name: z.string().min(1),
       symbolId: z.string().min(1),
       source: SourceSchema,
       location: SourceSpanSchema,
-      value: SupportedNumberSchema,
     }),
   ),
 });

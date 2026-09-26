@@ -1,6 +1,6 @@
 # Triage labels
 
-Use these strings in each backlog entry's `Triage:` field.
+Use these strings in each ticket file's `Triage:` field.
 
 | Role and label | Meaning |
 | --- | --- |
