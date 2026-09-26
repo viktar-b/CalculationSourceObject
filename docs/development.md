@@ -63,7 +63,10 @@ updates separately from that file.
 [PR title validation](../.github/workflows/pr-title.yml) adds the required
 `pr-title` check. It validates the format in [CONTRIBUTING.md](../CONTRIBUTING.md)
 on PR creation, title edits and updates, without installing dependencies. Run
-`npm run test:pr-title` for its accepted/rejected title cases.
+`npm run test:pr-title` for its accepted/rejected title cases, also run by the
+`quality` job. These tests execute the inline workflow validator. The title job
+uses the runner's Node runtime without checking out or executing repository code.
+Like other `pull_request` workflows, changes to the workflow itself require review.
 
 Keep all five check names stable and required in the `Protect main` ruleset.
 Do not add path filters or allow failures on required checks. PR code runs with

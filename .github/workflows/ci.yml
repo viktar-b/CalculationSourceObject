@@ -44,6 +44,7 @@ jobs:
           echo "PYTHON=$GITHUB_WORKSPACE/.venv/bin/python" >> "$GITHUB_ENV"
       - run: npx playwright install --with-deps chromium
       - run: npm audit --audit-level=high
+      - run: npm run test:pr-title
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test

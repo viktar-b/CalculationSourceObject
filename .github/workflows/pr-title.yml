@@ -16,14 +16,19 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .nvmrc
-      - run: npm run test:pr-title
       - name: Validate contribution format
-        run: node scripts/check-pr-title.ts
+        shell: node {0}
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          const title = process.env.PR_TITLE ?? '';
+          const scopedTitle = /^[^\s():]+\([^\s()]+\): \S(?:[^\r\n\u2028\u2029]*\S)?$/u;
+
+          if (title !== title.trim() || !scopedTitle.test(title)) {
+            process.stderr.write(
+              'PR title must match <type>(<scope>): <description>. See CONTRIBUTING.md.\n',
+            );
+            process.exitCode = 1;
+          } else {
+            process.stdout.write('PR title matches the contribution format.\n');
+          }
