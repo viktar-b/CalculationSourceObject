@@ -18,7 +18,7 @@ const HistoricalJsonValueSchema: z.ZodType<HistoricalJsonValue> = z.lazy(() =>
   z.union([
     z.null(),
     z.boolean(),
-    z.number().finite(),
+    z.number(),
     z.string(),
     z.array(HistoricalJsonValueSchema),
     HistoricalJsonObjectSchema,
@@ -152,7 +152,7 @@ export const PreparedContextValueSchema: z.ZodType<PreparedContextValue> =
       z.strictObject({
         kind: z.literal('text'),
         path: ContextPathSchema,
-        value: z.union([z.string(), z.number().finite(), z.boolean()]),
+        value: z.union([z.string(), z.number(), z.boolean()]),
       }),
       z.strictObject({
         kind: z.literal('math'),
@@ -238,7 +238,7 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
       assetId: NonemptyStringSchema,
       caption: z.string(),
       alt: z.string(),
-      width: z.number().finite().positive().optional(),
+      width: z.number().positive().optional(),
     }),
     contextSource: HistoricalJsonObjectSchema.optional(),
     ...placementFields,
