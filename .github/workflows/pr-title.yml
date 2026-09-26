@@ -1,0 +1,34 @@
+name: PR title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-title:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Validate contribution format
+        shell: node {0}
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          const title = process.env.PR_TITLE ?? '';
+          const scopedTitle = /^[^\s():]+\([^\s()]+\): \S(?:[^\r\n\u2028\u2029]*\S)?$/u;
+
+          if (title !== title.trim() || !scopedTitle.test(title)) {
+            process.stderr.write(
+              'PR title must match <type>(<scope>): <description>. See CONTRIBUTING.md.\n',
+            );
+            process.exitCode = 1;
+          } else {
+            process.stdout.write('PR title matches the contribution format.\n');
+          }
