@@ -83,6 +83,14 @@ const pythonReservedWords = new Set([
   'yield',
 ]);
 
+const pythonRuntimeIdentifiers = new Set([
+  'abs',
+  'math',
+  'max',
+  'min',
+  'round',
+]);
+
 const toPythonIdentifier = (value: string, fallback: string): string => {
   const sanitized = value
     .toLowerCase()
@@ -94,7 +102,8 @@ const toPythonIdentifier = (value: string, fallback: string): string => {
     ? `_${withFallback}`
     : withFallback;
 
-  return pythonReservedWords.has(safeLeadingCharacter)
+  return pythonReservedWords.has(safeLeadingCharacter) ||
+    pythonRuntimeIdentifiers.has(safeLeadingCharacter)
     ? `${safeLeadingCharacter}_value`
     : safeLeadingCharacter;
 };
