@@ -6,6 +6,7 @@
  * special MathML structures using the concrete leaf components in this folder.
  */
 import { renderSpecialValueFunction } from '../function-renderers.tsx';
+import { requiresExplicitOperandGroup } from './operand-grouping.ts';
 import {
   getFunctionBinaryOperatorById,
   getFunctionSpec,
@@ -144,25 +145,13 @@ const ValueTreeFunctionMathmlView = ({
         viewOptions={viewOptions}
       />
     );
-    const literal =
-      argNode.kind === 'literal'
-        ? argNode.value
-        : argNode.kind === 'symbol' && viewOptions.numerical
-          ? getSymbolById(sheet, argNode.symbolId)?.valueTree.result
-          : undefined;
-    const negative =
-      literal?.kind === 'number' &&
-      (literal.value < 0 || Object.is(literal.value, -0));
-    // Special MathML structures bypass the binary-operator grouping below.
-    const grouped =
-      (index === 0 &&
-        ((node.functionId === 'fg.pow' &&
-          (argNode.kind === 'function' || negative)) ||
-          (node.functionId === 'fg.uminus' && argNode.kind === 'function'))) ||
-      (index === 1 &&
-        (node.functionId === 'fg.multiply' || node.functionId === 'fg.subtract') &&
-        (negative ||
-          (argNode.kind === 'function' && argNode.functionId === 'fg.uminus')));
+    const grouped = requiresExplicitOperandGroup({
+      sheet,
+      node: argNode,
+      numerical: Boolean(viewOptions.numerical),
+      parentFunctionId: node.functionId,
+      argumentIndex: index,
+    });
     return grouped ? (
       <SymbolValueGroupMathmlView key={argNode.key} cursor={undefined}>
         {[rendered]}
