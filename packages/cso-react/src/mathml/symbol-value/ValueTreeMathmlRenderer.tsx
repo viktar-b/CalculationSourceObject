@@ -155,10 +155,14 @@ const ValueTreeFunctionMathmlView = ({
       (literal.value < 0 || Object.is(literal.value, -0));
     // Special MathML structures bypass the binary-operator grouping below.
     const grouped =
-      index === 0 &&
-      ((node.functionId === 'fg.pow' &&
-        (argNode.kind === 'function' || negative)) ||
-        (node.functionId === 'fg.uminus' && argNode.kind === 'function'));
+      (index === 0 &&
+        ((node.functionId === 'fg.pow' &&
+          (argNode.kind === 'function' || negative)) ||
+          (node.functionId === 'fg.uminus' && argNode.kind === 'function'))) ||
+      (index === 1 &&
+        (node.functionId === 'fg.multiply' || node.functionId === 'fg.subtract') &&
+        (negative ||
+          (argNode.kind === 'function' && argNode.functionId === 'fg.uminus')));
     return grouped ? (
       <SymbolValueGroupMathmlView key={argNode.key} cursor={undefined}>
         {[rendered]}
