@@ -81,3 +81,21 @@ def calculate(quantity: Annotated[float, symbol(glyph="q_{{in}}", description="I
         ):
             with self.subTest(expression=expression):
                 self.reject(expression, code="UNSUPPORTED_SYNTAX")
+
+    def test_extrema_reject_iterables_keywords_starred_arguments_and_shadowing(self):
+        for name in ["min", "max"]:
+            for args in [
+                "quantity",
+                "[quantity, 1.0]",
+                "quantity, [1.0, 2.0]",
+                "quantity, 1.0, key=quantity",
+                "quantity, default=1.0",
+                "quantity, *[1.0, 2.0]",
+            ]:
+                with self.subTest(function=name, args=args):
+                    self.reject(f"{name}({args})", code="UNSUPPORTED_SYNTAX")
+            self.reject(
+                f"{name}(quantity, 1.0, 2.0)",
+                extra=f'    {name}: Annotated[float, symbol(glyph="q_{{shadow}}", description="Shadow", unit="")] = 1.0\n',
+                code="SHADOWED_HELPER",
+            )

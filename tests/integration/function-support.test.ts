@@ -767,3 +767,107 @@ it('renders one 0.3em gap after binary and variadic logical operators', async ()
     await browser.close();
   }
 });
+
+it.each([
+  { expression: 'min(8, 3, 5, -2)', value: -2, kind: 'int' },
+  { expression: 'max(-8, -3, -5, -2)', value: -2, kind: 'int' },
+  { expression: 'min(8, -3, -3.0, 5)', value: -3, kind: 'int' },
+  { expression: 'min(8, -3.0, -3, 5)', value: -3, kind: 'float' },
+  { expression: 'max(-8, 3, 3.0, -5)', value: 3, kind: 'int' },
+  { expression: 'max(-8, 3.0, 3, -5)', value: 3, kind: 'float' },
+  { expression: 'min(1, -0.0, 0.0, 2)', value: -0, kind: 'float' },
+  { expression: 'min(1, 0.0, -0.0, 2)', value: 0, kind: 'float' },
+  { expression: 'max(-1, -0.0, 0.0, -2)', value: -0, kind: 'float' },
+  { expression: 'max(-1, 0.0, -0.0, -2)', value: 0, kind: 'float' },
+  { expression: 'min(-1e308, 0, 1e308)', value: -1e308, kind: 'float' },
+  { expression: 'max(-1e308, 0, 1e308)', value: 1e308, kind: 'float' },
+])(
+  'preserves variadic $expression through verification and replay',
+  ({ expression, value, kind }) => {
+    const { execution, output } = successfulCapture(expression);
+    expect(output.value).toBe(value);
+    expect(output.numericKind).toBe(kind);
+    const report = verifyExecution({ execution });
+    expect(report.ok, JSON.stringify(report.diagnostics)).toBe(true);
+    expect(exportReplay(execution, output.symbolId).result).toEqual({
+      value,
+      kind,
+    });
+  },
+);
+
+it.each(['min', 'max'])(
+  '%s evaluates later arguments eagerly and in source order',
+  (name) => {
+    expect(capture(`${name}(0, 1, 1 / 0, math.sqrt(-1))`)).toMatchObject({
+      ok: false,
+      diagnostics: [
+        {
+          code: 'EXECUTION_FAILED',
+          message: expect.stringContaining('ZeroDivisionError'),
+        },
+      ],
+    });
+    expect(capture(`${name}(0, 1, math.sqrt(-1), 1 / 0)`)).toMatchObject({
+      ok: false,
+      diagnostics: [
+        {
+          code: 'EXECUTION_FAILED',
+          message: expect.stringContaining('ValueError'),
+        },
+      ],
+    });
+    const { execution } = successfulCapture(
+      `${name}(0, 1, 1 / 0) if quantity < 0 else 1`,
+    );
+    expect(verifyExecution({ execution }).ok).toBe(true);
+    const nodes = execution.cso.sections.flatMap((section) =>
+      section.items.flatMap((item) =>
+        item.kind === 'symbol' ? item.symbol.valueTree.nodes : [],
+      ),
+    );
+    const predicate = nodes.find((node) => node.funcSpec?.id === 'fg.lt');
+    if (!predicate?.funcSpec) throw new Error('Missing predicate');
+    predicate.funcSpec.id = 'fg.gt';
+    expect(
+      verifyExecution({ execution }).diagnostics.some(
+        (d) => d.code === 'DIVISION_BY_ZERO',
+      ),
+    ).toBe(true);
+  },
+);
+
+it.each(['min', 'max'])(
+  '%s checks every dormant operand role and its minimum arity',
+  (name) => {
+    const { execution } = successfulCapture(
+      `${name}(0, 1, 2, 3) if quantity < 0 else 1`,
+    );
+    const nodes = execution.cso.sections.flatMap((section) =>
+      section.items.flatMap((item) =>
+        item.kind === 'symbol' ? item.symbol.valueTree.nodes : [],
+      ),
+    );
+    const call = nodes.find((node) => node.funcSpec?.id === `fg.${name}`);
+    const predicate = nodes.find((node) => node.funcSpec?.id === 'fg.lt');
+    if (!call?.funcArgs || !predicate)
+      throw new Error('Missing function or predicate');
+    const originalArgs = call.funcArgs;
+    for (let index = 0; index < originalArgs.length; index += 1) {
+      call.funcArgs = originalArgs.map((arg, position) =>
+        position === index ? { key: predicate.key } : arg,
+      );
+      expect(
+        verifyExecution({ execution }).diagnostics.some(
+          (d) => d.code === 'NONNUMERIC_FORMULA',
+        ),
+      ).toBe(true);
+    }
+    call.funcArgs = originalArgs.slice(0, 1);
+    expect(
+      verifyExecution({ execution }).diagnostics.some(
+        (d) => d.code === 'INVALID_FUNCTION_ARITY',
+      ),
+    ).toBe(true);
+  },
+);

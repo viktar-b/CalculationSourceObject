@@ -95,7 +95,9 @@ other than one. Values must be positive. `exp` rejects non-finite results.
 
 `min` and `max` take two or more positional numeric arguments. They retain the
 first selected operand on ties, including its actual numeric kind and signed zero.
-Iterable and keyword forms are not supported.
+All arguments evaluate in source order and must satisfy the finite-number and
+numeric-range rules, including operands that are not selected. Iterable, keyword
+and starred argument forms are not supported.
 
 `round(value)` uses ties to even and returns an integer. `round(value, digits)`
 requires integer `digits`, supports positive and negative digit counts, and

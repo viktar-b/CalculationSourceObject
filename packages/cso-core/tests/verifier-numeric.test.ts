@@ -407,3 +407,22 @@ it('normalizes the selected integer zero in max and preserves float signed zero'
     numericKind: 'float',
   });
 });
+
+it.each(['fg.min', 'fg.max'])(
+  '%s validates later operands even when they would not be selected',
+  (id) => {
+    expect(
+      failureCode(evaluateOperation(id, [0, 1, NaN], ['int', 'int', 'float'])),
+    ).toBe('NON_FINITE_NUMBER');
+    expect(
+      failureCode(evaluateOperation(id, [0, 1, 1e20], ['int', 'int', 'int'])),
+    ).toBe('UNSUPPORTED_NUMERIC_RANGE');
+    expect(failureCode(evaluateOperation(id, [0, 1, 1e20]))).toBe(
+      'UNSUPPORTED_NUMERIC_RANGE',
+    );
+    expect(evaluateOperation(id, [2, -3, 5])).toMatchObject({
+      ok: true,
+      value: id === 'fg.min' ? -3 : 5,
+    });
+  },
+);
