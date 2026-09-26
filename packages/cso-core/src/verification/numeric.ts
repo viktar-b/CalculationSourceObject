@@ -220,6 +220,7 @@ type Operation = (
       readonly kind: 'numeric';
       readonly operands: readonly OperandRole[];
       readonly evaluate: (...values: number[]) => NumericResult;
+      readonly evaluateValues?: (values: readonly number[]) => NumericResult;
       readonly typed: TypedEvaluation;
     }
   | {
@@ -261,16 +262,37 @@ const floatOperation = (
   calculate: (values: readonly number[]) => number,
   arity?: Arity,
 ): Operation => {
-  const evaluate = (...values: number[]) =>
+  const evaluateValues = (values: readonly number[]) =>
     validateNumber(calculate(values), 'float');
   return {
     kind: 'numeric',
     operands,
     ...(arity === undefined ? {} : { arity }),
-    evaluate,
-    typed: (values) => validateNumber(calculate(values), 'float'),
+    evaluate: (...values) => evaluateValues(values),
+    evaluateValues,
+    typed: evaluateValues,
   };
 };
+
+function hypot(values: readonly number[]): number {
+  const chunkSize = 1024;
+  if (values.length <= chunkSize) return Math.hypot(...values);
+
+  let scale = 0;
+  for (const value of values) scale = Math.max(scale, Math.abs(value));
+  if (scale === 0) return 0;
+
+  // Scale once so successive chunks do not repeatedly round subnormal norms.
+  // Bounded native calls also avoid the engine's call-argument limit.
+  let norm = 0;
+  for (let start = 0; start < values.length; start += chunkSize) {
+    const chunk = values
+      .slice(start, start + chunkSize)
+      .map((value) => value / scale);
+    norm = Math.hypot(norm, ...chunk);
+  }
+  return norm * scale;
+}
 
 const floatUnary = (calculate: (value: number) => number): Operation =>
   floatOperation(['number'], ([value]) => calculate(value));
@@ -471,7 +493,7 @@ const operations = new Map<string, Operation>([
   ],
   [
     'fg.hypot',
-    floatOperation(['number'], (values) => Math.hypot(...values), {
+    floatOperation(['number'], hypot, {
       min: 0,
       max: null,
     }),
@@ -658,7 +680,9 @@ export function evaluateOperation(
       );
       return kinds !== undefined && kinds.length === operands.length
         ? operation.typed(normalizedOperands, kinds)
-        : operation.evaluate(...normalizedOperands);
+        : operation.evaluateValues
+          ? operation.evaluateValues(normalizedOperands)
+          : operation.evaluate(...normalizedOperands);
     }
     default: {
       const exhaustive: never = operation;

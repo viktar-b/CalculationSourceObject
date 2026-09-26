@@ -1,29 +1,33 @@
 import { readFileSync } from 'node:fs';
+import type {
+  CalculationSourceObject,
+  CalculationSourceSymbol,
+} from '@cs-object/core';
 import { describe, expect, test } from 'vitest';
-import type { CalculationSourceSymbol } from '@cs-object/core';
-import type { CalculationSourceObject } from '@cs-object/core';
-const collectCsoSymbols = (cso: CalculationSourceObject) => cso.sections.flatMap(section => section.items.flatMap(item => item.kind === 'symbol' ? [item.symbol] : []));
+
+const collectCsoSymbols = (cso: CalculationSourceObject) =>
+  cso.sections.flatMap((section) =>
+    section.items.flatMap((item) =>
+      item.kind === 'symbol' ? [item.symbol] : [],
+    ),
+  );
+
 import {
+  BoundReferenceCaseSchema,
   type ExecutionPayload,
   ExecutionPayloadSchema,
   ExecutionResponseSchema,
   type Invocation,
-  type SymbolDefinition,
-  type SymbolObservation,
-} from '@cs-object/core';
-import {
-  BoundReferenceCaseSchema,
   ReferenceCaseSchema,
   ReferenceFileSchema,
+  type SymbolDefinition,
+  type SymbolObservation,
+  VerificationReportSchema,
+  verifyExecution,
 } from '@cs-object/core';
-import { VerificationReportSchema } from '@cs-object/core';
-import { verifyExecution } from '@cs-object/core';
 
 const fixtureUrl = (name: string): URL =>
-  new URL(
-    `../../fixtures/contract-cases/${name}.json`,
-    import.meta.url,
-  );
+  new URL(`../../fixtures/contract-cases/${name}.json`, import.meta.url);
 
 const fixtureExecution = (name = 'single-success'): ExecutionPayload => {
   const source: unknown = JSON.parse(readFileSync(fixtureUrl(name), 'utf8'));
@@ -118,6 +122,44 @@ const diagnosticCodes = (
   report: ReturnType<typeof verifyExecution>,
 ): string[] => report.diagnostics.map((diagnostic) => diagnostic.code);
 
+const largeHypotOperandCount = 150_000;
+
+const largeHypotExecution = ({
+  numericKind,
+  operandValue = 1,
+  expectedValue = Math.sqrt(largeHypotOperandCount),
+}: {
+  readonly numericKind?: 'float';
+  readonly operandValue?: number;
+  readonly expectedValue?: number;
+}): ExecutionPayload => {
+  const execution = structuredClone(fixtureExecution());
+  const area = symbolFor(execution, 'area');
+  const operand = required(
+    area.valueTree.nodes.find((node) => node.key === 'n2'),
+    'Missing area operand.',
+  );
+  operand.literal = {
+    kind: 'number',
+    value: operandValue,
+    ...(numericKind === undefined ? {} : { numericKind }),
+  };
+  const root = required(
+    area.valueTree.nodes.find((node) => node.key === 'n3'),
+    'Missing area root.',
+  );
+  root.funcSpec = { id: 'fg.hypot' };
+  root.funcArgs = Array.from({ length: largeHypotOperandCount }, () => ({
+    key: operand.key,
+  }));
+  root.result = { kind: 'number', value: expectedValue, numericKind: 'float' };
+  area.valueTree.result = root.result;
+  const observation = observationFor(execution, 'area');
+  observation.value = expectedValue;
+  observation.numericKind = 'float';
+  return ExecutionPayloadSchema.parse(execution);
+};
+
 const verifyUnknown = (input: unknown) =>
   VerificationReportSchema.parse(
     Reflect.apply(verifyExecution, undefined, [input]),
@@ -167,6 +209,35 @@ const objectAt = (value: unknown, path: readonly PropertyKey[]): object => {
 };
 
 describe('verifyExecution', () => {
+  test.each([
+    ['omitted', undefined],
+    ['complete', 'float'],
+  ] as const)(
+    'evaluates 150,000 hypot operands with %s numeric-kind evidence',
+    (_, numericKind) => {
+      const report = verifyExecution({
+        execution: largeHypotExecution({ numericKind }),
+      });
+
+      expect(report.ok, JSON.stringify(report.diagnostics)).toBe(true);
+      expect(report.checks.formulaConsistency.status).toBe('passed');
+    },
+  );
+
+  test('reports a nonfinite result for an overflowing 150,000-operand hypot', () => {
+    const report = verifyExecution({
+      execution: largeHypotExecution({
+        numericKind: 'float',
+        operandValue: Number.MAX_VALUE,
+        expectedValue: 0,
+      }),
+    });
+
+    expect(report.ok).toBe(false);
+    expect(diagnosticCodes(report)).toContain('NON_FINITE_NUMBER');
+    expect(() => VerificationReportSchema.parse(report)).not.toThrow();
+  });
+
   test.each([0, -0])(
     'matches reference input zero signs exactly for %s',
     (value) => {

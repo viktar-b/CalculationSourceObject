@@ -18,11 +18,8 @@ import {
   getSymbolById,
   getValueNodeByKey,
   getValueNodeByKeyOrUndefined,
-  isSheetLiteralEmpty,
 } from '@cs-object/core';
 import type { ReactElement } from 'react';
-import { requiresExplicitOperandGroup } from './operand-grouping.ts';
-import { displayedLiteralDraft } from './literal-display.ts';
 import { renderSpecialValueFunction } from '../function-renderers.tsx';
 import {
   SymbolValueBinaryOperatorMathmlView,
@@ -32,6 +29,8 @@ import {
   SymbolValueLiteralMathmlView,
   SymbolValueRootMathmlView,
 } from './components.tsx';
+import { displayedLiteralDraft } from './literal-display.ts';
+import { requiresExplicitOperandGroup } from './operand-grouping.ts';
 
 export interface SymbolValueViewOptions {
   readonly literalsAsDrafts?: boolean;

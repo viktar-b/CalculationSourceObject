@@ -1,6 +1,6 @@
 import {
-  SheetDocumentSchema,
   type SheetDocument,
+  SheetDocumentSchema,
   type SheetValueNode,
 } from '@cs-object/core';
 import { FormulaSheet } from '@cs-object/react';
@@ -97,14 +97,14 @@ const namedFunctionMarkup = (
       })),
     ],
   };
-  const functionSheet: SheetDocument = {
+  const functionSheet = SheetDocumentSchema.parse({
     ...sheet,
     symbols: [{ ...sheet.symbols[0], valueTree }],
-  };
+  });
   return renderToStaticMarkup(
     createElement(ValueTreeMathmlRenderer, {
       sheet: functionSheet,
-      valueTree,
+      valueTree: functionSheet.symbols[0].valueTree,
       viewOptions: {},
       noRootContainer: true,
     }),

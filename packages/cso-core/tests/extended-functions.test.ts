@@ -31,6 +31,7 @@ describe('extended numeric functions', () => {
     ['fg.log', [8, 2], ['float', 'int'], 3, 'float'],
     ['fg.hypot', [], [], 0, 'float'],
     ['fg.hypot', [-0], ['float'], 0, 'float'],
+    ['fg.hypot', [0, -0, 0], ['int', 'float', 'int'], 0, 'float'],
     ['fg.hypot', [3, 4], ['int', 'int'], 5, 'float'],
     ['fg.hypot', [2, 3, 6], ['int', 'int', 'int'], 7, 'float'],
     [
@@ -41,6 +42,20 @@ describe('extended numeric functions', () => {
       'float',
     ],
     ['fg.hypot', [3e154, 4e154], ['float', 'float'], 5e154, 'float'],
+    [
+      'fg.hypot',
+      [1e308, 3e307, 4e307],
+      ['float', 'float', 'float'],
+      1.118033988749895e308,
+      'float',
+    ],
+    [
+      'fg.hypot',
+      [4e307, 1e308, 3e307],
+      ['float', 'float', 'float'],
+      1.118033988749895e308,
+      'float',
+    ],
     ['fg.hypot', [3e-200, 4e-200], ['float', 'float'], 5e-200, 'float'],
     ['fg.hypot', [5e-324, 5e-324], ['float', 'float'], 5e-324, 'float'],
     ['fg.min', [0, -0, 1], ['int', 'float', 'int'], 0, 'int'],
@@ -64,6 +79,41 @@ describe('extended numeric functions', () => {
       });
     },
   );
+
+  it.each([
+    ['omitted', undefined],
+    ['complete', Array.from({ length: 150_000 }, () => 'float' as const)],
+  ] as const)(
+    'retains subnormal precision across hypot chunks with %s kind evidence',
+    (_, numericKinds) => {
+      const values = Array.from({ length: 150_000 }, () => Number.MIN_VALUE);
+
+      expect(evaluateOperation('fg.hypot', values, numericKinds)).toEqual({
+        ok: true,
+        value: Math.sqrt(values.length) * Number.MIN_VALUE,
+        numericKind: 'float',
+      });
+    },
+  );
+
+  it('agrees with Python for mixed magnitudes across hypot chunk boundaries', () => {
+    const expected = 1.118033988749895e308;
+    const first = Array.from({ length: 2_050 }, () => 0);
+    first[0] = 1e308;
+    first[1_024] = 3e307;
+    first[2_049] = 4e307;
+    const permuted = [...first].reverse();
+
+    for (const values of [first, permuted]) {
+      expect(
+        evaluateOperation(
+          'fg.hypot',
+          values,
+          values.map(() => 'float'),
+        ),
+      ).toEqual({ ok: true, value: expected, numericKind: 'float' });
+    }
+  });
 
   it.each([
     [[1, 1], Math.PI / 4],
