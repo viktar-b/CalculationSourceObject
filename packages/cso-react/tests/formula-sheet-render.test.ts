@@ -150,7 +150,11 @@ test.each(['fg.pow', 'fg.uminus'])(
     ).filter((math) => htmlText(math).includes('5.00'));
     expect(formulas.length).toBeGreaterThan(0);
     for (const formula of formulas) {
-      expect(htmlText(formula)).toContain('( 5.00 - 3.00 )');
+      expect(htmlText(formula)).toContain(
+        functionId === 'fg.pow'
+          ? '( 5.00 - 3.00 ) 2.00'
+          : '- ( 5.00 - 3.00 )',
+      );
       expect(formula.match(/<mo fence="true">\(<\/mo>/g)).toHaveLength(1);
       expect(formula.match(/<mo fence="true">\)<\/mo>/g)).toHaveLength(1);
     }
