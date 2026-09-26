@@ -10,7 +10,7 @@ class FunctionCall:
     function_id: str
     min_arity: int = 1
     max_arity: int | None = 1
-    module: Literal["math", "builtins", "cso_python"] = "math"
+    module: Literal["math", "builtins"] = "math"
 
     def accepts_arity(self, count: int) -> bool:
         return count >= self.min_arity and (
@@ -32,8 +32,6 @@ FUNCTION_CALLS = (
     FunctionCall("min", "fg.min", min_arity=2, max_arity=None, module="builtins"),
     FunctionCall("exp", "fg.exp"),
     FunctionCall("log", "fg.log", max_arity=2),
-    FunctionCall("noop", "fg.noop", module="cso_python"),
-    FunctionCall("stub", "fg.stub", module="cso_python"),
     FunctionCall("radians", "fg.rad", 1),
     FunctionCall("degrees", "fg.deg", 1),
     FunctionCall("sin", "fg.sin", 1),

@@ -126,16 +126,3 @@ def figure(*, id: str, path: str, media_type: str, caption: str, alt: str) -> No
 def document_section(*, id: str, title: str, metadata: dict[str, Any] | None = None):
     """Group one child level of calculation document content."""
     yield
-
-
-_Number = TypeVar("_Number", int, float)
-
-
-def noop(value: _Number) -> _Number:
-    """Group a numeric formula without changing its value or kind."""
-    return value
-
-
-def stub(value: _Number) -> _Number:
-    """Fill a FormulaSheet placeholder with an explicit numeric formula."""
-    return value

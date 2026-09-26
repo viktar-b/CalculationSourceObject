@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .function_calls import FUNCTION_CALLS, MATH_FUNCTION_NAMES
+from .function_calls import MATH_FUNCTION_NAMES
 
 Json = dict[str, Any]
 HELPERS = {
@@ -30,8 +30,7 @@ IMPORTS = {
     "__future__": {"annotations"},
     "typing": {"Annotated", "Any", "TypeAlias"},
     "math": MATH_FUNCTION_NAMES | {"pi", "isclose"},
-    "cso_python": HELPERS
-    | {call.name for call in FUNCTION_CALLS if call.module == "cso_python"},
+    "cso_python": HELPERS,
 }
 
 

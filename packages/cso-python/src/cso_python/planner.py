@@ -561,6 +561,11 @@ class Planner:
                     ],
                 )
             elif isinstance(node, ast.BoolOp):
+                if not condition:
+                    self.error(
+                        inv, node, "UNSUPPORTED_SYNTAX",
+                        "Logical operators are supported only in conditional tests",
+                    )
                 item.update(
                     mode="FUNCTION",
                     funcSpec={"id": "fg.and" if isinstance(node.op, ast.And) else "fg.or"},

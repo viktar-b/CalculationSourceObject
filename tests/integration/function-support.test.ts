@@ -32,7 +32,7 @@ const declarations = z
       function_id: z.string(),
       min_arity: z.number().int().positive(),
       max_arity: z.number().int().positive().nullable(),
-      module: z.enum(['math', 'builtins', 'cso_python']),
+      module: z.enum(['math', 'builtins']),
       spellings: z.array(z.string()).nonempty(),
     }),
   )
@@ -67,8 +67,6 @@ const referenceCases: Record<
   min: { args: [2, 1], expected: 1, kind: 'float' },
   exp: { args: [0], expected: 1, kind: 'float' },
   log: { args: [1], expected: 0, kind: 'float' },
-  noop: { args: [2], expected: 2, kind: 'float' },
-  stub: { args: [2], expected: 2, kind: 'float' },
   radians: { args: [180], expected: Math.PI, kind: 'float' },
   degrees: { args: [Math.PI], expected: 180, kind: 'float' },
   sin: { args: [Math.PI / 6], expected: 0.5, kind: 'float' },
@@ -274,15 +272,13 @@ it.each(declarations)(
         createElement(PreparedFormulaSheet, { document }),
       );
       expect(html).not.toContain('>?</');
-      if (call.module !== 'cso_python')
-        expect(html).toContain(
-          call.name === 'sqrt' ? '<msqrt>' : `>${spec?.glyph}</`,
-        );
+      expect(html).toContain(
+        call.name === 'sqrt' ? '<msqrt>' : `>${spec?.glyph}</`,
+      );
       const { code, result } = exportReplay(execution, output.symbolId);
-      if (call.module !== 'cso_python')
-        expect(code).toContain(
-          `${call.module === 'math' ? 'math.' : ''}${call.name}(`,
-        );
+      expect(code).toContain(
+        `${call.module === 'math' ? 'math.' : ''}${call.name}(`,
+      );
       expect(result.kind).toBe(sample.kind);
       expect(result.value).toBe(output.value);
 
@@ -476,18 +472,69 @@ const syntaxCases = [
     expected: 2,
     kind: 'int',
   },
-  { id: 'fg.and', expression: 'quantity and 2', expected: 2, kind: 'int' },
-  { id: 'fg.or', expression: 'quantity or 2', expected: 0.5, kind: 'float' },
+  {
+    id: 'fg.and',
+    expression: '1 if quantity > 0 and quantity < 1 else 2',
+    expected: 1,
+    kind: 'int',
+  },
+  {
+    id: 'fg.or',
+    expression: '1 if quantity < 0 or quantity > 1 else 2',
+    expected: 2,
+    kind: 'int',
+  },
 ];
 
-it('covers every registered FormulaSheet operation through Python authoring', () => {
+const displayOnlyFunctions = ['fg.noop', 'fg.stub'];
+
+it('classifies display-only functions separately from verified Python operations', () => {
+  const authored = new Set([
+    ...declarations.map((call) => call.function_id),
+    ...syntaxCases.map((sample) => sample.id),
+  ]);
   expect(
-    [
-      ...declarations.map((call) => call.function_id),
-      ...syntaxCases.map((sample) => sample.id),
-    ].sort(),
-  ).toEqual(sheetFunctionSpecs.map((spec) => spec.id).sort());
+    sheetFunctionSpecs
+      .filter((spec) => !authored.has(spec.id))
+      .map((spec) => spec.id)
+      .sort(),
+  ).toEqual(displayOnlyFunctions);
+  for (const id of authored) expect(getFunctionSpec(id)).toBeDefined();
 });
+
+it.each(displayOnlyFunctions)(
+  '%s retains display/export compatibility without numerical verification',
+  (id) => {
+    const { execution, output } = successfulCapture('quantity + 0');
+    const root = execution.cso.sections
+      .flatMap((section) =>
+        section.items.flatMap((item) =>
+          item.kind === 'symbol' ? item.symbol.valueTree.nodes : [],
+        ),
+      )
+      .find((node) => node.funcSpec?.id === 'fg.add');
+    if (!root?.funcArgs?.[0]) throw new Error('Missing formula operand');
+    root.funcSpec = { id };
+    root.funcArgs = [root.funcArgs[0]];
+    const report = verifyExecution({ execution });
+    expect(report.ok).toBe(false);
+    expect(
+      report.diagnostics.some(
+        (diagnostic) => diagnostic.code === 'UNSUPPORTED_FUNCTION',
+      ),
+    ).toBe(true);
+    const html = renderToStaticMarkup(
+      createElement(PreparedFormulaSheet, {
+        document: prepareExecutionDocument({ execution, assets: [] }),
+      }),
+    );
+    expect(html).not.toContain('>?</');
+    expect(exportReplay(execution, output.symbolId).result).toEqual({
+      value: 0.5,
+      kind: 'float',
+    });
+  },
+);
 
 it.each(syntaxCases)(
   '$id works through capture, verification, rendering and replay',
@@ -534,10 +581,6 @@ const extendedCases = [
   ['round(quantity, -400)', '-2.675', -0, 'float'],
   ['round(quantity, -400)', '-250', 0, 'int'],
   ['round(quantity, 323)', '5e-324', 0, 'float'],
-  ['quantity and (1 / 0)', '-0.0', -0, 'float'],
-  ['quantity or (1 / 0)', '2', 2, 'int'],
-  ['0 or quantity or (1 / 0)', '2.0', 2, 'float'],
-  ['quantity and 2 and 3', '1.0', 3, 'int'],
   ['1 if quantity > 0 and math.log(-1) > 0 else 2', '-1.0', 2, 'int'],
   ['1 if quantity > 0 or math.log(-1) > 0 else 2', '1.0', 1, 'int'],
   ['1 if 0 < quantity <= 2 != 3 else 2', '1.0', 1, 'int'],
@@ -548,18 +591,12 @@ const extendedCases = [
     1,
     'int',
   ],
-  ['noop(quantity)', '-0.0', -0, 'float'],
-  ['stub(quantity)', '2', 2, 'int'],
 ] satisfies [string, string, number, 'int' | 'float'][];
 
 it.each(extendedCases)(
   '%s at %s preserves the expected value and kind',
   (expression, input, value, kind) => {
-    const { execution, output } = successfulCapture(
-      expression,
-      input,
-      'import math\nfrom cso_python import noop, stub',
-    );
+    const { execution, output } = successfulCapture(expression, input);
     expect(output.value).toBe(value);
     expect(output.numericKind).toBe(kind);
     const report = verifyExecution({ execution });
@@ -614,7 +651,9 @@ it.each([
 it.each(['arity', 'role', 'cycle'])(
   'validates dormant logical operands for %s errors before evaluation',
   (change) => {
-    const { execution } = successfulCapture('quantity or math.sqrt(-1)');
+    const { execution } = successfulCapture(
+      '1 if quantity > 0 or math.sqrt(-1) > 0 else 2',
+    );
     const nodes = execution.cso.sections.flatMap((section) =>
       section.items.flatMap((item) =>
         item.kind === 'symbol' ? item.symbol.valueTree.nodes : [],
@@ -641,5 +680,38 @@ it.each(['arity', 'role', 'cycle'])(
               : 'NONNUMERIC_FORMULA'),
       ),
     ).toBe(true);
+  },
+);
+
+it.each(['and', 'or'])(
+  'rejects numeric %s operands in externally supplied graphs',
+  (operator) => {
+    for (const numericOnly of [false, true]) {
+      const { execution } = successfulCapture(
+        `1 if quantity > 0 ${operator} quantity < 1 else 2`,
+      );
+      const nodes = execution.cso.sections.flatMap((section) =>
+        section.items.flatMap((item) =>
+          item.kind === 'symbol' ? item.symbol.valueTree.nodes : [],
+        ),
+      );
+      const logical = nodes.find(
+        (node) => node.funcSpec?.id === `fg.${operator}`,
+      );
+      const comparison = nodes.find((node) => node.funcSpec?.id === 'fg.gt');
+      if (!logical?.funcArgs || !comparison?.funcArgs?.[0])
+        throw new Error('Missing predicate');
+      const numericOperand = comparison.funcArgs[0];
+      logical.funcArgs = logical.funcArgs.map((argument, index) =>
+        numericOnly || index === 0 ? { key: numericOperand.key } : argument,
+      );
+      const report = verifyExecution({ execution });
+      expect(report.ok).toBe(false);
+      expect(
+        report.diagnostics.some(
+          (diagnostic) => diagnostic.code === 'INVALID_CONDITIONAL',
+        ),
+      ).toBe(true);
+    }
   },
 );

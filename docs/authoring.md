@@ -104,12 +104,9 @@ the represented binary64 value, so `round(2.675, 2)` is `2.67`. A float rounded
 to zero retains its sign. Results remain subject to the finite-float and safe-int
 contracts. See [Python's round semantics](https://docs.python.org/3/library/functions.html#round).
 
-Import `noop` or `stub` from `cso_python` to preserve an explicit numeric operand
-inside a FormulaSheet grouping or filled placeholder. Both take one argument
-and preserve its value and kind. Empty draft placeholders and multi-value
-passthrough trees remain display/export forms; they cannot prove a numeric
-calculation. `stub(value)` is distinct from the unverified `documented_result`
-escape hatch.
+`noop` and `stub` are FormulaSheet grouping and placeholder nodes used by
+rendering and Python export. They are not Python authoring functions and are
+outside numerical verification, including when they contain a numeric operand.
 
 Trigonometry supports `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `sinh`, `cosh`,
 `tanh`, `radians` and `degrees`. Use `math.<name>(value)` after `import math`, or
@@ -133,12 +130,10 @@ Join comparisons with `and` / `or`, or use comparison chains such as
 the result is decided; a chain evaluates its shared numeric operand once.
 Only the selected conditional branch is evaluated.
 
-Numeric expressions also support `and` / `or` with numeric operands. These return
-the selected operand, preserving its actual kind and signed zero, following
-[Python's Boolean-operation semantics](https://docs.python.org/3/reference/expressions.html#boolean-operations).
-A predicate joins comparisons; a numeric logical expression joins numbers.
-Mixing comparisons and numbers within one logical expression is rejected.
-Boolean quantities and bare numeric conditional tests remain unsupported. Core checks every Value tree node, including
+`and` / `or` are supported only between comparisons in conditional tests.
+Numeric selection expressions such as `quantity or fallback`, mixed numeric and
+comparison operands, Boolean quantities and bare numeric conditional tests are
+rejected. Core checks every Value tree node, including
 dormant and disconnected nodes, for supported operations, operand roles,
 numeric literals, references and cycles before evaluation.
 Every captured literal must satisfy the numeric kind and range contract, even

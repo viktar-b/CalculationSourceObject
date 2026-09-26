@@ -35,7 +35,7 @@ def calculate(quantity: Annotated[float, symbol(glyph="q_{{in}}", description="I
     def test_all_declared_calls_reject_invalid_arity_and_keywords_before_execution(self):
         for call in FUNCTION_CALLS:
             for spelling in call.spellings:
-                imports = f"from math import {call.name}\nimport math" if call.module == "math" else f"from cso_python import {call.name}" if call.module == "cso_python" else ""
+                imports = f"from math import {call.name}\nimport math" if call.module == "math" else ""
                 counts = [call.min_arity - 1] + ([call.max_arity + 1] if call.max_arity is not None else [])
                 for args in [*(", ".join(["quantity"] * count) for count in counts), "quantity=quantity"]:
                     with self.subTest(function=spelling, args=args):
@@ -61,3 +61,23 @@ def calculate(quantity: Annotated[float, symbol(glyph="q_{{in}}", description="I
     def test_unlisted_math_functions_remain_unavailable(self):
         self.reject("math.floor(quantity)", "import math", code="UNSUPPORTED_SYNTAX")
         self.reject("floor(quantity)", "from math import floor", code="UNSUPPORTED_SYNTAX")
+
+    def test_display_helpers_are_not_authoring_functions(self):
+        import cso_python
+
+        for name in ("noop", "stub"):
+            with self.subTest(function=name):
+                self.assertFalse(hasattr(cso_python, name))
+                self.reject(f"{name}(quantity)", f"from cso_python import {name}", code="UNSUPPORTED_SYNTAX")
+                self.reject(f"{name}(quantity)", code="UNSUPPORTED_SYNTAX")
+
+    def test_numeric_logical_expressions_are_rejected_before_execution(self):
+        for expression in (
+            "quantity and 2", "quantity or 2",
+            "1 if quantity and 2 else 0",
+            "1 if quantity > 0 and quantity else 0",
+            "1 if (quantity or 2) > 0 else 0",
+            "1 if quantity < 0 else quantity or 2",
+        ):
+            with self.subTest(expression=expression):
+                self.reject(expression, code="UNSUPPORTED_SYNTAX")

@@ -209,7 +209,7 @@ function roundInteger(value: number): number {
 }
 
 export type ValueRole = 'number' | 'comparison';
-type OperandRole = ValueRole | 'either' | 'integer';
+type OperandRole = ValueRole | 'integer';
 type Arity = { readonly min: number; readonly max: number | null };
 type TypedEvaluation = (
   values: readonly number[],
@@ -343,14 +343,6 @@ const rounded = (
   return validateNumber(roundToDigits(value, digits, kinds?.[0]), kinds?.[0]);
 };
 
-const identityOperation: Operation = {
-  kind: 'numeric',
-  operands: ['number'],
-  evaluate: (value) => validateNumber(value),
-  typed: ([value], kinds) =>
-    validateNumber(kinds[0] === 'int' && value === 0 ? 0 : value, kinds[0]),
-};
-
 /** Own operation roles and evaluation together; rendering also accepts non-numeric argument forms. */
 const operations = new Map<string, Operation>([
   ['fg.add', binary(add, (a, b) => a + b)],
@@ -440,15 +432,13 @@ const operations = new Map<string, Operation>([
       typed: ([value, base]) => logarithm(value, base),
     },
   ],
-  ['fg.noop', identityOperation],
-  ['fg.stub', identityOperation],
   [
     'fg.and',
     {
       kind: 'logical',
       operator: 'and',
-      operands: ['either'],
-      arity: { min: 1, max: null },
+      operands: ['comparison'],
+      arity: { min: 2, max: null },
     },
   ],
   [
@@ -456,8 +446,8 @@ const operations = new Map<string, Operation>([
     {
       kind: 'logical',
       operator: 'or',
-      operands: ['either'],
-      arity: { min: 1, max: null },
+      operands: ['comparison'],
+      arity: { min: 2, max: null },
     },
   ],
   ['fg.rad', floatUnary((degrees) => degrees * (Math.PI / 180))],

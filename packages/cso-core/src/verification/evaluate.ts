@@ -286,7 +286,7 @@ export const createFormulaEvaluator = (
           role === 'comparison' ? 'INVALID_CONDITIONAL' : 'NONNUMERIC_FORMULA',
         message:
           role === 'comparison'
-            ? 'A conditional test requires one numeric comparison.'
+            ? 'A conditional test requires numeric comparisons.'
             : 'A numeric operand cannot contain a comparison.',
       }),
     );
@@ -351,24 +351,19 @@ export const createFormulaEvaluator = (
               message: resolved.message,
             }),
           );
-        const roles = new Set<ValueRole>();
         for (const [index, argument] of node.funcArgs.entries()) {
           const target = { symbolId: address.symbolId, nodeKey: argument.key };
           const child = validateStructure(target, stack);
           if (!child.ok) return child;
           const declared = resolved.operation.operands[index];
           const expected = declared === 'integer' ? 'number' : declared;
-          roles.add(child.role);
-          if (expected !== 'either' && child.role !== expected)
-            return roleFailure(target, expected);
+          if (child.role !== expected) return roleFailure(target, expected);
         }
-        if (resolved.operation.kind === 'logical' && roles.size !== 1)
-          return roleFailure(address, 'number');
         return {
           ok: true,
           role:
             resolved.operation.kind === 'comparison' ||
-            (resolved.operation.kind === 'logical' && roles.has('comparison'))
+            resolved.operation.kind === 'logical'
               ? 'comparison'
               : 'number',
         };
@@ -455,22 +450,6 @@ export const createFormulaEvaluator = (
     const shape = resolveOperation(node.funcSpec.id, node.funcArgs.length);
     if (!shape.ok) {
       return numericEvaluation(address, shape);
-    }
-    if (shape.operation.kind === 'logical') {
-      for (const [index, argument] of node.funcArgs.entries()) {
-        const result = evaluateNode(
-          { symbolId: graph.symbol.id, nodeKey: argument.key },
-          stack,
-        );
-        if (!result.ok) return result;
-        if (
-          (shape.operation.operator === 'and'
-            ? result.value === 0
-            : result.value !== 0) ||
-          index === node.funcArgs.length - 1
-        )
-          return result;
-      }
     }
     if (shape.operation.kind === 'conditional') {
       return evaluateConditional(graph, node, stack);

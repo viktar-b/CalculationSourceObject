@@ -10,8 +10,6 @@ describe('extended numeric functions', () => {
     ['fg.log', [8, 2], ['float', 'int'], 3, 'float'],
     ['fg.min', [0, -0, 1], ['int', 'float', 'int'], 0, 'int'],
     ['fg.max', [-0, 0, -1], ['float', 'int', 'int'], -0, 'float'],
-    ['fg.noop', [-0], ['float'], -0, 'float'],
-    ['fg.stub', [2], ['int'], 2, 'int'],
     ['fg.round', [2.675, 2], ['float', 'int'], 2.67, 'float'],
     ['fg.round', [-0.1, 0], ['float', 'int'], -0, 'float'],
     ['fg.round', [250, -2], ['int', 'int'], 200, 'int'],
@@ -73,10 +71,9 @@ describe('extended numeric functions', () => {
     ['fg.max', 0],
     ['fg.round', 3],
     ['fg.and', 0],
+    ['fg.and', 1],
     ['fg.or', 0],
-    ['fg.noop', 0],
-    ['fg.stub', 0],
-    ['fg.stub', 2],
+    ['fg.or', 1],
   ] satisfies [string, number][])('%s rejects arity %d', (id, count) => {
     expect(validateOperation(id, count)).toMatchObject({
       ok: false,
