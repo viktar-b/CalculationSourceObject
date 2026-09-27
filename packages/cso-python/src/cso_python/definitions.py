@@ -377,7 +377,8 @@ class Definitions:
             "parameters": [
                 {
                     "name": name,
-                    "type": spec.documented.numeric_type,
+                    "type": spec.declared.numeric_type,
+                    "documentedType": spec.documented.numeric_type,
                     "metadata": spec.documented.metadata,
                     **(
                         {"default": spec.default_value}

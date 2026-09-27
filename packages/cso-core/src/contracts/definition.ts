@@ -79,9 +79,9 @@ export const CalculationDefinitionSchema = z
           params: { diagnosticCode: 'ENTRY_MANIFEST_MISMATCH' },
         });
     }
-    for (const [field, items] of [
-      ['inputs', definition.inputs],
-      ['outputs', definition.outputs],
+    for (const [field, items, label, diagnosticCode] of [
+      ['inputs', definition.inputs, 'input', 'DUPLICATE_DEFINITION_INPUT'],
+      ['outputs', definition.outputs, 'output', 'DUPLICATE_DEFINITION_OUTPUT'],
     ] as const) {
       const seen = new Set<string>();
       for (const [index, item] of items.entries()) {
@@ -89,9 +89,9 @@ export const CalculationDefinitionSchema = z
           ctx.addIssue({
             code: 'custom',
             path: [field, index, 'name'],
-            message: `Duplicate definition ${field.slice(0, -1)} name`,
+            message: `Duplicate definition ${label} name`,
             params: {
-              diagnosticCode: `DUPLICATE_DEFINITION_${field.slice(0, -1).toUpperCase()}`,
+              diagnosticCode,
             },
           });
         seen.add(item.name);
