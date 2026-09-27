@@ -15,6 +15,10 @@ def main(argv: list[str] | None = None) -> int:
         from .execution import execute_from_argv
 
         return execute_from_argv(arguments[1:])
+    if arguments and arguments[0] == "describe":
+        from .describe import describe_from_argv
+
+        return describe_from_argv(arguments[1:])
     parser = argparse.ArgumentParser(
         prog="python -m cso_python",
         description="Author and export constrained Python calculations. Export is not numerical verification.",
@@ -28,6 +32,9 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser(
         "execute",
         help="Capture source and emit execution evidence for core verification.",
+    )
+    commands.add_parser(
+        "describe", help="Describe a calculation without executing authored code."
     )
     commands.add_parser("bindings", help="Generate typed calculation handles")
     add_export_arguments(export)

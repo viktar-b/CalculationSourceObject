@@ -248,3 +248,9 @@ export {
   AuthoringEvidenceSchema,
   type AuthoringEvidence,
 } from './contracts/authoring.ts';
+export {
+  CalculationDefinitionSchema,
+  CalculationDefinitionResponseSchema,
+  type CalculationDefinition,
+  type CalculationDefinitionResponse,
+} from './contracts/definition.ts';

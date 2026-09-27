@@ -79,7 +79,7 @@ def generate(directory: Path, *, check: bool = False) -> dict:
             )
             stub.append(f"{output_type} = TypedDict({output_type!r}, {{{fields}}})\n")
             parameters = ", ".join(
-                f"{key}: {spec.documented.numeric_type}"
+                f"{key}: {spec.declared.numeric_type}"
                 + (f" = {spec.default_value!r}" if spec.default is not None else "")
                 for key, spec in definition.parameters.items()
             )
