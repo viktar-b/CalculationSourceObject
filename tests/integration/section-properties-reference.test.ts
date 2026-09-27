@@ -136,7 +136,7 @@ it.each([
               'cso_python',
               'execute',
               new URL(
-                '../../examples/section-properties/unequal-tapered-i-beam/calculate.cso.py',
+                '../../examples/section-properties/unequal_tapered_i_beam/calculate.cso.py',
                 import.meta.url,
               ).pathname,
               '--function',
