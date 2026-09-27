@@ -68,6 +68,13 @@ public declarations; formula support, document content and requirements that
 depend on a particular invocation are checked during planning. Generation does
 not run authored calculations.
 
+Use `python -m cso_python describe <file.cso.py> --function <name>` to read
+the same static interface as a versioned JSON definition. It includes input
+names, numeric declarations, defaults, glyphs, descriptions, units and selected
+public outputs. It captures source identity but does not execute formulas or
+establish numerical verification. Core's `CalculationDefinitionResponseSchema`
+validates this handoff for consumers that build forms and input validators.
+
 Calls accept finite literals, earlier documented quantities or earlier public
 outputs. Paths resolve relative to the calling module and stay inside the entry
 directory, including through symlinks. Calls occupy separate source lines.
