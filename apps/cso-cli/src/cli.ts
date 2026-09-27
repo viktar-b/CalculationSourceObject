@@ -11,18 +11,36 @@ const [command, ...args] = process.argv.slice(2);
 if (
   command === '--help' ||
   command === undefined ||
-  (['verify', 'pdf', 'html', 'bindings', 'dev-export', 'dev-render'].includes(
-    command,
-  ) &&
+  ([
+    'verify',
+    'pdf',
+    'html',
+    'bindings',
+    'dev',
+    'dev-export',
+    'dev-render',
+  ].includes(command) &&
     args.includes('--help'))
 ) {
   process.stdout.write(
     command === 'verify' || command === 'pdf' || command === 'html'
       ? verifiedHelp(command)
-      : command === 'bindings'
-        ? bindingsHelp
-        : help,
+      : command === 'dev'
+        ? (await import('./dev-server.ts')).devHelp
+        : command === 'bindings'
+          ? bindingsHelp
+          : help,
   );
+} else if (command === 'dev') {
+  try {
+    const { devCommand } = await import('./dev-server.ts');
+    await devCommand(args);
+  } catch (error) {
+    process.stderr.write(
+      `${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    process.exitCode = error instanceof UsageError ? 2 : 1;
+  }
 } else if (command === 'bindings') {
   process.exitCode = bindingsCommand(args);
 } else if (command === 'verify' || command === 'pdf' || command === 'html') {

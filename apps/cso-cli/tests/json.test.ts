@@ -29,3 +29,13 @@ test('rejects cycles and non-JSON class instances', () => {
   expect(() => stringifyJson(cyclic)).toThrow('cyclic JSON');
   expect(() => stringifyJson(new Date())).toThrow('plain JSON object');
 });
+
+test('keeps wide finite float transport spellings from becoming Python integers', () => {
+  expect(
+    stringifyJson({
+      large: 1e20,
+      negative: -1e20,
+      safe: Number.MAX_SAFE_INTEGER,
+    }),
+  ).toBe('{"large":1e+20,"negative":-1e+20,"safe":9007199254740991}');
+});

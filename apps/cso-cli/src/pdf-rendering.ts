@@ -317,9 +317,15 @@ async function withPreparedPage<T>(
   document: PreparedDocument,
   html: string,
   usePage: (page: Page, presentation: PresentationMapping[]) => Promise<T>,
+  signal?: AbortSignal,
 ): Promise<T> {
   const browser = await chromium.launch({ headless: true, timeout: 30_000 });
+  const abort = () => {
+    void browser.close().catch(() => {});
+  };
+  signal?.addEventListener('abort', abort, { once: true });
   try {
+    signal?.throwIfAborted();
     const page = await browser.newPage();
     page.setDefaultTimeout(15_000);
     const requests: string[] = [];
@@ -348,6 +354,7 @@ async function withPreparedPage<T>(
     );
     return await usePage(page, presentation);
   } finally {
+    signal?.removeEventListener('abort', abort);
     await browser.close();
   }
 }
@@ -365,10 +372,12 @@ export function inspectPreparedHtml(
 
 export function renderPreparedPdf(
   document: PreparedDocument,
+  html = buildPreparedHtml(document),
+  signal?: AbortSignal,
 ): Promise<{ pdf: Buffer; presentation: PresentationMapping[] }> {
   return withPreparedPage(
     document,
-    buildPreparedHtml(document),
+    html,
     async (page, presentation) => {
       let printTimer: ReturnType<typeof setTimeout> | undefined;
       try {
@@ -390,5 +399,6 @@ export function renderPreparedPdf(
         clearTimeout(printTimer);
       }
     },
+    signal,
   );
 }
