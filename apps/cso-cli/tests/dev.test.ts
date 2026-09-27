@@ -63,6 +63,18 @@ test('accepts supplied numbers, defaults, negative zero and wide finite floats',
   ).toBe(true);
 });
 
+test.each(['9007199254740992.0', '9.007199254740992e15'])(
+  'accepts the wide float token %s while rejecting it for an integer input',
+  (token) => {
+    expect(
+      parseDevInputs(`{"inputs":{"width":${token}}}`, definition),
+    ).toEqual({ width: 9007199254740992 });
+    expect(() =>
+      parseDevInputs(`{"inputs":{"count":${token}}}`, definition),
+    ).toThrow('count requires a finite safe integer');
+  },
+);
+
 test.each([
   '{"width":4}',
   '{"inputs":{},"source":"other.py"}',
