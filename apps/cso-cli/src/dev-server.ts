@@ -44,6 +44,11 @@ export function parseDevArgs(args: string[]): DevOptions {
   const functionName = values.get('--function');
   if (!functionName || !PythonIdentifierSchema.safeParse(functionName).success)
     throw new UsageError('--function requires a Python identifier');
+  const normalizedFunction = functionName.normalize('NFKC');
+  if (!PythonIdentifierSchema.safeParse(normalizedFunction).success)
+    throw new UsageError(
+      '--function does not normalize to a valid Python identifier',
+    );
   const spelling = values.get('--port') ?? '3000';
   const port = Number(spelling);
   if (!/^\d+$/.test(spelling) || !Number.isInteger(port) || port > 65535)
@@ -51,7 +56,7 @@ export function parseDevArgs(args: string[]): DevOptions {
   const reference = values.get('--reference');
   return {
     sourcePath: resolve(source),
-    functionName: functionName.normalize('NFKC'),
+    functionName: normalizedFunction,
     port,
     ...(reference ? { referencePath: resolve(reference) } : {}),
   };
@@ -96,13 +101,27 @@ export function parseDevInputs(
         400,
         `${name} requires a finite ${input.numericType === 'int' ? 'safe integer' : 'number'}`,
       );
-    entries.push([name, value]);
+    entries.push([
+      name,
+      input.numericType === 'int' && Object.is(value, -0) ? 0 : value,
+    ]);
   }
   // JSON.parse rounds large integer tokens before numeric types can inspect them.
   for (const match of text.matchAll(
-    /"(?:[^"\\]|\\.)*"\s*:\s*(-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
+    /("(?:[^"\\]|\\.)*")\s*:\s*(-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
   )) {
-    if (!/[.eE]/.test(match[1]) && !Number.isSafeInteger(Number(match[1])))
+    const name: unknown = JSON.parse(match[1]);
+    const token = match[2];
+    if (
+      typeof name === 'string' &&
+      parameters.get(name)?.numericType === 'int' &&
+      /[.eE]/.test(token)
+    )
+      throw new HttpError(
+        400,
+        `${name} requires an integer token without a decimal or exponent`,
+      );
+    if (!/[.eE]/.test(token) && !Number.isSafeInteger(Number(token)))
       throw new HttpError(
         400,
         'Integer tokens must be within the safe integer range; use a decimal or exponent for floats',

@@ -72,13 +72,13 @@ form.addEventListener('submit', async event => {
     for (const [name, value] of Object.entries(run.outputs)) {
       const metadata = definition.outputs.find(item => item.name === name);
       const term = document.createElement('dt'); term.textContent = name;
-      const result = document.createElement('dd'); result.textContent = String(value) + (metadata?.unit ? ' ' + metadata.unit : '');
+      const result = document.createElement('dd'); result.textContent = numberText(value) + (metadata?.unit ? ' ' + metadata.unit : '');
       outputs.append(term, result);
     }
     showChecks(run.checks);
     report.src = run.html; report.hidden = false;
     pdf.href = run.pdf; pdf.hidden = false;
-    evidence.href = run.evidence; evidence.hidden = false;
+    evidence.href = run.evidence; evidence.hidden = true;
     status.textContent = 'Report ready. Review its assumptions and results.';
   } catch (error) { if (started === revision) status.textContent = error.message; }
   finally { button.disabled = false; }
@@ -99,8 +99,16 @@ pdf.addEventListener('click', async event => {
     const download = document.createElement('a'); download.href = url; download.download = 'calculation.pdf'; download.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     const latest = await readJson(await fetch('/api/runs/' + run.id));
-    if (started === revision) { showChecks(latest.checks); status.textContent = 'PDF ready. Human review remains pending.'; }
-  } catch (error) { if (started === revision) status.textContent = error.message; }
+    if (started === revision) { showChecks(latest.checks); evidence.href = run.evidence; evidence.hidden = false; status.textContent = 'PDF ready. Human review remains pending.'; }
+  } catch (error) {
+    if (started === revision) {
+      try {
+        const latest = await readJson(await fetch('/api/runs/' + run.id));
+        if (started === revision) showChecks(latest.checks);
+      } catch { /* Keep the original PDF failure if the run is unavailable. */ }
+      if (started === revision) status.textContent = error.message;
+    }
+  }
   finally { if (started === revision) pdf.hidden = false; }
 });
 (async () => {

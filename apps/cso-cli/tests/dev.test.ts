@@ -30,6 +30,7 @@ test('fixes source and function at startup and accepts an assigned port', () => 
   expect(
     parseDevArgs(['report.cso.py', '--function', 'calculate', '--port', '0']),
   ).toMatchObject({ functionName: 'calculate', port: 0 });
+  expect(() => parseDevArgs(['report.cso.py', '--function', 'ͺ'])).toThrow();
   for (const extra of [
     ['--host', '0.0.0.0'],
     ['--port', '-1'],
@@ -47,6 +48,13 @@ test('accepts supplied numbers, defaults, negative zero and wide finite floats',
     parseDevInputs('{"inputs":{"width":1e20,"count":3}}', definition),
   ).toEqual({ width: 1e20, count: 3 });
   expect(parseDevInputs('{"inputs":{}}', definition)).toEqual({});
+  expect(
+    Object.is(parseDevInputs('{"inputs":{"count":-0}}', definition).count, 0),
+  ).toBe(true);
+  for (const token of ['1.0', '1e0', '-0.0'])
+    expect(() =>
+      parseDevInputs('{"inputs":{"count":' + token + '}}', definition),
+    ).toThrow('integer token');
   expect(
     Object.is(
       parseDevInputs('{"inputs":{"width":-0.0}}', definition).width,

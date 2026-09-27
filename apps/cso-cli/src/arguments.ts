@@ -130,7 +130,7 @@ export function parseCliArgs(args: readonly string[]): DevelopmentOptions {
 }
 
 export const help = `Usage: cso <verify|html|pdf|bindings|dev|dev-export|dev-render> [arguments]
-Use cso <command> --help for usage. Development commands require
+Use cso <command> --help for usage. dev-export and dev-render require
 --source <file.cso.py> --function <name> --out <path>.
 
 verify evaluates documented formulas and optional independent references.
