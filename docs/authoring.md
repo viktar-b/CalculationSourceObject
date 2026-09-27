@@ -27,6 +27,43 @@ is not a LaTeX engine; commands such as `\mathrm` and `\frac` are unsupported.
 
 ## Inputs and reusable calculations
 
+### Reuse a calculation
+
+Start with the [two-panel walkthrough](../examples/two-panel/README.md).
+Its `geometry.cso.py` defines `rectangle(width, height)` and returns named
+`area` and `perimeter` outputs. `quantities.py` supplies shared input metadata.
+Generate the directory's bindings before importing the calculation:
+
+```sh
+python -m cso_python bindings examples/two-panel
+```
+
+The generator creates `_cso_bindings/geometry.py` and `geometry.pyi`. A caller
+in that example directory imports the handle and supplies keyword arguments:
+
+```python
+from _cso_bindings.geometry import rectangle
+
+# Inside an annotated parent calculation:
+first_panel = rectangle(width=width, height=first_panel_height)
+second_panel = rectangle(width=width, height=second_panel_height)
+total_area: TotalPanelArea = first_panel["area"] + second_panel["area"]
+```
+
+`TotalPanelArea` is the shared metadata alias used by the canonical
+[parent](../examples/two-panel/estimate.cso.py). That parent forwards the total
+to a material calculation and returns area, volume and mass. Both rectangle
+perimeters still appear in the document: public outputs select what a caller
+can access; they do not hide documented intermediate work.
+
+Every call gets its own invocation and places its child section at the call
+site. Forwarded quantities retain their identity and metadata. Distinct results
+get [qualified notation](#repeated-symbols), even when calls receive equal values.
+See the [section-property comparisons](../examples/section-properties/README.md#reuse-in-a-comparison)
+for the same workflow with larger calculations.
+
+### Parameters and public outputs
+
 Keep reusable metadata in shared `Annotated` / `TypeAlias` declarations.
 Each selected function has `@calculation`, `@section`, numeric parameters and a
 final public-output dictionary. Parameters accept `float`, `int` or metadata
@@ -55,11 +92,35 @@ Declared callee units must match exactly; conversions belong in explicit
 annotated calculations. Equal numeric values do not make two quantities identical.
 Standalone values, supplied literals and defaults create input rows.
 
+### Binding generation and project layout
+
 Generate handles with `python -m cso_python bindings <directory>` or
 `cso bindings <directory>`. Use `--check` to detect missing/stale bindings without
 writing files. Generated `_cso_bindings` modules provide named arguments and
 typed public result keys. Generate bindings in a temporary consumer when tests
 mutate sources. Dynamic Python callers can use `load_calculation` directly.
+
+Choose the generation root that contains the parent calculation and all its
+dependencies. Every source path below that root must use Python identifiers:
+use `hot_formed_i_sections/calculate.cso.py`, not hyphenated directory names.
+Imports mirror those relative paths, for example
+`from _cso_bindings.hot_formed_i_sections.calculate import calculate`.
+For ordinary Python imports, run the consumer from that root or put the root
+on its import path. The generation root's own directory name need not be a
+Python identifier.
+
+`_cso_bindings/` is generated, Git-ignored output in this repository. Never edit
+it. Generate after a fresh checkout and after interface changes. These include
+parameter names, numeric declarations, defaults, quantity metadata and which
+quantity a public output selects. Formula-only edits can leave bindings current.
+Generation is explicit; importing a missing or stale handle does not refresh it.
+The [setup guide](development.md#setup) generates the maintained examples.
+
+Build and CI consumers must generate bindings before importing calculations;
+`--check` alone cannot bootstrap a fresh checkout. A distributable calculation
+bundle needs its `.cso.py` sources, local dependencies and matching bindings, or
+a documented generation step using the intended `cso-python` version. Ignoring
+bindings in Git does not make their runtime files optional at execution time.
 
 Generation validates calculation definitions before writing generated files.
 Parameters, defaults and public output selections follow the same static rules

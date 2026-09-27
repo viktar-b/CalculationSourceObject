@@ -13,7 +13,7 @@ to React for document preparation, then publishes the PDF and evidence.
 | Plan formulas, inherited inputs and document order | [Planner](../packages/cso-python/src/cso_python/planner.py), [annotations](../packages/cso-python/src/cso_python/annotations.py) | [authoring tests](../packages/cso-python/tests/test_authoring_v2.py) |
 | Declare supported Python calls, imports and argument counts | [Function calls](../packages/cso-python/src/cso_python/function_calls.py) | [call preflight tests](../packages/cso-python/tests/test_function_calls.py), [function support contract](../tests/integration/function-support.test.ts) |
 | Observe assignments and public returns from captured code | [Execution](../packages/cso-python/src/cso_python/execution.py) | [authoring protocol integration](../tests/integration/authoring-v2.test.ts) |
-| Generate editor types without executing calculations | [bindings](../packages/cso-python/src/cso_python/bindings.py), [handles](../packages/cso-python/src/cso_python/handles.py) | [authoring tests](../packages/cso-python/tests/test_authoring_v2.py) |
+| Generate runtime handles and editor types without executing calculations | [bindings](../packages/cso-python/src/cso_python/bindings.py), [handles](../packages/cso-python/src/cso_python/handles.py) | [authoring tests](../packages/cso-python/tests/test_authoring_v2.py) |
 | Parse cross-language evidence | [execution schema](../packages/cso-core/src/contracts/execution.ts), [authoring schema](../packages/cso-core/src/contracts/authoring.ts) | [execution contract tests](../packages/cso-core/tests/execution-contract.test.ts) |
 | Validate numeric evidence and retain input kinds in artifact bindings | [numeric contracts](../packages/cso-core/src/contracts/numbers.ts), [input evidence](../packages/cso-core/src/contracts/common.ts), `executionBindingFrom` in [execution contracts](../packages/cso-core/src/contracts/execution.ts) | [numeric contract tests](../packages/cso-core/tests/numeric-evidence-contract.test.ts), [cross-package evidence](../tests/integration/numeric-evidence.test.ts) |
 | Parse notation and validate scoped Symbol display identity across documents | [notation parser](../packages/cso-core/src/notation/parse.ts), [Symbol display module](../packages/cso-core/src/contracts/glyphs.ts) | [display contract tests](../packages/cso-core/tests/symbol-display-contract.test.ts), [notation conformance](../tests/integration/notation-conformance.test.ts) |
@@ -21,6 +21,14 @@ to React for document preparation, then publishes the PDF and evidence.
 | Prepare ordered content bound to that execution | [prepareExecutionDocument](../packages/cso-react/src/prepare-document.ts), [document schemas](../packages/cso-core/src/contracts/document.ts) | [prepared-document tests](../tests/integration/react/prepared-document.test.ts) |
 | Select engineering context, operand details and retained-source pointers | [context preparation](../packages/cso-react/src/prepare-context.ts) | [context tests](../packages/cso-react/tests/prepared-context.test.ts) |
 | Capture assets, render and publish | [pdfCommand](../apps/cso-cli/src/pdf.ts), [assets](../apps/cso-cli/src/assets.ts), [evidence](../apps/cso-cli/src/evidence.ts) | [installed PDF cases](../tests/integration/installed/pdf-consumer.mjs), [evidence tests](../apps/cso-cli/tests/evidence.test.ts) |
+
+Binding generation and invocation planning read the same static calculation
+definitions. Generated `.py` modules create callable handles; adjacent `.pyi`
+files describe their keyword arguments and public output keys. Importing a handle
+does not execute the authored function. Calling it enters the capture, planning
+and execution path above. See the [Python library](../packages/cso-python/README.md#generated-calculation-bindings)
+for the developer workflow and the [authoring guide](authoring.md#reuse-a-calculation)
+for composition.
 
 The [CLI entry point](../apps/cso-cli/src/cli.ts) separates verified commands
 from `dev-export` and `dev-render`. The [legacy exporter](../packages/cso-python/src/cso_python/exporter.py)

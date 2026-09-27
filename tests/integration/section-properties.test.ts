@@ -49,8 +49,8 @@ function symbols(execution: ReturnType<typeof capture>) {
 }
 
 it.each([
-  ['hot-formed-I-sections', 8, 38, 'X', 18.11502650020568],
-  ['unequal-tapered-i-beam', 9, 91, 'Z_x', 38690.717308022955],
+  ['hot_formed_i_sections', 8, 38, 'X', 18.11502650020568],
+  ['unequal_tapered_i_beam', 9, 91, 'Z_x', 38690.717308022955],
 ])(
   'verifies every quantity in the %s reference transcription',
   (slug, inputs, formulas, localId, expected) => {
@@ -88,7 +88,7 @@ it.each([
 it('preserves the tapered reference’s two Z_web quantities with axis scopes', () => {
   const execution = capture(
     new URL(
-      '../../examples/section-properties/unequal-tapered-i-beam/calculate.cso.py',
+      '../../examples/section-properties/unequal_tapered_i_beam/calculate.cso.py',
       import.meta.url,
     ).pathname,
   );

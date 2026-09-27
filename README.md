@@ -67,6 +67,8 @@ The [two-panel example](examples/two-panel/README.md) calls the same
 [rectangle calculation](examples/two-panel/geometry.cso.py) with different inputs:
 
 ```python
+from _cso_bindings.geometry import rectangle
+
 first_panel = rectangle(width=width, height=first_panel_height)
 second_panel = rectangle(width=width, height=second_panel_height)
 ```
@@ -75,9 +77,12 @@ The generated report shows both calculations with distinct symbols and results.
 The [parent calculation](examples/two-panel/estimate.cso.py) adds their areas and
 passes the total to a reusable material calculation for volume and mass.
 
-The same approach supports shared calculation libraries and larger reports.
-See the [section-property examples](examples/section-properties/README.md) for
-more substantial calculations.
+Generate `_cso_bindings` from the authored functions before importing them;
+[setup](docs/development.md#setup) prepares the maintained examples. The
+[two-panel walkthrough](examples/two-panel/README.md) explains the complete
+define, generate, import and call workflow. The
+[section-property comparisons](examples/section-properties/README.md#reuse-in-a-comparison)
+apply it to larger calculations while retaining their documented intermediates.
 
 ## Use Python's scientific libraries
 
