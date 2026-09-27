@@ -11,7 +11,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { CommandReportSchema } from '@cs-object/core';
-import { chromium } from 'playwright';
+import { chromium, type Page } from 'playwright';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 
 const directory = mkdtempSync(join(tmpdir(), 'cso-html-'));
@@ -72,6 +72,82 @@ function run(
   };
 }
 
+function replaceFixture(
+  source: string,
+  search: string | RegExp,
+  replacement: string,
+): string {
+  const matches =
+    typeof search === 'string'
+      ? source.split(search).length - 1
+      : [...source.matchAll(new RegExp(search.source, 'g'))].length;
+  expect(matches, `Expected one fixture match for ${search}`).toBe(1);
+  const changed = source.replace(search, replacement);
+  expect(changed).not.toBe(source);
+  return changed;
+}
+
+async function inspectMedia(
+  output: string,
+  inspect: (page: Page) => Promise<void>,
+) {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    const external: string[] = [];
+    page.on('request', (request) => {
+      if (/^https?:/.test(request.url())) external.push(request.url());
+    });
+    await page.goto(pathToFileURL(output).href);
+    for (const media of ['screen', 'print'] satisfies Array<
+      'screen' | 'print'
+    >) {
+      await page.emulateMedia({ media });
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+        await Promise.all(
+          Array.from(document.images, (image) => image.decode()),
+        );
+      });
+      await inspect(page);
+    }
+    expect(external).toEqual([]);
+  } finally {
+    await browser.close();
+  }
+}
+
+function assertLayoutRejected(source: string, stem: string) {
+  const reports = [];
+  for (const command of ['html', 'pdf'] satisfies Array<'html' | 'pdf'>) {
+    const output = join(directory, `${stem}.${command}`);
+    writeFileSync(output, 'previous artifact');
+    const result = run(
+      command,
+      source,
+      'polynomial',
+      output,
+      command === 'html' ? ['--check-layout'] : [],
+    );
+    expect(result.status, result.stdout).toBe(1);
+    expect(readFileSync(output, 'utf8')).toBe('previous artifact');
+    expect(result.report.output).toBeUndefined();
+    expect(result.report.checks.rendering.status).toBe('failed');
+    const issues = result.report.diagnostics.filter(
+      (item) => item.code === 'DOCUMENT_LAYOUT_OVERFLOW',
+    );
+    expect(issues.length).toBeGreaterThan(0);
+    expect(new Set(issues.map((item) => item.layout?.media))).toEqual(
+      new Set(['screen', 'print']),
+    );
+    expect(
+      issues.every((item) => item.layout && item.layout.overflowPx > 2),
+    ).toBe(true);
+    reports.push(issues);
+  }
+  return reports.flat();
+}
+
 test('exports standalone HTML and exact evidence without a browser; preview matches print content width', async () => {
   const output = join(directory, 'panels.html');
   const result = run(
@@ -105,42 +181,21 @@ test('exports standalone HTML and exact evidence without a browser; preview matc
       readFileSync(join(dirname(locator.path), 'execution.json'), 'utf8'),
     ).ok,
   ).toBe(true);
-  const browser = await chromium.launch({ headless: true });
-  try {
-    const page = await browser.newPage();
-    const external: string[] = [];
-    page.on('request', (request) => {
-      if (/^https?:/.test(request.url())) external.push(request.url());
+  await inspectMedia(output, async (page) => {
+    const layout = await page.evaluate(() => {
+      const sheet = document.querySelector('[data-formula-sheet]');
+      if (!sheet) throw new Error('Missing sheet');
+      return {
+        width: sheet.getBoundingClientRect().width,
+        math: sheet.querySelectorAll('math').length,
+        images: Array.from(document.images, (image) => image.naturalWidth),
+      };
     });
-    await page.goto(pathToFileURL(output).href);
-    for (const media of ['screen', 'print'] satisfies Array<
-      'screen' | 'print'
-    >) {
-      await page.emulateMedia({ media });
-      await page.evaluate(async () => {
-        await document.fonts.ready;
-        await Promise.all(
-          Array.from(document.images, (image) => image.decode()),
-        );
-      });
-      const layout = await page.evaluate(() => {
-        const sheet = document.querySelector('[data-formula-sheet]');
-        if (!sheet) throw new Error('Missing sheet');
-        return {
-          width: sheet.getBoundingClientRect().width,
-          math: sheet.querySelectorAll('math').length,
-          images: Array.from(document.images, (image) => image.naturalWidth),
-        };
-      });
-      expect(layout.width).toBeCloseTo((190 * 96) / 25.4, 1);
-      expect(layout.math).toBeGreaterThan(0);
-      expect(layout.images.length).toBeGreaterThan(0);
-      expect(layout.images.every((width) => width > 0)).toBe(true);
-    }
-    expect(external).toEqual([]);
-  } finally {
-    await browser.close();
-  }
+    expect(layout.width).toBeCloseTo((190 * 96) / 25.4, 1);
+    expect(layout.math).toBeGreaterThan(0);
+    expect(layout.images.length).toBeGreaterThan(0);
+    expect(layout.images.every((width) => width > 0)).toBe(true);
+  });
 }, 30_000);
 
 test('checks the HTML in Chromium when requested', () => {
@@ -165,9 +220,13 @@ test.each(['fraction', 'conditional', 'qualified'])(
       'utf8',
     );
     if (kind === 'conditional')
-      fixture = fixture.replace(' / 2', ' / 2 if input_value > 0 else 0');
+      fixture = replaceFixture(
+        fixture,
+        ' / 2',
+        ' / 2 if input_value > 0 else 0',
+      );
     if (kind === 'qualified')
-      fixture = fixture.replace('x_{src}', 'x_{src,bs}');
+      fixture = replaceFixture(fixture, 'x_{src}', 'x_{src,bs}');
     writeFileSync(source, fixture);
     const unchecked = run(
       'html',
@@ -178,37 +237,14 @@ test.each(['fraction', 'conditional', 'qualified'])(
       false,
     );
     expect(unchecked.status, unchecked.stdout).toBe(0);
-    for (const command of ['html', 'pdf'] satisfies Array<'html' | 'pdf'>) {
-      const output = join(directory, `${kind}.${command}`);
-      writeFileSync(output, 'previous artifact');
-      const result = run(
-        command,
-        source,
-        'polynomial',
-        output,
-        command === 'html' ? ['--check-layout'] : [],
-      );
-      expect(result.status, result.stdout).toBe(1);
-      expect(readFileSync(output, 'utf8')).toBe('previous artifact');
-      expect(result.report.output).toBeUndefined();
-      expect(result.report.checks.rendering.status).toBe('failed');
-      const issues = result.report.diagnostics.filter(
-        (item) => item.code === 'DOCUMENT_LAYOUT_OVERFLOW',
-      );
-      expect(issues.length).toBeGreaterThan(0);
-      expect(new Set(issues.map((item) => item.layout?.media))).toEqual(
-        new Set(['screen', 'print']),
-      );
-      expect(
-        issues.every(
-          (item) =>
-            item.layout &&
-            item.layout.overflowPx > 2 &&
-            item.layout.sourcePlacementId &&
-            item.layout.selector.includes('data-source-placement'),
-        ),
-      ).toBe(true);
-    }
+    const issues = assertLayoutRejected(source, kind);
+    expect(
+      issues.every(
+        (item) =>
+          item.layout?.sourcePlacementId &&
+          item.layout.selector.includes('data-source-placement'),
+      ),
+    ).toBe(true);
   },
   30_000,
 );
@@ -237,68 +273,44 @@ test('preserves HTML on evidence-write failure and explains it without claiming 
 
 test('rejects title text beyond the sheet even when it fits the browser viewport', async () => {
   const source = join(directory, 'title.cso.py');
+  const fixture = readFileSync(
+    'tests/integration/installed/fixtures/overflow.cso.py.txt',
+    'utf8',
+  );
+  const titled = replaceFixture(
+    fixture,
+    'Synthetic layout regression',
+    'W'.repeat(45),
+  );
   writeFileSync(
     source,
-    readFileSync(
-      'tests/integration/installed/fixtures/overflow.cso.py.txt',
-      'utf8',
-    )
-      .replace('Synthetic layout regression', 'W'.repeat(45))
-      .replace(/\(input_value \*\* 1.*\) \/ 2/, 'input_value / 2'),
+    replaceFixture(titled, /\(input_value \*\* 1.*\) \/ 2/, 'input_value / 2'),
   );
   const preview = join(directory, 'title-preview.html');
   const unchecked = run('html', source, 'polynomial', preview, [
     '--no-evidence',
   ]);
   expect(unchecked.status, unchecked.stdout).toBe(0);
-  const browser = await chromium.launch({ headless: true });
-  try {
-    const page = await browser.newPage();
-    await page.goto(pathToFileURL(preview).href);
-    for (const media of ['screen', 'print'] satisfies Array<
-      'screen' | 'print'
-    >) {
-      await page.emulateMedia({ media });
-      const bounds = await page.evaluate(() => {
-        const title = document.querySelector('h1');
-        const sheet = document.querySelector('[data-formula-sheet]');
-        if (!title || !sheet) throw new Error('Missing title or sheet');
-        const range = document.createRange();
-        range.selectNodeContents(title);
-        return {
-          textRight: range.getBoundingClientRect().right,
-          sheetRight: sheet.getBoundingClientRect().right,
-          viewportRight: document.documentElement.clientWidth,
-          scrollWidth: document.documentElement.scrollWidth,
-        };
-      });
-      expect(bounds.textRight).toBeGreaterThan(bounds.sheetRight + 2);
-      expect(bounds.textRight).toBeLessThan(bounds.viewportRight);
-      expect(bounds.scrollWidth).toBe(bounds.viewportRight);
-    }
-  } finally {
-    await browser.close();
-  }
-  for (const command of ['html', 'pdf'] satisfies Array<'html' | 'pdf'>) {
-    const output = join(directory, `title.${command}`);
-    writeFileSync(output, 'previous artifact');
-    const result = run(
-      command,
-      source,
-      'polynomial',
-      output,
-      command === 'html' ? ['--check-layout'] : [],
-    );
-    expect(result.status, result.stdout).toBe(1);
-    expect(readFileSync(output, 'utf8')).toBe('previous artifact');
-    expect(result.report.checks.rendering.status).toBe('failed');
-    expect(
-      result.report.diagnostics.some(
-        (item) =>
-          item.layout &&
-          item.layout.selector === '[data-formula-sheet]' &&
-          item.layout.overflowPx > 2,
-      ),
-    ).toBe(true);
-  }
+  await inspectMedia(preview, async (page) => {
+    const bounds = await page.evaluate(() => {
+      const title = document.querySelector('h1');
+      const sheet = document.querySelector('[data-formula-sheet]');
+      if (!title || !sheet) throw new Error('Missing title or sheet');
+      const range = document.createRange();
+      range.selectNodeContents(title);
+      return {
+        textRight: range.getBoundingClientRect().right,
+        sheetRight: sheet.getBoundingClientRect().right,
+        viewportRight: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+      };
+    });
+    expect(bounds.textRight).toBeGreaterThan(bounds.sheetRight + 2);
+    expect(bounds.textRight).toBeLessThan(bounds.viewportRight);
+    expect(bounds.scrollWidth).toBe(bounds.viewportRight);
+  });
+  const issues = assertLayoutRejected(source, 'title');
+  expect(
+    issues.every((item) => item.layout?.selector === '[data-formula-sheet]'),
+  ).toBe(true);
 }, 30_000);

@@ -208,6 +208,55 @@ function inspectLayoutInPage(media: 'screen' | 'print'): Diagnostic[] {
   if (!sheet) throw new Error('Missing formula sheet');
   const sheetBounds = sheet.getBoundingClientRect();
   const findings = new Map<Element, Diagnostic>();
+  function recordOverflow({
+    element,
+    bounds,
+    containerLeft,
+    containerRight,
+    placement,
+    fallback,
+    message,
+  }: {
+    element: Element;
+    bounds: DOMRect;
+    containerLeft: number;
+    containerRight: number;
+    placement: Element | null;
+    fallback: Element;
+    message: string;
+  }) {
+    if (!bounds.width || !bounds.height) return;
+    const overflowPx = Math.max(
+      0,
+      containerLeft - bounds.left,
+      bounds.right - containerRight,
+    );
+    if (overflowPx <= 2) return;
+    const key = placement ?? fallback;
+    const previous = findings.get(key);
+    if (previous && (previous.layout?.overflowPx ?? 0) >= overflowPx) return;
+    const sourcePlacementId =
+      placement?.getAttribute('data-source-placement') ?? undefined;
+    const selector = sourcePlacementId
+      ? `[data-source-placement=${JSON.stringify(sourcePlacementId)}]`
+      : '[data-formula-sheet]';
+    findings.set(key, {
+      code: 'DOCUMENT_LAYOUT_OVERFLOW',
+      stage: 'rendering',
+      check: 'rendering',
+      message: `${message} in ${media} layout: ${selector}, ${element.tagName}, ${overflowPx.toFixed(2)}px beyond content bounds.`,
+      layout: {
+        media,
+        sourcePlacementId,
+        selector,
+        left: bounds.left,
+        right: bounds.right,
+        containerLeft,
+        containerRight,
+        overflowPx,
+      },
+    });
+  }
   for (const math of sheet.querySelectorAll('math')) {
     const placement = math.closest('[data-source-placement]');
     const row = math.closest('.cso-symbol-row') ?? sheet;
@@ -226,39 +275,15 @@ function inspectLayoutInPage(media: 'screen' | 'print'): Diagnostic[] {
       containerRight = Math.min(containerRight, parentBounds.right);
     }
     for (const element of [math, ...math.querySelectorAll('*')]) {
-      const bounds = element.getBoundingClientRect();
-      if (!bounds.width || !bounds.height) continue;
-      const overflowPx = Math.max(
-        containerLeft - bounds.left,
-        bounds.right - containerRight,
-        0,
-      );
-      if (overflowPx <= 2) continue;
-      const sourcePlacementId =
-        placement?.getAttribute('data-source-placement') ?? undefined;
-      const selector = sourcePlacementId
-        ? `[data-source-placement=${JSON.stringify(sourcePlacementId)}]`
-        : '[data-formula-sheet]';
-      const diagnostic: Diagnostic = {
-        code: 'DOCUMENT_LAYOUT_OVERFLOW',
-        stage: 'rendering',
-        check: 'rendering',
-        message: `Mathematical notation overflows its cell or sheet in ${media} layout: ${selector}, ${element.tagName}, ${overflowPx.toFixed(2)}px beyond content bounds.`,
-        layout: {
-          media,
-          sourcePlacementId,
-          selector,
-          left: bounds.left,
-          right: bounds.right,
-          containerLeft,
-          containerRight,
-          overflowPx,
-        },
-      };
-      const key = placement ?? row;
-      const previous = findings.get(key);
-      if (!previous || (previous.layout?.overflowPx ?? 0) < overflowPx)
-        findings.set(key, diagnostic);
+      recordOverflow({
+        element,
+        bounds: element.getBoundingClientRect(),
+        containerLeft,
+        containerRight,
+        placement,
+        fallback: row,
+        message: 'Mathematical notation overflows its cell or sheet',
+      });
     }
   }
   // Element boxes alone miss text painted beyond an otherwise fitting block.
@@ -274,38 +299,14 @@ function inspectLayoutInPage(media: 'screen' | 'print'): Diagnostic[] {
       rectangles.push(...range.getClientRects());
     }
     for (const bounds of rectangles) {
-      if (!bounds.width || !bounds.height) continue;
-      const overflowPx = Math.max(
-        0,
-        sheetBounds.left - bounds.left,
-        bounds.right - sheetBounds.right,
-      );
-      if (overflowPx <= 2) continue;
-      const placement = element.closest('[data-source-placement]');
-      const key = placement ?? sheet;
-      const previous = findings.get(key);
-      if (previous && (previous.layout?.overflowPx ?? 0) >= overflowPx)
-        continue;
-      const sourcePlacementId =
-        placement?.getAttribute('data-source-placement') ?? undefined;
-      const selector = sourcePlacementId
-        ? `[data-source-placement=${JSON.stringify(sourcePlacementId)}]`
-        : '[data-formula-sheet]';
-      findings.set(key, {
-        code: 'DOCUMENT_LAYOUT_OVERFLOW',
-        stage: 'rendering',
-        check: 'rendering',
-        message: `Document content exceeds printable sheet width in ${media} layout: ${element.tagName}, ${overflowPx.toFixed(2)}px beyond content bounds.`,
-        layout: {
-          media,
-          sourcePlacementId,
-          selector,
-          left: bounds.left,
-          right: bounds.right,
-          containerLeft: sheetBounds.left,
-          containerRight: sheetBounds.right,
-          overflowPx,
-        },
+      recordOverflow({
+        element,
+        bounds,
+        containerLeft: sheetBounds.left,
+        containerRight: sheetBounds.right,
+        placement: element.closest('[data-source-placement]'),
+        fallback: sheet,
+        message: 'Document content exceeds printable sheet width',
       });
     }
   }
