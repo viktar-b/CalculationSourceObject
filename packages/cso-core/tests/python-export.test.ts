@@ -51,6 +51,36 @@ const beamDocument = {
 };
 
 describe('Python export', () => {
+  test('rejects malformed unary and binary function calls before exporting', () => {
+    const { sheet } = createSheetFromValueTreeJson(beamDocument, {
+      id: 'malformed',
+      label: 'Malformed calls',
+    });
+    const tree = sheet.symbols[0].valueTree;
+    tree.rootKey = 'call';
+    tree.nodes = [
+      {
+        kind: 'function',
+        key: 'call',
+        functionId: 'fg.abs',
+        argKeys: ['value', 'value'],
+      },
+      { kind: 'literal', key: 'value', value: { kind: 'number', value: 2 } },
+    ];
+    expect(() => createPythonFromSheetDocument(sheet)).toThrow(
+      "Cannot export function 'fg.abs' with 2 args to Python",
+    );
+    tree.nodes[0] = {
+      kind: 'function',
+      key: 'call',
+      functionId: 'fg.atan2',
+      argKeys: ['value'],
+    };
+    expect(() => createPythonFromSheetDocument(sheet)).toThrow(
+      "Cannot export function 'fg.atan2' with 1 args to Python",
+    );
+  });
+
   test.each([
     [2, 'float', '2.0'],
     [-0, 'float', '-0.0'],

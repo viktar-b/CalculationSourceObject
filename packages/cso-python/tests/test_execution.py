@@ -97,7 +97,7 @@ class ExecutionTest(unittest.TestCase):
             positive["authoring"]["outputs"][0]["value"], 6.141592653589793
         )
 
-    def test_imported_pi_is_supported_and_cannot_be_shadowed(self):
+    def test_pi_distinguishes_imported_constant_from_ordinary_parameter(self):
         self.entry.write_text(
             "from math import pi\n"
             + source(f'a: {SYMBOL} = given(x)\nb: {RESULT} = pi * a\nreturn {{"b": b}}')
@@ -115,6 +115,18 @@ class ExecutionTest(unittest.TestCase):
             )
         )
         self.reject_before_execution("UNSUPPORTED_SIGNATURE")
+        self.entry.write_text(
+            source(
+                f'b: {RESULT} = pi + 1\nreturn {{"b": b}}',
+                parameters=f"pi: {SYMBOL} = 2.0",
+            )
+        )
+        execution = self.success(self.run_case())
+        self.assertEqual(execution["authoring"]["outputs"][0]["value"], 3.0)
+        nodes = execution["cso"]["sections"][0]["items"][-1]["symbol"]["valueTree"][
+            "nodes"
+        ]
+        self.assertFalse(any(n.get("funcSpec", {}).get("id") == "fg.pi" for n in nodes))
 
     def test_builtin_formula_helpers_reject_shadowing_before_execution(self):
         for helper, call in [

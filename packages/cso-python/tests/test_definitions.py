@@ -29,9 +29,16 @@ class DefinitionTest(unittest.TestCase):
         }
 
     def test_invalid_declarations_agree_and_never_replace_generated_files(self):
-        original = self.source.read_text()
+        original = self.source.read_text().replace(
+            "CalculationResults, calculation", "given, CalculationResults, calculation"
+        )
         returned = 'return {"adjusted": adjusted, "original": amount}'
         cases = [
+            (
+                "    adjusted:",
+                "    supplied: Amount = given(amount)\n    adjusted:",
+                "AMBIGUOUS_METADATA",
+            ),
             (returned, 'return {"": adjusted}', "INVALID_RETURN_KEYS"),
             (returned, "", "INVALID_RETURN_KEYS"),
             (returned, "return adjusted", "INVALID_RETURN_KEYS"),
