@@ -1,6 +1,7 @@
 # Create a local calculation project
 
-Use Node.js 24 or newer and Python 3.11 or newer.
+Use Node.js 24 or newer and Python 3.11 or newer. After the versioned npm and
+Python dependencies are published:
 
 ```sh
 npm create cs-object my-report

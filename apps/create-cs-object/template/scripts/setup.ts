@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const project = fileURLToPath(new URL('..', import.meta.url));
@@ -59,8 +59,9 @@ try {
   const cliRequire = createRequire(
     require.resolve('@cs-object/cli/package.json'),
   );
+  const playwright = dirname(cliRequire.resolve('playwright/package.json'));
   run(process.execPath, [
-    cliRequire.resolve('playwright/cli'),
+    join(playwright, 'cli.js'),
     'install',
     'chromium',
   ]);

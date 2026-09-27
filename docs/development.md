@@ -57,7 +57,7 @@ access. PDF checks also need Chromium and Poppler.
 with Node 24 and Python 3.11 on Ubuntu. Its required checks are:
 
 - `quality`: dependency audit, lint, typechecking, workspace tests and demo build.
-- `isolation`: independent builds and tests for all five projects.
+- `isolation`: independent builds and tests for all projects.
 - `installed-packages`: npm archives, Python wheel, CLI/PDF acceptance and library
   type/export/browser consumers. Both archive commands are required.
 

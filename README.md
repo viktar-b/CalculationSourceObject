@@ -95,6 +95,27 @@ and results, with figures where they help the reader follow the work.
 Your calculation can combine readable equations with specialised numerical
 methods in one report.
 
+## Create a local report project
+
+The [initializer](apps/create-cs-object/README.md) creates a standalone project
+with a Python calculation and a browser app. It requires Node 24 and Python 3.11+.
+After the `0.1.0` packages are published, create and start a project with:
+
+```sh
+npm create cs-object my-report
+cd my-report
+npm run dev
+```
+
+The initializer installs the JavaScript dependencies, a project Python environment,
+and Chromium for PDF generation. Your coding agent edits the calculation and its
+brief. The local app derives editable inputs from that calculation, verifies API
+results on the server, and offers its report as HTML and PDF.
+
+The packages are prepared for release; this repository does not establish their
+availability on npm or PyPI. [Installed-package acceptance](tests/integration/README.md)
+tests the generated experience using actual archives before publication.
+
 ## Start your first calculation
 
 Open this repository in your coding agent and start with a prompt such as:

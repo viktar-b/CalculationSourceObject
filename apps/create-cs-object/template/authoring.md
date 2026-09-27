@@ -1,7 +1,9 @@
 # Write scalar calculations
 
-Use constrained Python in `calculations/report.cso.py`. Declare numeric inputs
-and documented assignments with `Annotated[float, symbol(...)]` or `int`.
+Use constrained Python in `calculations/report.cso.py`. Declare documented inputs
+and assignments with `Annotated[float, symbol(...)]` or
+`Annotated[int, symbol(...)]`. A plain `float` or `int` parameter needs a separate
+documented `given()` assignment.
 Use descriptive names and qualified glyphs such as `A_{rect}`. Define units and
 explain each glyph qualifier. Return a dictionary that selects documented values.
 

@@ -9,7 +9,8 @@ npm run dev
 
 Open the localhost address printed in the terminal. Edit numeric inputs in the
 browser, calculate, review the report, and download its PDF. Change formulas in
-`calculations/report.cso.py`, then calculate again. Existing report downloads
+`calculations/report.cso.py`, then calculate again. If you change the declared
+inputs, reload the browser page to rebuild its form. Existing report downloads
 remain tied to their captured run until that run expires or the server stops.
 
 To choose a port, run `npm run dev -- --port 4173`. Use port `0` to select an
