@@ -7,6 +7,14 @@ export function stringifyJson(value: unknown): string {
     if (Object.is(item, -0)) {
       return '-0.0';
     }
+    if (
+      typeof item === 'number' &&
+      Number.isFinite(item) &&
+      Number.isInteger(item) &&
+      !Number.isSafeInteger(item)
+    ) {
+      return item.toExponential();
+    }
     if (item === null || typeof item !== 'object') {
       return JSON.stringify(item);
     }

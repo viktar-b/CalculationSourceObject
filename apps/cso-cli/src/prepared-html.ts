@@ -18,7 +18,10 @@ const previewCss = `
   }
 }`;
 
-export function buildPreparedHtml(preparedDocument: PreparedDocument): string {
+export function buildPreparedHtml(
+  preparedDocument: PreparedDocument,
+  reviewNotice?: string,
+): string {
   const css = readFileSync(
     createRequire(import.meta.url).resolve('@cs-object/react/style.css'),
     'utf8',
@@ -31,6 +34,6 @@ export function buildPreparedHtml(preparedDocument: PreparedDocument): string {
     renderToStaticMarkup(createElement('title', null, preparedDocument.title)),
     '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data:; style-src \'unsafe-inline\'; font-src data:">',
     `<meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}${previewCss}</style></head><body class="formula-sheet-printing">`,
-    `<div data-formula-sheet-print-root="true">${markup}</div></body></html>`,
+    `<div data-formula-sheet-print-root="true">${reviewNotice ? renderToStaticMarkup(createElement('p', { 'data-cso-review-notice': true, style: { fontSize: '10pt', margin: '0 0 4mm', padding: '2mm', border: '1px solid #bbb' } }, reviewNotice)) : ''}${markup}</div></body></html>`,
   ].join('');
 }

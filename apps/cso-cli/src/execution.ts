@@ -20,7 +20,10 @@ type ExecutionAttempt =
 const message = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
-export function runPythonExecution(options: VerifiedOptions): ExecutionAttempt {
+export function runPythonExecution(
+  options: VerifiedOptions,
+  timeoutMs?: number,
+): ExecutionAttempt {
   const environment = { ...process.env };
   for (const key of ['PYTHONPATH', 'PYTHONHOME', 'NODE_PATH']) {
     Reflect.deleteProperty(environment, key);
@@ -38,7 +41,12 @@ export function runPythonExecution(options: VerifiedOptions): ExecutionAttempt {
       '--inputs-json',
       stringifyJson(options.inputs),
     ],
-    { env: environment, maxBuffer: 64 * 1024 * 1024 },
+    {
+      env: environment,
+      maxBuffer: 64 * 1024 * 1024,
+      timeout: timeoutMs,
+      killSignal: 'SIGKILL',
+    },
   );
   if (result.stderr) {
     process.stderr.write(result.stderr);

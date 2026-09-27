@@ -23,6 +23,7 @@ export type VerifiedCapture = {
 };
 export function executeAndVerify(
   options: VerifiedOptions,
+  timeoutMs?: number,
 ):
   | { kind: 'failed'; outcome: CommandOutcome }
   | { kind: 'verified'; report: CommandReport; capture: VerifiedCapture } {
@@ -38,7 +39,7 @@ export function executeAndVerify(
       exitCode,
     },
   });
-  const attempt = runPythonExecution(options);
+  const attempt = runPythonExecution(options, timeoutMs);
   if (attempt.kind === 'failed') {
     report.diagnostics.push(...attempt.diagnostics);
     report.checks.executionValidity = { status: 'failed' };

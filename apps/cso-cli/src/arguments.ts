@@ -129,7 +129,7 @@ export function parseCliArgs(args: readonly string[]): DevelopmentOptions {
   };
 }
 
-export const help = `Usage: cso <verify|html|pdf|bindings|dev-export|dev-render> [arguments]
+export const help = `Usage: cso <verify|html|pdf|bindings|dev|dev-export|dev-render> [arguments]
 Use cso <command> --help for usage. Development commands require
 --source <file.cso.py> --function <name> --out <path>.
 
@@ -138,6 +138,7 @@ Development export/render establishes no numerical verification or independent
 reference agreement. Inspect every PDF page before delivery.
 
 Commands:
+  dev                    Serve a verified calculation, editable inputs and report on localhost.
   bindings               Generate typed calculation handles; --check reports stale files without writing.
   dev-export             Export CSO JSON using the selected installed Python module.
   dev-render             Export once and render a development PDF with installed React/CSS.
