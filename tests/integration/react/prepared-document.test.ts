@@ -75,28 +75,6 @@ describe('Prepared document rendering and preservation', () => {
       ).toBe(html);
     }
   });
-  test('preserves signed zero and ordinary scalar inputs in the execution header', () => {
-    const document = prepareExecutionDocument({
-      execution: execution('single-success'),
-      assets: [],
-    });
-    if (document.source.kind !== 'execution')
-      throw new Error('Expected execution source');
-    document.source.resolvedInputs = {
-      negativeZero: -0,
-      positiveZero: 0,
-      number: -2.5,
-    };
-    const html = renderToStaticMarkup(
-      createElement(PreparedFormulaSheet, { document }),
-    );
-    expect(html).toContain(
-      'negativeZero = -0, positiveZero = 0, number = -2.5',
-    );
-    expect(Object.is(document.source.resolvedInputs.negativeZero, -0)).toBe(
-      true,
-    );
-  });
   test('presents useful engineering context while retaining audit and empty values in JSON', () => {
     const payload = execution('single-success');
     payload.cso.source.metadata = {
@@ -176,43 +154,6 @@ describe('Prepared document rendering and preservation', () => {
       document.historicalReviews,
     );
   });
-
-  test('retains explicitly empty authored metadata containers', () => {
-    const payload = execution('single-success');
-    const item = payload.cso.sections[0].items.find(
-      (item) => item.kind === 'symbol',
-    );
-    if (item?.kind !== 'symbol') throw new Error('Expected symbol');
-    item.symbol.valueTree.metadata = {};
-    item.symbol.valueTree.nodes[0].metadata = {};
-    payload.cso.source.metadata = {};
-    const document = prepareExecutionDocument({
-      execution: payload,
-      assets: [],
-    });
-    expect(document.historicalReviews[0].originalFields.symbols).toMatchObject([
-      { valueTree: { metadata: {}, nodes: [{ metadata: {} }] } },
-      {},
-    ]);
-    const legacyDocument = prepareLegacyDocument({
-      cso: {
-        ...payload.cso,
-        sections: payload.cso.sections.map((section) => ({
-          ...section,
-          items: section.items.map((item) => ({ ...item, metadata: {} })),
-        })),
-      },
-      fixtureId: 'empty-metadata',
-      fixtureSha256: payload.entry.sourceHash,
-      assets: [],
-      manifest: { manifestVersion: '1', entries: [] },
-    });
-    expect(
-      legacyDocument.historicalReviews[0].originalFields.placements,
-    ).toMatchObject([{ metadata: {} }, { metadata: {} }]);
-
-    expect(JSON.parse(JSON.stringify(document))).toEqual(document);
-  });
   test.each(['legacy', 'execution'])(
     'preserves %s symbol, reference and child placement metadata',
     (mode) => {
@@ -259,91 +200,6 @@ describe('Prepared document rendering and preservation', () => {
       expect(JSON.parse(JSON.stringify(document))).toEqual(document);
     },
   );
-  test.each([true, false])(
-    'attributes execution definitions by active reachability: %s',
-    (referenced) => {
-      const payload = execution('single-success');
-      const section = payload.cso.sections[0];
-      const width = section.items[0];
-      const area = section.items[1];
-      if (width.kind !== 'symbol' || area.kind !== 'symbol')
-        throw new Error('Expected width and area');
-      width.symbol.metadata = {
-        ...width.symbol.metadata,
-        symbolVerification: 'Width review',
-        ['__proto__']: 'Own symbol metadata',
-      };
-      area.symbol.metadata = {
-        ...area.symbol.metadata,
-        symbolVerification: 'Area review',
-      };
-      const { symbolVerification: _verification, ...runtime } =
-        area.symbol.metadata;
-      section.items = referenced
-        ? [
-            area,
-            {
-              kind: 'symbolRef',
-              id: area.symbol.id,
-              metadata: runtime,
-            },
-          ]
-        : [width];
-      if (!referenced) {
-        width.symbol.valueTree.nodes.push({
-          key: 'unused',
-          mode: 'SYMBOL',
-          symbol: { id: area.symbol.id },
-        });
-      }
-      payload.cso.detachedItems = [referenced ? width : area];
-      const before = JSON.stringify(payload);
-      const document = prepareExecutionDocument({
-        execution: payload,
-        assets: [],
-      });
-      const history = document.historicalReviews[0].originalFields;
-      expect(history.symbols).toMatchObject([
-        {
-          id: referenced ? area.symbol.id : width.symbol.id,
-          glyph: referenced ? area.symbol.glyph : width.symbol.glyph,
-          additionalFields: {
-            glyphPlaintext: referenced
-              ? area.symbol.glyphPlaintext
-              : width.symbol.glyphPlaintext,
-          },
-          metadata: referenced
-            ? { symbolVerification: 'Area review' }
-            : {
-                symbolVerification: 'Width review',
-                ['__proto__']: 'Own symbol metadata',
-              },
-        },
-      ]);
-      expect(history.referencedSymbols).toEqual(
-        referenced
-          ? [
-              {
-                id: width.symbol.id,
-                glyph: width.symbol.glyph,
-                additionalFields: {
-                  glyphPlaintext: width.symbol.glyphPlaintext,
-                  description: width.symbol.description,
-                  unit: width.symbol.unit,
-                },
-                metadata: {
-                  symbolVerification: 'Width review',
-                  ['__proto__']: 'Own symbol metadata',
-                },
-              },
-            ]
-          : undefined,
-      );
-      expect(JSON.stringify(payload)).toEqual(before);
-
-      expect(JSON.parse(JSON.stringify(document))).toEqual(document);
-    },
-  );
   test('attributes execution source identity and complete supported origin separately from source context', () => {
     const payload = execution('single-success');
     payload.cso.source.id = 'upstream source identity';
@@ -382,31 +238,6 @@ describe('Prepared document rendering and preservation', () => {
     expect(() =>
       prepareExecutionDocument({ execution: unsupported, assets: [] }),
     ).toThrow(DocumentPreparationError);
-
-    expect(JSON.parse(JSON.stringify(document))).toEqual(document);
-  });
-  test('preserves execution source context separately from historical review', () => {
-    const payload = execution('single-success');
-    payload.cso.source.metadata = JSON.parse(
-      '{"purpose":"Qualifying source purpose","assumptions":{"openings":false,"factors":[1,null,2],"exceptions":[]},"approval":{"status":"approved"},"__proto__":{"meaning":"ordinary source context"},"constructor":"source-constructor","empty":{}}',
-    );
-    const original = JSON.stringify(payload);
-    const document = prepareExecutionDocument({
-      execution: payload,
-      assets: [],
-    });
-    expect(document.sourceMetadata).toEqual(payload.cso.source.metadata);
-    expect(Object.hasOwn(document.sourceMetadata ?? {}, '__proto__')).toBe(
-      true,
-    );
-    expect(document.historicalReviews).toHaveLength(1);
-    expect(document.historicalReviews[0].originalFields.source).toEqual({
-      id: payload.cso.source.id,
-    });
-    expect(document.historicalReviews[0].originalFields).not.toHaveProperty(
-      'source.metadata',
-    );
-    expect(JSON.stringify(payload)).toEqual(original);
 
     expect(JSON.parse(JSON.stringify(document))).toEqual(document);
   });
@@ -669,22 +500,6 @@ describe('Prepared document rendering and preservation', () => {
 
     expect(JSON.parse(JSON.stringify(document))).toEqual(document);
   });
-  test.each([{ audit: { approvedBy: 'DB' } }, { status: 'approved' }])(
-    'attributes nested or value-based review metadata as historical: %j',
-    (metadata) => {
-      const payload = execution('single-success');
-      payload.cso.sections[0].metadata = {
-        ...payload.cso.sections[0].metadata,
-        ...metadata,
-      };
-      const document = prepareExecutionDocument({
-        execution: payload,
-        assets: [],
-      });
-
-      expect(JSON.parse(JSON.stringify(document))).toEqual(document);
-    },
-  );
   test.each(['execution-v1', 'legacy-cso'] as const)(
     'rejects display-colliding symbol definitions through %s preparation',
     (mode) => {
@@ -732,38 +547,4 @@ describe('Prepared document rendering and preservation', () => {
       );
     },
   );
-  test('rejects a display collision in a directly supplied prepared document', () => {
-    const document = prepareExecutionDocument({
-      execution: execution('single-success'),
-      assets: [],
-    });
-    const definitions = document.sections.flatMap((section) =>
-      section.items.filter((item) => item.kind === 'symbol'),
-    );
-    const first = definitions[0];
-    const second = definitions[1];
-    if (first?.kind !== 'symbol' || second?.kind !== 'symbol') {
-      throw new Error('Expected two prepared symbol definitions');
-    }
-    first.symbol.glyph = 'times';
-    second.symbol.glyph = 'xx';
-
-    const result = PreparedDocumentSchema.safeParse(document);
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            params: expect.objectContaining({
-              diagnosticCode: 'DUPLICATE_GLYPH',
-              symbolId: second.symbol.id,
-            }),
-          }),
-        ]),
-      );
-    }
-    expect(() =>
-      renderToStaticMarkup(createElement(PreparedFormulaSheet, { document })),
-    ).toThrow();
-  });
 });

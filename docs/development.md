@@ -122,6 +122,19 @@ to select HTML or PDF checks and apply its delivery requirements.
 
 ## Test data
 
+Keep the suite concentrated on public behavior and important failures. Package
+tests own numerical rules, parsing and rendering details. Integration tests own
+capture-to-verification-to-document/export workflows; keep one representative
+case per supported operation and selected transport or evaluation-order failures.
+Do not repeat each package's full case table through the whole pipeline.
+
+Prefer representative cases over every combination of equivalent inputs. Add
+an edge case for a concrete failure or a distinct requirement. Avoid tests of
+test-only helpers, exact example counts and incidental markup. Preserve
+independent numerical references, document content, publication recovery and
+installed-package checks when consolidating tests. Fewer tests should mean less
+duplicated setup and fewer maintained cases, not moving the same cases into loops.
+
 Generated test data belongs in disposable directories. Keep one canonical source
 for each engineering example; integration tests copy it when mutation is needed.
 Package fixtures use small synthetic behavior cases.

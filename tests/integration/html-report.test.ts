@@ -292,6 +292,7 @@ test('rejects title text beyond the sheet even when it fits the browser viewport
   ]);
   expect(unchecked.status, unchecked.stdout).toBe(0);
   await inspectMedia(preview, async (page) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
     const bounds = await page.evaluate(() => {
       const title = document.querySelector('h1');
       const sheet = document.querySelector('[data-formula-sheet]');

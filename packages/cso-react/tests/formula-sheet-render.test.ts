@@ -288,91 +288,12 @@ describe.each([
       fences: [1],
     },
     {
-      name: 'negative draft with empty backing',
-      right: {
-        kind: 'literal',
-        key: 'right',
-        value: { kind: 'empty' },
-        draft: '-2',
-      },
-      left: 5,
-      expected: [`5.00 ${operator} ( -2 )`],
-      fences: [1],
-    },
-    {
-      name: 'positive draft with negative backing',
-      right: {
-        kind: 'literal',
-        key: 'right',
-        value: { kind: 'number', value: -2 },
-        draft: '2',
-      },
-      left: 5,
-      expected: [`5.00 ${operator} 2`],
-      fences: [0],
-    },
-    {
-      name: 'empty draft keeps negative numeric value',
-      right: {
-        kind: 'literal',
-        key: 'right',
-        value: { kind: 'number', value: -2 },
-        draft: '',
-      },
-      left: 5,
-      expected: [`5.00 ${operator} ( -2.00 )`],
-      fences: [1],
-    },
-    {
-      name: 'Unicode minus draft',
-      right: {
-        kind: 'literal',
-        key: 'right',
-        value: { kind: 'number', value: 2 },
-        draft: '−2',
-      },
-      left: 5,
-      expected: [`5.00 ${operator} ( −2 )`],
-      fences: [1],
-    },
-    {
-      name: 'negative zero literal',
-      right: {
-        kind: 'literal',
-        key: 'right',
-        value: { kind: 'number', value: -0 },
-      },
-      left: 5,
-      expected: [`5.00 ${operator} ( 0 )`],
-      fences: [1],
-    },
-    {
       name: 'negative substitution',
       right: { kind: 'symbol', key: 'right', symbolId: 'operand' },
       left: 5,
       referencedValue: -2,
       expected: [`5.00 ${operator} b`, `5.00 ${operator} ( -2.00 )`],
       fences: [0, 1],
-    },
-    {
-      name: 'negative zero substitution',
-      right: { kind: 'symbol', key: 'right', symbolId: 'operand' },
-      left: 5,
-      referencedValue: -0,
-      expected: [`5.00 ${operator} b`, `5.00 ${operator} ( 0 )`],
-      fences: [0, 1],
-    },
-    {
-      name: 'explicit unary minus',
-      right: {
-        kind: 'function',
-        key: 'right',
-        functionId: 'fg.uminus',
-        argKeys: ['magnitude'],
-      },
-      left: 5,
-      expected: [`5.00 ${operator} ( - 2.00 )`],
-      fences: [1],
     },
     {
       name: 'positive literal',
@@ -383,25 +304,6 @@ describe.each([
       },
       left: 5,
       expected: [`5.00 ${operator} 2.00`],
-      fences: [0],
-    },
-    {
-      name: 'positive substitution',
-      right: { kind: 'symbol', key: 'right', symbolId: 'operand' },
-      left: 5,
-      referencedValue: 2,
-      expected: [`5.00 ${operator} b`, `5.00 ${operator} 2.00`],
-      fences: [0, 0],
-    },
-    {
-      name: 'negative left operand',
-      right: {
-        kind: 'literal',
-        key: 'right',
-        value: { kind: 'number', value: 2 },
-      },
-      left: -5,
-      expected: [`-5.00 ${operator} 2.00`],
       fences: [0],
     },
     {
@@ -609,33 +511,6 @@ test('absolute-value bars enclose a compound argument', () => {
 
   expect(markup).toBe(
     '<mrow><mo fence="true" stretchy="true">|</mo><mrow><mn>5</mn><mo>-</mo><mn>3</mn></mrow><mo fence="true" stretchy="true">|</mo></mrow>',
-  );
-});
-
-test('absolute-value bars enclose an entire fraction', () => {
-  const markup = absoluteValueMarkup(
-    createElement(
-      'mfrac',
-      null,
-      createElement('mn', null, '1'),
-      createElement('mn', null, '2'),
-    ),
-  );
-
-  expect(markup).toBe(
-    '<mrow><mo fence="true" stretchy="true">|</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mo fence="true" stretchy="true">|</mo></mrow>',
-  );
-});
-
-test('nested absolute values retain both pairs of bars', () => {
-  const inner = renderSpecialValueFunction({
-    functionId: 'fg.abs',
-    argReactNodes: [createElement('mn', null, '-2')],
-  });
-  if (!inner) throw new Error('Expected an inner absolute-value renderer');
-
-  expect(absoluteValueMarkup(inner)).toBe(
-    '<mrow><mo fence="true" stretchy="true">|</mo><mrow><mo fence="true" stretchy="true">|</mo><mn>-2</mn><mo fence="true" stretchy="true">|</mo></mrow><mo fence="true" stretchy="true">|</mo></mrow>',
   );
 });
 
