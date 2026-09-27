@@ -123,12 +123,16 @@ function uniqueArchive(prefix: string, extension: string): string {
 }
 const fixturePaths = run(repo, 'git', [
   'ls-files',
+  '-z',
+  '--cached',
+  '--others',
+  '--exclude-standard',
+  '--',
   'examples',
   'tests/fixtures',
 ])
-  .trim()
-  .split('\n')
-  .filter(Boolean);
+  .split('\0')
+  .filter((path) => path !== '' && existsSync(join(repo, path)));
 const fixtureHashes = Object.fromEntries(
   fixturePaths.map((path) => [path, hash(join(repo, path))]),
 );

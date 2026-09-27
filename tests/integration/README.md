@@ -1,7 +1,8 @@
 # Workspace integration tests
 
 This layer composes built packages, apps, the maintained two-panel calculation
-and synthetic fixtures. Package/app behavior tests stay in their owning projects.
+and section-property examples, and synthetic fixtures. Package/app behavior tests
+stay in their owning projects.
 
 - `core/`: conversion, shared contracts and formula verification.
 - `react/`: document preparation and content retention.
@@ -30,6 +31,15 @@ Use the [rendering guide](../../docs/rendering.md#choose-verification-by-change)
 to select HTML or PDF checks. Automatic generation leaves visual inspection
 pending. Test artifacts require manual review only when they are being delivered
 or their visual behavior is part of the change.
+
+The section-property comparisons generate bindings in a temporary consumer,
+reuse each canonical reference calculation twice and forward outputs to a shared
+comparison. Equal-depth cases check ratios of 1 and preserve every child formula
+in the prepared document. Installed acceptance also checks the default comparisons
+and ordinary Python imports against fresh archives and a wheel outside the repo.
+
+Automatic PDF generation leaves visual inspection pending. Inspect every page
+before delivering a PDF and record findings against its exact hash.
 
 ## Measure generated handle calls
 
