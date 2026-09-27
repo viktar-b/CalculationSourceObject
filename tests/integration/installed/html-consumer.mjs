@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { renameSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { CommandReportSchema } from '@cs-object/core';
 
@@ -11,13 +13,15 @@ const output = resolve('html-output/panels.html');
 mkdirSync('html-output', { recursive: true });
 const results = [];
 function run(name, command, args, expected, extraEnv = {}) {
+  const env = { ...process.env, ...extraEnv };
+  for (const key of ['NODE_PATH', 'PYTHONPATH', 'PYTHONHOME']) delete env[key];
   const response = spawnSync(
     process.execPath,
     [cli, command, ...args, '--format', 'json'],
     {
       encoding: 'utf8',
       maxBuffer: 64 * 1024 * 1024,
-      env: { ...process.env, ...extraEnv },
+      env,
     },
   );
   assert.equal(response.status, expected, response.stdout + response.stderr);
@@ -72,26 +76,41 @@ run(
 );
 assert(!existsSync(`${onlyOutput}.evidence`));
 writeFileSync(output, 'preserved HTML');
-run('browser-unavailable', 'html', [...panel, '--check-layout'], 1, {
-  PLAYWRIGHT_BROWSERS_PATH: resolve('absent-browser'),
-});
-assert.equal(readFileSync(output, 'utf8'), 'preserved HTML');
-
-const sum = Array.from(
-  { length: 16 },
-  (_, index) => `input_value ** ${index + 1}`,
-).join(' + ');
-writeFileSync(
-  'overflow.cso.py',
-  `from typing import Annotated
-from cso_python import CalculationResults, calculation, section, symbol
-@calculation(id="overflow", title="Synthetic wide fraction")
-@section(id="polynomial", title="Polynomial")
-def polynomial(input_value: Annotated[float, symbol(glyph="x_{src}", description="Dimensionless input", unit="")] = 0.5) -> CalculationResults:
-    polynomial_sum: Annotated[float, symbol(glyph="S_{poly}", description="Sum of powers", unit="")] = (${sum}) / 2
-    return {"polynomial_sum": polynomial_sum}
-`,
+const unavailable = run(
+  'browser-unavailable',
+  'html',
+  [...panel, '--check-layout'],
+  1,
+  {
+    PLAYWRIGHT_BROWSERS_PATH: resolve('absent-browser'),
+  },
 );
+assert.equal(readFileSync(output, 'utf8'), 'preserved HTML');
+assert.equal(unavailable.report.checks.rendering.status, 'failed');
+assert(
+  unavailable.report.diagnostics.some((item) => item.stage === 'rendering'),
+);
+
+// A missing packaged stylesheet fails HTML preparation before browser work.
+const stylesheet = createRequire(import.meta.url).resolve(
+  '@cs-object/react/style.css',
+);
+renameSync(stylesheet, `${stylesheet}.test-backup`);
+try {
+  const failed = run('html-build-failed', 'html', panel, 1);
+  assert.equal(failed.report.checks.documentContent.status, 'failed');
+  assert.equal(failed.report.checks.rendering.status, 'not_applicable');
+  assert(
+    failed.report.diagnostics.some(
+      (item) => item.code === 'DOCUMENT_PREPARATION_FAILED',
+    ),
+  );
+  assert.equal(readFileSync(output, 'utf8'), 'preserved HTML');
+} finally {
+  renameSync(`${stylesheet}.test-backup`, stylesheet);
+}
+
+writeFileSync('overflow.cso.py', readFileSync('overflow.cso.py.txt'));
 for (const command of ['html', 'pdf']) {
   const path = resolve(`html-output/overflow.${command}`);
   writeFileSync(path, 'previous artifact');

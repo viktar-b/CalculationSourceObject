@@ -16,12 +16,20 @@ python3 -m venv .venv
 .venv/bin/python -m pip install --no-index --find-links artifacts --force-reinstall cso-python
 export PYTHON="$PWD/.venv/bin/python"
 npm run build:cli
+"$PYTHON" -m cso_python bindings examples/two-panel
+"$PYTHON" -m cso_python bindings examples/section-properties
 npx playwright install chromium
 ```
 
 Rebuild and reinstall the wheel after Python source changes. Exporting `PYTHON`
 selects the installed interpreter for the CLI and test runners. A source/editable
 install does not prove wheel contents or behavior outside the checkout.
+
+The binding commands prepare imports and editor types in the source checkout.
+Repeat them after changing calculation interfaces. Generated bindings stay
+Git-ignored; see [generation and project layout](authoring.md#binding-generation-and-project-layout).
+The demo and installed-consumer tests generate their own copies, so those runs
+do not replace this source-checkout setup step.
 
 Use `npm run dev` for the demo. The [launcher](../scripts/demo.ts) prepares the
 maintained two-panel width-2 example from a verified execution. Demo generation
@@ -113,6 +121,19 @@ visual inspection pending. Use the [rendering guide](rendering.md#choose-verific
 to select HTML or PDF checks and apply its delivery requirements.
 
 ## Test data
+
+Keep the suite concentrated on public behavior and important failures. Package
+tests own numerical rules, parsing and rendering details. Integration tests own
+capture-to-verification-to-document/export workflows; keep one representative
+case per supported operation and selected transport or evaluation-order failures.
+Do not repeat each package's full case table through the whole pipeline.
+
+Prefer representative cases over every combination of equivalent inputs. Add
+an edge case for a concrete failure or a distinct requirement. Avoid tests of
+test-only helpers, exact example counts and incidental markup. Preserve
+independent numerical references, document content, publication recovery and
+installed-package checks when consolidating tests. Fewer tests should mean less
+duplicated setup and fewer maintained cases, not moving the same cases into loops.
 
 Generated test data belongs in disposable directories. Keep one canonical source
 for each engineering example; integration tests copy it when mutation is needed.

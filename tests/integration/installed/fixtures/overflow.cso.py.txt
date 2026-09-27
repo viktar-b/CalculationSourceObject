@@ -1,0 +1,7 @@
+from typing import Annotated
+from cso_python import CalculationResults, calculation, section, symbol
+@calculation(id="overflow", title="Synthetic layout regression")
+@section(id="polynomial", title="Polynomial")
+def polynomial(input_value: Annotated[float, symbol(glyph="x_{src}", description="Dimensionless input", unit="")] = 0.5) -> CalculationResults:
+    polynomial_sum: Annotated[float, symbol(glyph="S_{poly}", description="Sum of powers", unit="")] = (input_value ** 1 + input_value ** 2 + input_value ** 3 + input_value ** 4 + input_value ** 5 + input_value ** 6 + input_value ** 7 + input_value ** 8 + input_value ** 9 + input_value ** 10 + input_value ** 11 + input_value ** 12 + input_value ** 13 + input_value ** 14 + input_value ** 15 + input_value ** 16) / 2
+    return {"polynomial_sum": polynomial_sum}

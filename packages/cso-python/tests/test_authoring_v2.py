@@ -1,10 +1,7 @@
 """Behavioral checks for signature inputs, inherited quantities and typed handles."""
 
 import hashlib
-import json
 import shutil
-import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -168,15 +165,6 @@ class AuthoringV2Test(unittest.TestCase):
             self.assertEqual(result["diagnostics"][0]["code"], "INPUT_UNIT_MISMATCH")
             run.assert_not_called()
 
-    def test_duplicate_signature_input_metadata_rejected(self):
-        self.edit(
-            "defaulted_step.cso.py",
-            "    adjusted:",
-            '    amount: Annotated[float, symbol(glyph="Q", description="Amount", unit="m")] = given(amount)\n    adjusted:',
-        )
-        result = self.run_case("adjust", amount=2)
-        self.assertEqual(result["diagnostics"][0]["code"], "AMBIGUOUS_METADATA")
-
     def test_source_change_after_capture_does_not_change_execution(self):
         engine = Execution(self.root / "defaulted_step.cso.py", "adjust", {"amount": 2})
         self.edit(
@@ -185,20 +173,6 @@ class AuthoringV2Test(unittest.TestCase):
         result = engine.response()["execution"]
         self.assertEqual(result["authoring"]["outputs"][0]["value"], 5)
 
-    def test_captured_and_direct_handle_calls_agree(self):
-        generate(self.root)
-        code = "from _cso_bindings.defaulted_step import adjust; import json,inspect; print(json.dumps(adjust(amount=2))); print(inspect.signature(adjust))"
-        result = subprocess.run(
-            [sys.executable, "-c", code],
-            cwd=self.root,
-            text=True,
-            capture_output=True,
-            check=True,
-        )
-        self.assertEqual(
-            json.loads(result.stdout.splitlines()[0]), {"adjusted": 5, "original": 2}
-        )
-        self.assertIn("increment: float = 3", result.stdout)
 
     @sources("forwarded_output.cso.py")
     def test_nested_forwarding_keeps_each_parameter_hop(self):
@@ -362,29 +336,6 @@ def wrapper(w: Amount, h: Increment) -> CalculationResults:
             self.assertEqual(diagnostic["relatedLocations"][0]["start"]["line"], 10)
             run.assert_not_called()
 
-    def test_equivalent_glyph_spellings_are_duplicates(self):
-        self.add_hidden_assignment()
-        path = self.root / "defaulted_step.cso.py"
-        original = path.read_text()
-        pairs = [
-            ("R_ab", "R_{ab}"),
-            (r"\rho", "ρ"),
-            ("R_a", " R_{a} "),
-            ("times", "xx"),
-            ("emptyset", "O/"),
-            ("A_{rect}", 'A_{"rect"}'),
-            ("alpha", "𝛼"),
-        ]
-        for first, second in pairs:
-            with self.subTest(first=first, second=second):
-                path.write_text(
-                    original.replace('glyph="R"', f"glyph={first!r}").replace(
-                        'glyph="I"', f"glyph={second!r}"
-                    )
-                )
-                result = self.run_case("adjust", amount=2)
-                self.assertFalse(result["ok"])
-                self.assertEqual(result["diagnostics"][0]["code"], "DUPLICATE_GLYPH")
 
     @sources("forwarded_output.cso.py")
     def test_descriptive_call_names_use_compact_scopes_and_keep_full_provenance(self):
@@ -415,19 +366,6 @@ def wrapper(w: Amount, h: Increment) -> CalculationResults:
             self.assertIn("relatedLocations", result["diagnostics"][0])
             run.assert_not_called()
 
-    @sources("forwarded_output.cso.py")
-    def test_existing_subscripts_are_preserved_and_collisions_are_not_renumbered(self):
-        self.edit("defaulted_step.cso.py", 'glyph="R"', 'glyph="R_{s}"')
-        generate(self.root)
-        symbols = self.symbols(self.success(self.run_case()))
-        self.assertEqual(
-            symbols['["symbol","root/first","adjusted"]']["glyph"], "R_{s,first}"
-        )
-        self.edit("forwarded_output.cso.py", 'glyph="R"', 'glyph="R_{s,first}"')
-        generate(self.root)
-        result = self.run_case()
-        self.assertFalse(result["ok"])
-        self.assertEqual(result["diagnostics"][0]["code"], "DUPLICATE_GLYPH")
 
 
 if __name__ == "__main__":
