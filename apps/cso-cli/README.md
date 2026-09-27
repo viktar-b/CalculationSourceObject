@@ -1,7 +1,7 @@
 # Calculation CLI
 
 `cso verify` captures one Python execution and independently checks its formulas.
-`cso pdf` verifies that same execution before preparing and rendering a document.
+`cso html` and `cso pdf` verify that same execution before preparing a document.
 `cso bindings` generates typed calculation handles. `dev-export` and `dev-render`
 retain the unverified development paths.
 
@@ -12,8 +12,11 @@ Follow [setup](../../docs/development.md#setup). In the workspace use
 `PYTHON` selects the interpreter with the installed `cso-python` wheel.
 
 ```sh
+cso bindings examples/two-panel
 cso verify examples/two-panel/estimate.cso.py \
   --function estimate --input width=2 --reference examples/two-panel/reference.json --format json
+cso html examples/two-panel/estimate.cso.py \
+  --function estimate --input width=2 --out output/panels.html --check-layout --format json
 cso pdf examples/two-panel/estimate.cso.py \
   --function estimate --input width=2 --reference examples/two-panel/reference.json \
   --out output/panels.pdf --format json
@@ -27,7 +30,7 @@ The [argument parser](src/verified-arguments.ts) is authoritative for syntax.
 Verified commands write one structured JSON report to stdout and operational
 messages to stderr. Exit 0 means success, 1 means verification/generation failure,
 and 2 means invalid usage. Reports retain known source hashes, function, inputs,
-versions and diagnostics; successful PDF reports include output path and hash.
+versions and diagnostics; successful HTML/PDF reports include output path and hash.
 Unknown provenance is not fabricated. See [report schemas](../../packages/cso-core/src/contracts/reports.ts).
 
 ## Numerical checks
@@ -74,13 +77,41 @@ The CLI captures reference bytes once. Source edits, including numerically
 equivalent edits, invalidate reference bindings until an explicit reviewed
 revision. Never regenerate expected numbers from the execution being verified.
 
-## PDF and evidence publication
+## HTML preview
 
-The [PDF coordinator](src/pdf.ts) uses one execution for verification and
+`cso html` writes a standalone page with embedded CSS and captured images. Open it
+directly in a browser. Its screen layout uses the 190 mm print content width and
+the same prepared document renderer as PDF. It contains the full calculation
+narrative, including formulas, substitutions, units, explanations and results.
+
+Without `--check-layout`, no browser runs. Execution and prepared-document checks
+must pass; `rendering` is `not_applicable` and `visualInspection` is `pending`.
+This mode permits inspection of a layout that needs repair. Image signatures and
+source bindings are checked during capture; image decoding, passive SVG policy
+and browser presentation checks require `--check-layout`.
+
+`--check-layout` uses Chromium to check assets, presentation and MathML bounds in
+screen and print media. Failures report `DOCUMENT_LAYOUT_OVERFLOW` with placement,
+selector, bounds, media and overflow distance under `diagnostics[].layout`.
+A failed check preserves existing HTML. Both modes retain evidence by default;
+`--no-evidence` writes only the page. The evidence manifest uses `html` for the
+output binding and records automatic presentation as `not_applicable` when no
+browser check ran. Geometry checks do not certify pagination or visual acceptance.
+
+See the [HTML workflow](../../docs/rendering.md#html-iteration) for development
+and the [check selection](../../docs/rendering.md#choose-verification-by-change)
+for when PDF inspection is needed.
+
+## Document and evidence publication
+
+The [document coordinator](src/document.ts) uses one execution for verification and
 preparation. [Asset capture](src/assets.ts) checks module-relative containment,
-actual media, PNG/JPEG decode and passive SVG policy. Symlink escapes and active
-or external SVG content fail. The browser uses captured data URLs, waits for
-fonts/images and checks mathematical overflow before printing.
+hashes and media signatures. Browser checks for PDF and checked HTML additionally
+require PNG/JPEG decode and passive SVG policy. Symlink escapes and active or
+external SVG content fail those checks. The browser uses captured data URLs,
+waits for fonts/images and checks mathematical descendants against row and sheet
+bounds. [HTML construction](src/prepared-html.ts) and
+[browser inspection](src/pdf-rendering.ts) are shared by both commands.
 
 For output P, [evidence publication](src/evidence.ts) writes `P.evidence/H/`,
 where H hashes the exact manifest bytes. Stderr reports its location/hash.
@@ -89,17 +120,17 @@ prepared data with captured assets, and a field/disposition mapping. Generated
 JSON preserves negative zero. Source hashes identify captured Python files;
 the bundle does not contain their original source bytes.
 
-The manifest binds payloads, PDF and prospective successful stdout bytes. Complete
-evidence is published before the final atomic PDF replacement. Verification,
-preparation, rendering or evidence-write failure preserves an existing PDF and
+The manifest binds payloads, the document and prospective successful stdout bytes. Complete
+evidence is published before the final atomic output replacement. Verification,
+preparation, rendering or evidence-write failure preserves an existing output and
 cleans owned temporary files. A failed final rename can leave an unused complete
-bundle; require an actual successful report and matching PDF before treating it
-as a receipt. Stdout failure after PDF replacement cannot roll back that commit.
-`--no-evidence` retains verification and atomic PDF replacement but creates no
+bundle; require an actual successful report and matching output before treating it
+as a receipt. Stdout failure after replacement cannot roll back that commit.
+`--no-evidence` retains verification and atomic replacement but creates no
 sibling evidence bundle.
 
-New PDF reports leave visual inspection `pending`. Inspect every delivered page
-and bind findings to its exact bytes. Keep source consistency, independent
+New document reports leave visual inspection `pending`. Use the
+[delivery guide](../../docs/rendering.md#printing-and-inspection). Keep source consistency, independent
 agreement, content retention, rendering and visual inspection separate.
 Generation and historical source reviews do not establish human approval.
 

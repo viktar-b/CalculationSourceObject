@@ -86,6 +86,61 @@ function expectCode(schema: z.ZodType, input: unknown, diagnosticCode: string) {
   }
 }
 
+describe('HTML command reports', () => {
+  it('separates verified HTML publication from optional browser inspection', () => {
+    const report = { ...pdfReport(), command: 'html' };
+    report.checks.rendering = skipped;
+    expect(CommandReportSchema.parse(report).checks.rendering.status).toBe(
+      'not_applicable',
+    );
+    report.checks.rendering = passed;
+    expect(CommandReportSchema.parse(report).ok).toBe(true);
+    expectCode(
+      CommandReportSchema,
+      { ...report, output: undefined },
+      'REPORT_OK_MISMATCH',
+    );
+    expectCode(
+      CommandReportSchema,
+      { ...report, checks: { ...report.checks, documentContent: skipped } },
+      'REPORT_OK_MISMATCH',
+    );
+    expectCode(
+      CommandReportSchema,
+      {
+        ...report,
+        command: 'pdf',
+        checks: { ...report.checks, rendering: skipped },
+      },
+      'REPORT_OK_MISMATCH',
+    );
+  });
+
+  it('accepts publication failure without inventing a browser check', () => {
+    const report = pdfReport();
+    expect(
+      CommandReportSchema.parse({
+        ...report,
+        command: 'html',
+        ok: false,
+        output: undefined,
+        checks: {
+          ...report.checks,
+          rendering: skipped,
+          visualInspection: skipped,
+        },
+        diagnostics: [
+          {
+            code: 'HTML_PUBLICATION_FAILED',
+            stage: 'write',
+            message: 'Destination unavailable',
+          },
+        ],
+      }).ok,
+    ).toBe(false);
+  });
+});
+
 describe('check and verification report contracts', () => {
   it('keeps input-only success separate from independent reference evidence', () => {
     const report = VerificationReportSchema.parse(verificationReport());

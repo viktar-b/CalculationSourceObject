@@ -10,7 +10,7 @@ showing formulas, substitutions, units and results, ready to print as a PDF.
 
 <p align="center">
 The calculation and its report share one source. Automatic consistency checks
-run before PDF publication, with no separate formula template to maintain.
+run before HTML or PDF publication, with no separate formula template to maintain.
 </p>
 
 [![Python source beside its generated mathematical document, showing one rectangle calculation reused for two panels.](assets/readme-demo.png)](assets/readme-demo.png)
@@ -32,7 +32,8 @@ yourself.
    explanations and figures.
 3. CSO runs the calculation, checks its documented formulas against the Python
    results, and generates the report from that same captured execution.
-4. Your agent inspects the PDF pages. You review the inputs, assumptions,
+4. Your agent inspects the HTML report during development and the final pages
+   when delivering a PDF. You review the inputs, assumptions,
    method and results against the problem.
 
 When something changes, update the calculation source and regenerate the report.
@@ -96,8 +97,9 @@ Open this repository in your coding agent and start with a prompt such as:
 > Set up CalculationSourceObject using its development guide. Create a calculation
 > for [describe the problem], using [inputs and units] and [assumptions]. Read the
 > authoring guide and reuse existing calculations where appropriate. Ask me about
-> missing inputs or assumptions. Run the verified PDF workflow, inspect every
-> page, and return the source, PDF and check results. Report what passed, failed
+> missing inputs or assumptions. Verify the calculation and inspect its HTML
+> report, using browser layout checks. Return the source, HTML and check results.
+> If I request a PDF, inspect its final pages before delivery. Report what passed, failed
 > or was not checked.
 
 For local setup, use Node 24 LTS and Python 3.11+. Follow the
@@ -111,7 +113,7 @@ node apps/cso-cli/dist/cli.js verify examples/two-panel/estimate.cso.py \
   --reference examples/two-panel/reference.json --format json
 ```
 
-The [CLI guide](apps/cso-cli/README.md) covers PDF generation and verification
+The [CLI guide](apps/cso-cli/README.md) covers HTML/PDF generation and verification
 reports. To explore the example locally, run `npm run dev` after setup.
 
 ## Project status and documentation

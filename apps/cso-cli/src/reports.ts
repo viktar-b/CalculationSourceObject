@@ -1,7 +1,9 @@
 import { CommandReportSchema, type CommandReport } from '@cs-object/core';
 import { version } from '../package.json';
 
-export function initialReport(command?: 'verify' | 'pdf'): CommandReport {
+export function initialReport(
+  command?: 'verify' | 'pdf' | 'html',
+): CommandReport {
   return {
     reportVersion: '1',
     command,
@@ -34,7 +36,7 @@ export function initialReport(command?: 'verify' | 'pdf'): CommandReport {
 
 export function usageReport(
   failure:
-    | { kind: 'unavailable'; command: 'verify' | 'pdf' }
+    | { kind: 'unavailable'; command: 'verify' | 'pdf' | 'html' }
     | { kind: 'unknown'; command: string },
 ): CommandReport {
   return CommandReportSchema.parse({

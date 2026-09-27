@@ -26,8 +26,10 @@ Tests copy sources into temporary consumers before changing them and generate
 their own bindings. Expected numerical values remain independently authored.
 Source-to-document consistency and independent agreement are separate checks.
 
-Automatic PDF generation leaves visual inspection pending. Inspect every page
-before delivering a PDF and record findings against its exact hash.
+Use the [rendering guide](../../docs/rendering.md#choose-verification-by-change)
+to select HTML or PDF checks. Automatic generation leaves visual inspection
+pending. Test artifacts require manual review only when they are being delivered
+or their visual behavior is part of the change.
 
 ## Measure generated handle calls
 

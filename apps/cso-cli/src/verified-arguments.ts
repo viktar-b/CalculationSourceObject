@@ -13,10 +13,16 @@ export type VerifiedOptions = {
       readonly outPath: string;
       readonly retainEvidence: boolean;
     }
+  | {
+      readonly command: 'html';
+      readonly outPath: string;
+      readonly retainEvidence: boolean;
+      readonly checkLayout: boolean;
+    }
 );
 
 export function parseVerifiedArgs(
-  command: 'verify' | 'pdf',
+  command: 'verify' | 'pdf' | 'html',
   args: readonly string[],
 ): VerifiedOptions {
   const [source, ...options] = args;
@@ -28,17 +34,22 @@ export function parseVerifiedArgs(
   let referencePath: string | undefined;
   let outPath: string | undefined;
   let retainEvidence = true;
+  let checkLayout = false;
   for (let index = 0; index < options.length; ) {
     const key = options[index];
-    if (key === '--no-evidence') {
-      if (command !== 'pdf') {
+    if (key === '--no-evidence' || key === '--check-layout') {
+      if (
+        (key === '--no-evidence' && command === 'verify') ||
+        (key === '--check-layout' && command !== 'html')
+      ) {
         throw new UsageError(`Unknown option ${key}`);
       }
       if (seen.has(key)) {
         throw new UsageError(`${key} was provided more than once`);
       }
       seen.add(key);
-      retainEvidence = false;
+      if (key === '--no-evidence') retainEvidence = false;
+      else checkLayout = true;
       index += 1;
       continue;
     }
@@ -49,7 +60,7 @@ export function parseVerifiedArgs(
         '--input',
         '--reference',
         '--format',
-        ...(command === 'pdf' ? ['--out'] : []),
+        ...(command !== 'verify' ? ['--out'] : []),
       ].includes(key)
     ) {
       throw new UsageError(`Unknown option ${key}`);
@@ -74,7 +85,7 @@ export function parseVerifiedArgs(
     }
     index += 2;
   }
-  if (command === 'pdf' && !outPath) {
+  if (command !== 'verify' && !outPath) {
     throw new UsageError('--out is required');
   }
   // Share numeric/identifier normalization with the installed development path.
@@ -85,13 +96,33 @@ export function parseVerifiedArgs(
     inputs: parsed.inputs,
     referencePath,
   };
+  if (command === 'html') {
+    return {
+      ...common,
+      command,
+      outPath: parsed.outPath,
+      retainEvidence,
+      checkLayout,
+    };
+  }
   if (command === 'pdf') {
     return { ...common, command, outPath: parsed.outPath, retainEvidence };
   }
   return { ...common, command };
 }
 
-export function verifiedHelp(command: 'verify' | 'pdf'): string {
+export function verifiedHelp(command: 'verify' | 'pdf' | 'html'): string {
+  if (command === 'html')
+    return `Usage: cso html <file.cso.py> --function <name> [--input <name=number>] [--reference <file.json>] --out <path.html> [--format json] [--no-evidence] [--check-layout]
+
+Verify one captured execution and atomically publish standalone HTML with embedded CSS/assets.
+--check-layout uses Chromium to check assets, presentation and screen/print overflow before publication.
+Without --check-layout, no browser runs and rendering is not_applicable. Visual inspection stays pending.
+--no-evidence omits the sibling evidence bundle; verification and atomic replacement still apply.
+Inputs, reference matching, JSON reports, PYTHON and exit codes follow cso verify.
+Paths resolve against the caller directory. --help executes neither Python nor Chromium.
+`;
+
   return `Usage: cso ${command} <file.cso.py> --function <name> [--input <name=number>] [--reference <file.json>]${command === 'pdf' ? ' --out <path.pdf>' : ''} [--format json]${command === 'pdf' ? ' [--no-evidence]' : ''}
 
 ${command === 'verify' ? 'Execute once with installed cso-python and independently evaluate every documented result.' : 'Verify once, render the captured execution, and atomically replace the PDF. Evidence is retained unless --no-evidence is set.'}

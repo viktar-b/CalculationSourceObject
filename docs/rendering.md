@@ -117,6 +117,49 @@ without requiring Python authoring syntax. Add an independent
 reference case there and domain/edge cases in the owning packages. Display-only
 or export-only operations do not need an authoring declaration.
 
+## Choose verification by change
+
+Choose the evidence needed for the changed behavior before generating artifacts.
+
+| Change | Primary checks | PDF work |
+| --- | --- | --- |
+| Bindings, imports, documentation or runtime only | Execution, contracts, types and consumer tests | Only for a requested PDF deliverable |
+| Calculation content or composition | Prepared content/identity assertions and affected HTML formulas | A targeted print check if pagination is affected |
+| MathML, CSS or document layout | Screen and print-media browser checks; inspect affected HTML rows | Representative final pagination check |
+| PDF pipeline or delivery | HTML diagnostics first | Print behavior checks; every-page inspection for a delivered PDF |
+
+Use the actual prepared document renderer and captured assets. A fresh Python
+execution, a hand-built HTML approximation or the demo's screen layout does not
+establish the layout of the verified report being inspected.
+
+## HTML iteration
+
+After [setup](development.md#setup), generate a standalone report from the
+repository root:
+
+```sh
+node apps/cso-cli/dist/cli.js bindings examples/two-panel
+node apps/cso-cli/dist/cli.js html examples/two-panel/estimate.cso.py \
+  --function estimate --input width=2 --out output/panels.html --format json
+```
+
+Open the file in a browser. It embeds the shared renderer's CSS and captured image
+bytes, uses the 190 mm print content width on screen, and needs no preview server.
+Generation verifies one execution and prepares its document without Chromium.
+The report records browser rendering as `not_applicable`; it is not a layout pass.
+
+Add `--check-layout` to check the same HTML in Chromium at screen and print media
+settings before publication. The shared HTML/PDF check waits for fonts and images,
+validates presentation, and checks MathML descendant bounds against the row and
+sheet. Overflow diagnostics identify the source placement, selector, measured
+bounds, media and overflow in CSS pixels. Inspect that row first; capture a
+targeted screenshot when notation or spacing needs visual judgment.
+
+For a failing layout, plain `html` export still produces an inspectable preview.
+`html --check-layout` and `pdf` fail without replacing an existing output.
+Browser geometry checks do not establish actual PDF pagination, font embedding,
+independent numerical agreement or human visual acceptance.
+
 ## Printing and inspection
 
 Import `@cs-object/react/style.css` once. Browser `printFormulaSheet` accepts
@@ -129,3 +172,11 @@ Content retention tests, rendering success and every-page inspection are separat
 [Prepared-document tests](../tests/integration/react/prepared-document.test.ts)
 check retained fields and engineering presentation using synthetic inputs.
 Extracted text or a page count cannot establish visual acceptance.
+
+Before delivering a PDF, inspect every page for missing content, unreadable
+notation, clipping and pagination. Bind findings to the exact final PDF bytes.
+Generated test artifacts can remain marked `visualInspection: pending`; running
+an automated suite does not create a manual review queue for every test PDF.
+For HTML work, inspect affected formulas at their intended width and keep
+numerical, browser-layout and visual results separate. On-demand hosted downloads
+follow the pending-review policy in [ADR 0004](adr/0004-hosted-verification-and-pdf-review.md).

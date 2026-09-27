@@ -109,7 +109,8 @@ ranges permit a patched version and fresh workspace/isolated installs confirm it
 
 Isolation and installed-package jobs retain logs and evidence for 14 days,
 including generated PDFs and their hashes. Passing automated PDF checks leaves
-visual inspection pending; inspect every page before delivering a PDF.
+visual inspection pending. Use the [rendering guide](rendering.md#choose-verification-by-change)
+to select HTML or PDF checks and apply its delivery requirements.
 
 ## Test data
 
