@@ -61,5 +61,18 @@
   },
   "peerDependencies": {
     "react": ">=18.3.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/viktar-b/CalculationSourceObject.git",
+    "directory": "packages/cso-react"
+  },
+  "homepage": "https://github.com/viktar-b/CalculationSourceObject#readme",
+  "bugs": {
+    "url": "https://github.com/viktar-b/CalculationSourceObject/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

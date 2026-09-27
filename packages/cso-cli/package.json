@@ -43,5 +43,18 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@biomejs/biome": "2.5.14"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/viktar-b/CalculationSourceObject.git",
+    "directory": "packages/cso-cli"
+  },
+  "homepage": "https://github.com/viktar-b/CalculationSourceObject#readme",
+  "bugs": {
+    "url": "https://github.com/viktar-b/CalculationSourceObject/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

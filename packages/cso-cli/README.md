@@ -9,7 +9,7 @@ retain the unverified development paths.
 
 Follow [setup](../../docs/development.md#setup). In the workspace use
 `node packages/cso-cli/dist/cli.js`; an installed consumer uses `cso`.
-`PYTHON` selects the interpreter with the installed `cso-python` wheel.
+`PYTHON` selects the interpreter with the installed `cs-object` wheel.
 
 ```sh
 cso bindings examples/two-panel

@@ -185,7 +185,7 @@ try {
     archives,
     join(repo, 'packages/cso-python'),
   ]);
-  const wheel = uniqueArchive('cso_python-', '.whl');
+  const wheel = uniqueArchive('cs_object-', '.whl');
   const wheelFiles = run(root, builderPython, [
     '-c',
     'import sys,zipfile,json; print(json.dumps(zipfile.ZipFile(sys.argv[1]).namelist()))',
@@ -197,7 +197,7 @@ try {
       members.every(
         (path) =>
           typeof path === 'string' &&
-          /^(cso_python\/|cso_python-[^/]+\.dist-info\/)/.test(path),
+          /^(cso_python\/|cs_object-[^/]+\.dist-info\/)/.test(path),
       ),
   );
 

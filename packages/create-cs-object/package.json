@@ -1,6 +1,6 @@
 {
   "name": "create-cs-object",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Create a local CalculationSourceObject report project.",
   "license": "Apache-2.0",
   "type": "module",
@@ -33,5 +33,18 @@
     "@types/node": "^26",
     "tsup": "^8.5.1",
     "typescript": "^5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/viktar-b/CalculationSourceObject.git",
+    "directory": "packages/create-cs-object"
+  },
+  "homepage": "https://github.com/viktar-b/CalculationSourceObject#readme",
+  "bugs": {
+    "url": "https://github.com/viktar-b/CalculationSourceObject/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

@@ -13,7 +13,7 @@ From the repository root:
 npm ci
 python3 -m venv .venv
 .venv/bin/python -m pip wheel --no-deps ./packages/cso-python --wheel-dir artifacts
-.venv/bin/python -m pip install --no-index --find-links artifacts --force-reinstall cso-python
+.venv/bin/python -m pip install --no-index --find-links artifacts --force-reinstall cs-object
 export PYTHON="$PWD/.venv/bin/python"
 npm run build:cli
 "$PYTHON" -m cso_python bindings examples/two-panel
@@ -146,6 +146,33 @@ After building, pack the required npm workspaces into `artifacts/` with
 archive paths together in the consumer. Install the Python wheel into its chosen
 interpreter. Use the package manifests for versions and peer dependencies.
 These commands do not publish to npm or PyPI.
+
+## Registry releases
+
+[Release packages](../.github/workflows/release.yml) is a manual GitHub Actions
+workflow. Run it from `main` and select `all`, `npm` or `python`. It runs the full
+CI workflow before publishing. Versions come from each package manifest;
+already published versions are skipped, allowing a partially completed release
+to be retried. Bump versions and update internal dependency pins, the initializer's
+Python requirement and the lockfile before running it.
+
+Both registries authenticate with GitHub OIDC. No npm or PyPI upload secrets are
+needed. Configure a GitHub Actions trusted publisher on each npm package
+(`@cs-object/core`, `@cs-object/react`, `@cs-object/cli`, `create-cs-object`) and
+the PyPI project `cs-object`, using these exact values:
+
+| Field | Value |
+| --- | --- |
+| Owner | `viktar-b` |
+| Repository | `CalculationSourceObject` |
+| Workflow filename | `release.yml` |
+| Environment | Leave blank |
+
+On npm, enable direct `npm publish` for each connection. Stage-only permission
+would require approval for every release. PyPI uses the same workflow filename
+for its trusted publisher. Registry-side setup is separate from checking in the
+workflow; a passing local check does not confirm OIDC authentication. Confirm the
+first release run in GitHub Actions and verify its versions in each registry.
 
 ## Documentation changes
 

@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cso-python"
+name = "cs-object"
 version = "0.1.0"
 description = "Constrained Python authoring and CalculationSourceObject JSON export"
 readme = "README.md"
@@ -11,6 +11,11 @@ requires-python = ">=3.11"
 authors = [{ name = "Viktar B" }]
 license = { text = "Apache-2.0" }
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/viktar-b/CalculationSourceObject"
+Repository = "https://github.com/viktar-b/CalculationSourceObject"
+Issues = "https://github.com/viktar-b/CalculationSourceObject/issues"
 
 [tool.setuptools]
 license-files = ["LICENSE", "NOTICE"]

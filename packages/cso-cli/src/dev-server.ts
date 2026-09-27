@@ -23,7 +23,7 @@ type DevOptions = DevTarget & { port: number };
 export const devHelp = `Usage: cso dev <file.cso.py> --function <name> [--port <0-65535>] [--reference <file.json>]
 
 Serve a verified calculation on 127.0.0.1. Port 0 chooses an available port.
-PYTHON selects the installed cso-python interpreter. Source path and function are fixed at startup.
+PYTHON selects the installed cs-object interpreter. Source path and function are fixed at startup.
 `;
 export function parseDevArgs(args: string[]): DevOptions {
   const [source, ...rest] = args;

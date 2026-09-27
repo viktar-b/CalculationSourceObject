@@ -5,7 +5,7 @@ export const bindingsHelp = `Usage: cso bindings <directory> [--check]
 Generate importable _cso_bindings modules and typed signatures from .cso.py files.
 --check reports stale or missing files without writing. Calculations are not executed.
 Python-only equivalent: python -m cso_python bindings <directory> [--check]
-Set PYTHON to the interpreter with cso-python installed.
+Set PYTHON to the interpreter with cs-object installed.
 Exit codes: 0 current/generated, 1 stale/source/write failure, 2 invalid usage.
 `;
 
