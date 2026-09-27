@@ -8,8 +8,8 @@
     "packages/cso-core",
     "packages/cso-react",
     "apps/demo",
-    "apps/cso-cli",
-    "apps/create-cs-object"
+    "packages/cso-cli",
+    "packages/create-cs-object"
   ],
   "scripts": {
     "dev": "npm run build:lib && tsx scripts/demo.ts dev",

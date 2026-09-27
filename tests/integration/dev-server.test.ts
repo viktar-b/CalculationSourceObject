@@ -6,13 +6,13 @@ import { join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { chromium } from 'playwright';
-import * as pdfRenderer from '../../apps/cso-cli/src/pdf-rendering.ts';
+import * as pdfRenderer from '../../packages/cso-cli/src/pdf-rendering.ts';
 import {
   CalculationDefinitionSchema,
   ExecutionResponseSchema,
 } from '@cs-object/core';
 import { z } from 'zod';
-import { startDevServer } from '../../apps/cso-cli/src/dev-server.ts';
+import { startDevServer } from '../../packages/cso-cli/src/dev-server.ts';
 
 const directory = mkdtempSync(join(tmpdir(), 'cso-dev-runtime-'));
 const source = join(directory, 'area.cso.py');

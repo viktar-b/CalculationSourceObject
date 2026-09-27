@@ -67,7 +67,7 @@ input names, source bytes and assets remain unchanged. Calls through one handle
 run serially because each call updates that handle's execution trace.
 
 Successful execution supplies observations; it does not establish formula
-consistency. Use [the verified CLI](../../apps/cso-cli/README.md) for that check.
+consistency. Use [the verified CLI](../../packages/cso-cli/README.md) for that check.
 The captured path preflights local source and executes captured UTF-8 bytes.
 Older single-file exports retain the development exporter. This is trusted local
 calculation authoring, not isolation for hostile Python.

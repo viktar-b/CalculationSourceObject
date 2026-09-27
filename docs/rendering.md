@@ -66,7 +66,7 @@ constructed directly must provide context arrays and symbol operand arrays.
 Update core and React together; source CSO and execution versions are unchanged.
 
 The pure preparer receives captured data URLs and validates their binding to
-the execution. The [CLI](../apps/cso-cli/src/assets.ts) owns file containment,
+the execution. The [CLI](../packages/cso-cli/src/assets.ts) owns file containment,
 capture, media validation and image decoding. For imported documents, supply a
 `LegacyAssetManifest` binding figure IDs and URLs to captured bytes, captions and
 alt text. Authored widths remain preferred CSS pixel sizes constrained to the page.
@@ -138,8 +138,8 @@ After [setup](development.md#setup), generate a standalone report from the
 repository root:
 
 ```sh
-node apps/cso-cli/dist/cli.js bindings examples/two-panel
-node apps/cso-cli/dist/cli.js html examples/two-panel/estimate.cso.py \
+node packages/cso-cli/dist/cli.js bindings examples/two-panel
+node packages/cso-cli/dist/cli.js html examples/two-panel/estimate.cso.py \
   --function estimate --input width=2 --out output/panels.html --format json
 ```
 
@@ -167,7 +167,7 @@ a sheet target and waits for cloned images. Its boolean result means the request
 was accepted; `onError` reports deferred failures. See the [print implementation](../packages/cso-react/src/formula-sheet/print.ts)
 and [browser tests](../tests/integration/formula-sheet-print-browser.test.ts).
 
-Verified PDF generation runs through [the CLI](../apps/cso-cli/README.md).
+Verified PDF generation runs through [the CLI](../packages/cso-cli/README.md).
 Content retention tests, rendering success and every-page inspection are separate.
 [Prepared-document tests](../tests/integration/react/prepared-document.test.ts)
 check retained fields and engineering presentation using synthetic inputs.

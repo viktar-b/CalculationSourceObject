@@ -3,11 +3,11 @@ import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { prepareExecutionDocument } from '@cs-object/react';
-import { captureAssets } from '../apps/cso-cli/src/assets.ts';
-import { bindingsCommand } from '../apps/cso-cli/src/bindings.ts';
-import { stringifyJson } from '../apps/cso-cli/src/json.ts';
-import { executeAndVerify } from '../apps/cso-cli/src/verification.ts';
-import type { VerifiedOptions } from '../apps/cso-cli/src/verified-arguments.ts';
+import { captureAssets } from '../packages/cso-cli/src/assets.ts';
+import { bindingsCommand } from '../packages/cso-cli/src/bindings.ts';
+import { stringifyJson } from '../packages/cso-cli/src/json.ts';
+import { executeAndVerify } from '../packages/cso-cli/src/verification.ts';
+import type { VerifiedOptions } from '../packages/cso-cli/src/verified-arguments.ts';
 import { PythonSourceBundleSchema } from '../apps/demo/src/examples/python-source.ts';
 
 const root = fileURLToPath(new URL('..', import.meta.url));

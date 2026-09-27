@@ -73,5 +73,5 @@ boundary when another consumer needs the server independently of the CLI.
 
 - [ADR-0001: Package ownership and the CSO handoff](0001-package-ownership-and-cso-handoff.md)
 - [ADR-0004: Verify hosted results and label on-demand PDF review](0004-hosted-verification-and-pdf-review.md)
-- [Initializer guide](../../apps/create-cs-object/README.md)
-- [CLI guide](../../apps/cso-cli/README.md)
+- [Initializer guide](../../packages/create-cs-object/README.md)
+- [CLI guide](../../packages/cso-cli/README.md)

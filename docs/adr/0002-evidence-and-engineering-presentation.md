@@ -71,6 +71,6 @@ reviewable narrative.
 - [ADR-0004: Hosted verification and PDF review](0004-hosted-verification-and-pdf-review.md)
   narrows the delivery rule for on-demand downloads with automated checks and
   pending human review.
-- [CLI contract](../../apps/cso-cli/README.md)
+- [CLI contract](../../packages/cso-cli/README.md)
 - [Rendering guide](../rendering.md)
 - [Code map](../code-map.md)

@@ -43,9 +43,9 @@ CLI. An installed CLI also exposes `cso`.
 
 ```sh
 "$PYTHON" -m cso_python bindings examples/two-panel
-node apps/cso-cli/dist/cli.js bindings examples/two-panel --check
-node apps/cso-cli/dist/cli.js verify examples/two-panel/estimate.cso.py --function estimate --input width=2 --reference examples/two-panel/reference.json --format json
-node apps/cso-cli/dist/cli.js pdf examples/two-panel/estimate.cso.py --function estimate --input width=2 --reference examples/two-panel/reference.json --out output/two-panel-width-2.pdf --format json
+node packages/cso-cli/dist/cli.js bindings examples/two-panel --check
+node packages/cso-cli/dist/cli.js verify examples/two-panel/estimate.cso.py --function estimate --input width=2 --reference examples/two-panel/reference.json --format json
+node packages/cso-cli/dist/cli.js pdf examples/two-panel/estimate.cso.py --function estimate --input width=2 --reference examples/two-panel/reference.json --out output/two-panel-width-2.pdf --format json
 ```
 
 Repeat with width 1 for the second case. Python 3.11 or newer is supported.

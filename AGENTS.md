@@ -16,7 +16,7 @@ and human engineering approval.
 - For document content, notation, layout or print changes, use
   [rendering](docs/rendering.md#choose-verification-by-change) to select HTML or PDF checks.
 - For setup and verification commands, use [development](docs/development.md)
-  and the owning package's scripts. CLI behavior is in [its guide](apps/cso-cli/README.md).
+  and the owning package's scripts. CLI behavior is in [its guide](packages/cso-cli/README.md).
 - For function support, cross-package verification, execution evidence or
   review-feedback work, use the [repository workflows](.agents/README.md).
 

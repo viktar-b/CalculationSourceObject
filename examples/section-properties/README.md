@@ -24,8 +24,8 @@ be evaluated.
 From the repository root after [setup](../../docs/development.md#setup):
 
 ```sh
-node apps/cso-cli/dist/cli.js verify examples/section-properties/hot_formed_i_sections/calculate.cso.py --function calculate --format json
-node apps/cso-cli/dist/cli.js verify examples/section-properties/unequal_tapered_i_beam/calculate.cso.py --function calculate --format json
+node packages/cso-cli/dist/cli.js verify examples/section-properties/hot_formed_i_sections/calculate.cso.py --function calculate --format json
+node packages/cso-cli/dist/cli.js verify examples/section-properties/unequal_tapered_i_beam/calculate.cso.py --function calculate --format json
 ```
 
 These are numerical compatibility examples, not pixel-identical reproductions of
@@ -56,9 +56,9 @@ URL slugs; the reference calculation files retain their original bytes.
 
 ```sh
 "$PYTHON" -m cso_python bindings examples/section-properties
-node apps/cso-cli/dist/cli.js bindings examples/section-properties --check
-node apps/cso-cli/dist/cli.js verify examples/section-properties/compare.cso.py --function compare_hot_formed --format json
-node apps/cso-cli/dist/cli.js verify examples/section-properties/compare.cso.py --function compare_tapered --format json
+node packages/cso-cli/dist/cli.js bindings examples/section-properties --check
+node packages/cso-cli/dist/cli.js verify examples/section-properties/compare.cso.py --function compare_hot_formed --format json
+node packages/cso-cli/dist/cli.js verify examples/section-properties/compare.cso.py --function compare_tapered --format json
 ```
 
 The hot-formed comparison uses depths 1056 and 1200 mm by default. The tapered
@@ -66,7 +66,7 @@ comparison uses 100 and 120 mm. Run an equal-depth case, whose expected ratios
 are 1:
 
 ```sh
-node apps/cso-cli/dist/cli.js verify examples/section-properties/compare.cso.py --function compare_tapered --input candidate_depth=100 --format json
+node packages/cso-cli/dist/cli.js verify examples/section-properties/compare.cso.py --function compare_tapered --input candidate_depth=100 --format json
 ```
 
 This command checks formula consistency. The ordinary Python consumer below
@@ -119,8 +119,8 @@ PY
 To inspect the complete composed report:
 
 ```sh
-node apps/cso-cli/dist/cli.js pdf examples/section-properties/compare.cso.py --function compare_hot_formed --out output/hot-formed-comparison.pdf --format json
-node apps/cso-cli/dist/cli.js pdf examples/section-properties/compare.cso.py --function compare_tapered --out output/tapered-comparison.pdf --format json
+node packages/cso-cli/dist/cli.js pdf examples/section-properties/compare.cso.py --function compare_hot_formed --out output/hot-formed-comparison.pdf --format json
+node packages/cso-cli/dist/cli.js pdf examples/section-properties/compare.cso.py --function compare_tapered --out output/tapered-comparison.pdf --format json
 ```
 
 PDF publication checks source-to-document consistency and content retention.
