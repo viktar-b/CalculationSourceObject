@@ -1,6 +1,16 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { appendFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+
+const maximumCapturedCharacters = 4 * 1024 * 1024;
+
+function retainOutput(current: string, chunk: string) {
+  const remaining = Math.max(0, maximumCapturedCharacters - current.length);
+  return {
+    value: `${current}${chunk.slice(0, remaining)}`,
+    truncated: chunk.length > remaining,
+  };
+}
 
 export type CommandRecord = {
   readonly cwd: string;
@@ -31,6 +41,8 @@ export function createCommandRunner(
     };
     const commandIndex = commands.push(record);
     return await new Promise((resolveRun, rejectRun) => {
+      const log = join(logs, `command-${commandIndex}.log`);
+      writeFileSync(log, '');
       const child = spawn(options.command, options.args, {
         cwd: options.cwd,
         env: options.env ?? defaultEnvironment,
@@ -42,14 +54,22 @@ export function createCommandRunner(
       child.stderr.setEncoding('utf8');
       let stdout = '';
       let stderr = '';
+      let stdoutTruncated = false;
+      let stderrTruncated = false;
       let spawnError: Error | undefined;
       let timedOut = false;
       let killTimer: ReturnType<typeof setTimeout> | undefined;
       child.stdout.on('data', (chunk: string) => {
-        stdout += chunk;
+        appendFileSync(log, chunk);
+        const retained = retainOutput(stdout, chunk);
+        stdout = retained.value;
+        stdoutTruncated ||= retained.truncated;
       });
       child.stderr.on('data', (chunk: string) => {
-        stderr += chunk;
+        appendFileSync(log, chunk);
+        const retained = retainOutput(stderr, chunk);
+        stderr = retained.value;
+        stderrTruncated ||= retained.truncated;
       });
       child.once('error', (error) => {
         spawnError = error;
@@ -66,17 +86,21 @@ export function createCommandRunner(
         clearTimeout(timer);
         if (killTimer) clearTimeout(killTimer);
         record.status = status;
-        const log = join(logs, `command-${commandIndex}.log`);
-        writeFileSync(log, `${stdout}\n${stderr}`);
         if (spawnError) return rejectRun(spawnError);
         if (timedOut)
           return rejectRun(
             new Error(`${options.command} timed out; see ${log}`),
           );
+        if (stdoutTruncated)
+          return rejectRun(
+            new Error(
+              `${options.command} stdout exceeded ${maximumCapturedCharacters} characters; see ${log}`,
+            ),
+          );
         if (status !== 0)
           return rejectRun(
             new Error(
-              `${options.command} ${options.args.join(' ')} exited ${status}; see ${log}\n${stderr}`,
+              `${options.command} ${options.args.join(' ')} exited ${status}; see ${log}\n${stderr}${stderrTruncated ? '\n[stderr truncated in memory; full output is in the log]' : ''}`,
             ),
           );
         resolveRun(stdout);
