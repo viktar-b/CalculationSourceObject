@@ -50,17 +50,32 @@ describe('calculation definition contract', () => {
   it('rejects duplicate names, mismatched integer defaults and closure drift', () => {
     const cases = [
       {
-        value: { ...definition, inputs: [...definition.inputs, definition.inputs[0]] },
+        value: {
+          ...definition,
+          sourceManifest: [...sourceManifest, sourceManifest[0]],
+        },
+        code: 'DUPLICATE_MODULE_ID',
+      },
+      {
+        value: {
+          ...definition,
+          inputs: [...definition.inputs, definition.inputs[0]],
+        },
         code: 'DUPLICATE_DEFINITION_INPUT',
       },
       {
-        value: { ...definition, outputs: [...definition.outputs, definition.outputs[0]] },
+        value: {
+          ...definition,
+          outputs: [...definition.outputs, definition.outputs[0]],
+        },
         code: 'DUPLICATE_DEFINITION_OUTPUT',
       },
       {
         value: {
           ...definition,
-          inputs: [{ ...definition.inputs[0], numericType: 'int', default: 1.5 }],
+          inputs: [
+            { ...definition.inputs[0], numericType: 'int', default: 1.5 },
+          ],
         },
         code: 'NUMERIC_KIND_MISMATCH',
       },
@@ -83,15 +98,5 @@ describe('calculation definition contract', () => {
           ]),
         );
     }
-    const duplicateManifest = {
-      ...definition,
-      sourceManifest: [...sourceManifest, sourceManifest[0]],
-    };
-    expect(() =>
-      CalculationDefinitionSchema.safeParse(duplicateManifest),
-    ).not.toThrow();
-    expect(CalculationDefinitionSchema.safeParse(duplicateManifest).success).toBe(
-      false,
-    );
   });
 });

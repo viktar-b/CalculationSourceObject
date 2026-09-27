@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from cso_python.bindings import generate
+
 
 class DescribeTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -37,12 +39,19 @@ class DescribeTest(unittest.TestCase):
             capture_output=True,
             check=False,
         )
-        return result, json.loads(result.stdout)
+        try:
+            response = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            self.fail(
+                f"describe returned invalid JSON (exit {result.returncode})\n"
+                f"stdout: {result.stdout}\nstderr: {result.stderr}"
+            )
+        return result, response
 
     def test_describes_composed_interface_without_executing_calculation(self) -> None:
-        self.source.write_text(
-            self.source.read_text().replace("amount + increment", "amount / 0")
-        )
+        original = self.source.read_text()
+        self.assertEqual(original.count("amount + increment"), 1)
+        self.source.write_text(original.replace("amount + increment", "amount / 0"))
         fixtures = Path(__file__).parent / "fixtures/authoring-api"
         parent = self.root / "forwarded_output.cso.py"
         parent.write_text(
@@ -144,6 +153,28 @@ def adjust(amount: float = 1.5):
                     "default": 1.5,
                 }
             ],
+        )
+
+        generate(self.root)
+        stub = self.root / "_cso_bindings/defaulted_step.pyi"
+        self.assertIn("amount: float = 1.5", stub.read_text())
+        original = self.source.read_text().replace("= 1.5", "= 1")
+        self.source.write_text(original)
+        _, before = self.run_describe()
+        generate(self.root)
+        before_binding = (self.root / "_cso_bindings/defaulted_step.py").read_text()
+        self.assertEqual(original.count("amount: float"), 1)
+        self.source.write_text(original.replace("amount: float", "amount: int"))
+        result, after = self.run_describe()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(after["definition"]["inputs"][0]["numericType"], "int")
+        self.assertNotEqual(
+            before["definition"]["fingerprint"], after["definition"]["fingerprint"]
+        )
+        generate(self.root)
+        self.assertIn("amount: int = 1", stub.read_text())
+        self.assertNotEqual(
+            before_binding, (self.root / "_cso_bindings/defaulted_step.py").read_text()
         )
 
     def test_reports_static_definition_failures(self) -> None:
