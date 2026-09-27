@@ -1,0 +1,8 @@
+node_modules/
+.venv/
+__pycache__/
+_cso_bindings/
+output/
+*.evidence/
+.DS_Store
+.env

@@ -13,6 +13,7 @@ to React for document preparation, then publishes HTML or PDF and evidence.
 | Plan formulas, inherited inputs and document order | [Planner](../packages/cso-python/src/cso_python/planner.py), [annotations](../packages/cso-python/src/cso_python/annotations.py) | [authoring tests](../packages/cso-python/tests/test_authoring_v2.py) |
 | Declare supported Python calls, imports and argument counts | [Function calls](../packages/cso-python/src/cso_python/function_calls.py) | [call preflight tests](../packages/cso-python/tests/test_function_calls.py), [function support contract](../tests/integration/function-support.test.ts) |
 | Observe assignments and public returns from captured code | [Execution](../packages/cso-python/src/cso_python/execution.py) | [authoring protocol integration](../tests/integration/authoring-v2.test.ts) |
+| Describe inputs and outputs without executing calculations | [describe](../packages/cso-python/src/cso_python/describe.py), [definition contract](../packages/cso-core/src/contracts/definition.ts) | [manifest integration](../tests/integration/definition-manifest.test.ts) |
 | Generate runtime handles and editor types without executing calculations | [bindings](../packages/cso-python/src/cso_python/bindings.py), [handles](../packages/cso-python/src/cso_python/handles.py) | [authoring tests](../packages/cso-python/tests/test_authoring_v2.py) |
 | Parse cross-language evidence | [execution schema](../packages/cso-core/src/contracts/execution.ts), [authoring schema](../packages/cso-core/src/contracts/authoring.ts) | [execution contract tests](../packages/cso-core/tests/execution-contract.test.ts) |
 | Validate numeric evidence and retain input kinds in artifact bindings | [numeric contracts](../packages/cso-core/src/contracts/numbers.ts), [input evidence](../packages/cso-core/src/contracts/common.ts), `executionBindingFrom` in [execution contracts](../packages/cso-core/src/contracts/execution.ts) | [numeric contract tests](../packages/cso-core/tests/numeric-evidence-contract.test.ts), [cross-package evidence](../tests/integration/numeric-evidence.test.ts) |
@@ -31,7 +32,11 @@ for the developer workflow and the [authoring guide](authoring.md#reuse-a-calcul
 for composition.
 
 The [CLI entry point](../apps/cso-cli/src/cli.ts) separates verified commands
-from `dev-export` and `dev-render`. The [legacy exporter](../packages/cso-python/src/cso_python/exporter.py)
+from `dev-export` and `dev-render`. The local `cso dev` command uses the
+[server](../apps/cso-cli/src/dev-server.ts) to validate requests and the
+[runtime](../apps/cso-cli/src/dev-runtime.ts) to retain verified runs.
+The [browser UI](../apps/cso-cli/src/dev-ui.ts) edits declared inputs.
+The [legacy exporter](../packages/cso-python/src/cso_python/exporter.py)
 still serves older single-file sources. Development output is not verification.
 
 ## Ownership
@@ -42,6 +47,9 @@ still serves older single-file sources. Development output is not verification.
 - React owns preparation, MathML rendering and engineering presentation.
   It receives captured assets; it does not execute calculations or fetch files.
 - CLI owns process and filesystem access, reports, asset policy and HTML/PDF publication.
+- Initializer owns its synthetic project template and setup scripts; it delegates the
+  local app to the installed CLI. [Fresh-project acceptance](../tests/integration/installed/initializer-acceptance.ts)
+  exercises published-style dependencies through actual archives.
 - Demo consumes packages and explicit data directories through its
   [workspace launcher](../scripts/demo.ts). Root [example preparation](../scripts/prepare-demo-examples.ts)
   reuses CLI verification and asset capture to supply the canonical prepared document.

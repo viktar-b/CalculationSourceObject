@@ -154,6 +154,9 @@ jobs:
             ${{ runner.temp }}/library-archives.log
             ${{ runner.temp }}/cso installed packages */*.json
             ${{ runner.temp }}/cso installed packages */*.log
+            ${{ runner.temp }}/cso installed packages */*.png
+            ${{ runner.temp }}/cso installed packages */*.pdf
+            ${{ runner.temp }}/cso installed packages */*.html
             ${{ runner.temp }}/cso installed packages */python-tests.stdout.txt
             ${{ runner.temp }}/cso installed packages */archives/*
             ${{ runner.temp }}/cso installed packages */full cli/*-results.json

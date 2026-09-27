@@ -8,7 +8,8 @@
     "packages/cso-core",
     "packages/cso-react",
     "apps/demo",
-    "apps/cso-cli"
+    "apps/cso-cli",
+    "apps/create-cs-object"
   ],
   "scripts": {
     "dev": "npm run build:lib && tsx scripts/demo.ts dev",
@@ -18,7 +19,8 @@
     "build:lib": "npm run build --workspace @cs-object/core && npm run build --workspace @cs-object/react",
     "build:css": "npm run build:css --workspace @cs-object/react",
     "test": "npm run test:projects && npm run test:python && npm run test:integration",
-    "test:packages": "npm run build:cli && tsx tests/integration/installed/acceptance.ts",
+    "test:packages": "npm run build:cli && tsx tests/integration/installed/acceptance.ts && npm run test:initializer",
+    "test:initializer": "tsx tests/integration/installed/initializer-acceptance.ts",
     "typecheck": "npm run build:lib && tsc --noEmit --pretty false && npm run typecheck --workspaces",
     "lint": "npm run lint --workspaces && biome lint tests scripts/check-library-archives.ts scripts/check-project-isolation.ts scripts/run-python-tests.ts scripts/check-pr-title.test.ts scripts/check-ci.test.ts",
     "format": "biome format --write ./apps/demo/app ./apps/demo/src ./packages/cso-core/src ./packages/cso-react/src ./packages/cso-core/tests ./packages/cso-react/tests ./tests",

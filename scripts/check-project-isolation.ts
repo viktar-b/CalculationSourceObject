@@ -84,6 +84,7 @@ for (const [name, relative] of [
   ['react', 'packages/cso-react'],
   ['cli', 'apps/cso-cli'],
   ['demo', 'apps/demo'],
+  ['initializer', 'apps/create-cs-object'],
 ]) {
   const directory = copyProject(relative, name);
   const manifest = z
@@ -182,5 +183,5 @@ writeFileSync(
   ),
 );
 process.stdout.write(
-  `All five isolated projects passed: ${join(output, 'qualification.json')}\n`,
+  `All six isolated projects passed: ${join(output, 'qualification.json')}\n`,
 );

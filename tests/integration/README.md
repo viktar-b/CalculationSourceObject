@@ -22,6 +22,14 @@ npm run test:packages
 consumers outside the checkout, and checks those installed packages together.
 The package/app isolation gate is `npm run test:isolation`.
 
+The [initializer acceptance](installed/initializer-acceptance.ts) runs
+`npm create cs-object my-report` against a temporary loopback npm registry backed
+by actual archives. It installs the Python wheel into the generated project,
+starts `npm run dev`, and checks browser edits, the output-only calculation API,
+report/PDF evidence and restart. It also replaces the starter with a copy of the
+canonical two-panel calculation. Third-party dependencies still need network
+access. This tests installation without publishing a release.
+
 The canonical two-panel calculations and metadata stay in `examples/two-panel`.
 Tests copy sources into temporary consumers before changing them and generate
 their own bindings. Expected numerical values remain independently authored.
