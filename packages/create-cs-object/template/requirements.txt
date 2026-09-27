@@ -1,1 +1,1 @@
-cso-python==0.1.0
+cs-object==0.1.0

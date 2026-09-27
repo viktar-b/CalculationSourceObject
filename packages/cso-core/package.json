@@ -49,5 +49,18 @@
   "dependencies": {
     "@noble/hashes": "2.4.0",
     "zod": "^4.6.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/viktar-b/CalculationSourceObject.git",
+    "directory": "packages/cso-core"
+  },
+  "homepage": "https://github.com/viktar-b/CalculationSourceObject#readme",
+  "bugs": {
+    "url": "https://github.com/viktar-b/CalculationSourceObject/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

@@ -119,7 +119,7 @@ The [setup guide](development.md#setup) generates the maintained examples.
 Build and CI consumers must generate bindings before importing calculations;
 `--check` alone cannot bootstrap a fresh checkout. A distributable calculation
 bundle needs its `.cso.py` sources, local dependencies and matching bindings, or
-a documented generation step using the intended `cso-python` version. Ignoring
+a documented generation step using the intended `cs-object` version. Ignoring
 bindings in Git does not make their runtime files optional at execution time.
 
 Generation validates calculation definitions before writing generated files.

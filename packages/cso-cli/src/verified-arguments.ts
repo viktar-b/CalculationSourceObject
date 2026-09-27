@@ -125,7 +125,7 @@ Paths resolve against the caller directory. --help executes neither Python nor C
 
   return `Usage: cso ${command} <file.cso.py> --function <name> [--input <name=number>] [--reference <file.json>]${command === 'pdf' ? ' --out <path.pdf>' : ''} [--format json]${command === 'pdf' ? ' [--no-evidence]' : ''}
 
-${command === 'verify' ? 'Execute once with installed cso-python and independently evaluate every documented result.' : 'Verify once, render the captured execution, and atomically replace the PDF. Evidence is retained unless --no-evidence is set.'}
+${command === 'verify' ? 'Execute once with installed cs-object and independently evaluate every documented result.' : 'Verify once, render the captured execution, and atomically replace the PDF. Evidence is retained unless --no-evidence is set.'}
 Repeat --input for distinct parameters. Duplicate, unknown and invalid inputs fail.
 --reference captures one explicit versioned reference file. Missing matches are not_applicable.
 --format json emits one public CommandReport, including on errors.

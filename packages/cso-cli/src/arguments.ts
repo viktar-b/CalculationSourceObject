@@ -152,7 +152,7 @@ Options:
   --help                 Show usage without executing Python or launching Chromium.
 
 Paths resolve from the caller's directory. Set PYTHON to the interpreter with the
-cso-python wheel installed. dev-render requires Playwright Chromium.
+cs-object wheel installed. dev-render requires Playwright Chromium.
 Development exit codes: 0 exported/rendered, 1 execution/render/write failed,
 2 invalid usage. verify/html/pdf --format json emit one public CommandReport.
 `;

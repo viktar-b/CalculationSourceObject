@@ -1,4 +1,4 @@
-# cso-python
+# cs-object
 
 Author constrained `.cso.py` calculations with Python 3.11+. Runtime dependencies
 are the standard library only. Read [authoring](../../docs/authoring.md) before
@@ -6,6 +6,9 @@ writing calculations and use [two-panel](../../examples/two-panel/README.md) for
 shared metadata and composed calls.
 
 ## Install and run
+
+Install from PyPI with `python -m pip install cs-object`. The import package and
+module command remain `cso_python`.
 
 Follow [workspace setup](../../docs/development.md#setup) to build and install a
 wheel. Distribution metadata lives in [pyproject.toml](pyproject.toml).

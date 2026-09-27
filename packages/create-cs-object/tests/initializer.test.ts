@@ -105,7 +105,7 @@ test('the installed archive creates a complete project without installing', () =
   assert.match(setup.stderr, /run npm run setup again/);
   assert.equal(
     readFileSync(join(project, 'requirements.txt'), 'utf8'),
-    'cso-python==0.1.0\n',
+    'cs-object==0.1.0\n',
   );
 });
 

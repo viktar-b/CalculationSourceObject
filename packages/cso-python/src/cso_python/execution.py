@@ -366,7 +366,7 @@ def versions() -> Json:
     from importlib.metadata import version
 
     return {
-        "pythonPackage": version("cso-python"),
+        "pythonPackage": version("cs-object"),
         "pythonInterpreter": sys.executable,
         "pythonVersion": platform.python_version(),
     }
