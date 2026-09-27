@@ -4,7 +4,9 @@ import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
-import { afterAll, beforeAll, expect, test } from 'vitest';
+import { afterAll, beforeAll, expect, test, vi } from 'vitest';
+import { chromium } from 'playwright';
+import * as pdfRenderer from '../../apps/cso-cli/src/pdf-rendering.ts';
 import {
   CalculationDefinitionSchema,
   ExecutionResponseSchema,
@@ -297,3 +299,82 @@ test('counts captured reference bytes toward retention and includes their exact 
     await bounded.close();
   }
 });
+
+test('keeps calculations available during PDF work and reports retention and rendering failures accurately', async () => {
+  const limited = await startDevServer(
+    { sourcePath: source, functionName: 'calculate', port: 0 },
+    { maximumRuns: 10, maximumBytes: 1024 * 1024, maximumAgeMs: 60_000 },
+  );
+  const browser = await chromium.launch();
+  const render = vi.spyOn(pdfRenderer, 'renderPreparedPdf');
+  let finish:
+    | ((
+        result: Awaited<ReturnType<typeof pdfRenderer.renderPreparedPdf>>,
+      ) => void)
+    | undefined;
+  render.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  try {
+    const page = await browser.newPage();
+    await page.goto(limited.origin);
+    await expect
+      .poll(() => page.locator('#outputs').textContent())
+      .toContain('6 m^2');
+    await page.locator('input[name="width"]').fill('-0');
+    await page.locator('#calculate').click();
+    await expect
+      .poll(() => page.locator('#outputs').textContent())
+      .toContain('-0.0 m^2');
+    expect(await page.locator('#evidence').isHidden()).toBe(true);
+    const retainedFailure = page.waitForResponse((response) =>
+      response.url().endsWith('/report.pdf'),
+    );
+    await page.locator('#pdf').click();
+    await expect.poll(() => finish !== undefined).toBe(true);
+    const calculationResponse = await fetch(limited.origin + '/api/calculate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"inputs":{}}',
+    });
+    expect(calculationResponse.status).toBe(200);
+    expect(await calculationResponse.json()).toEqual({ area: 6 });
+    if (!finish) throw new Error('PDF rendering did not start');
+    finish({ pdf: Buffer.alloc(2 * 1024 * 1024), presentation: [] });
+    expect((await retainedFailure).status()).toBe(413);
+    await expect
+      .poll(() => page.locator('#status').textContent())
+      .toContain('local session limit');
+    await expect
+      .poll(() => page.locator('#checks').textContent())
+      .toContain('PDF layout: pending');
+    expect(await page.locator('#evidence').isHidden()).toBe(true);
+    render.mockRejectedValue(new Error('Synthetic browser failure'));
+    await page.locator('#pdf').click();
+    await expect
+      .poll(() => page.locator('#checks').textContent())
+      .toContain('PDF layout: failed');
+    expect(await page.locator('#evidence').isHidden()).toBe(true);
+    render.mockResolvedValue({
+      pdf: Buffer.from('%PDF-test'),
+      presentation: [],
+    });
+    await page.locator('#calculate').click();
+    await expect
+      .poll(() => page.locator('#status').textContent())
+      .toContain('Report ready');
+    await page.locator('#pdf').click();
+    await expect
+      .poll(() => page.locator('#status').textContent())
+      .toContain('PDF ready');
+    expect(await page.locator('#evidence').isVisible()).toBe(true);
+    await page.screenshot({ path: '/tmp/cso-pr66-ui.png', fullPage: true });
+  } finally {
+    render.mockRestore();
+    await browser.close();
+    await limited.close();
+  }
+}, 30_000);

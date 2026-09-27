@@ -167,6 +167,10 @@ export function createDevRuntime(
         return rendered.pdf;
       })
       .catch((error: unknown) => {
+        if (error instanceof HttpError && error.status === 413) {
+          run.pdf = { kind: 'pending' };
+          throw error;
+        }
         const message =
           error instanceof Error ? error.message : 'PDF rendering failed';
         const failure = new HttpError(
@@ -192,8 +196,6 @@ export function createDevRuntime(
   }
   function execute({ definition, inputs }: Invocation) {
     assertOpen();
-    if (activePdf)
-      throw new HttpError(429, 'A PDF is rendering; retry shortly');
     const verified = executeAndVerify(
       { ...options, command: 'verify', inputs },
       30_000,
