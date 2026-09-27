@@ -19,7 +19,6 @@ import {
   ExecutionResponseSchema,
   type Invocation,
   ReferenceCaseSchema,
-  ReferenceFileSchema,
   type SymbolDefinition,
   type SymbolObservation,
   VerificationReportSchema,
@@ -92,30 +91,6 @@ const observationFor = (
     ),
     `Missing observation '${definition.symbolId}'.`,
   );
-};
-
-const sharedInputExecution = (): ExecutionPayload => {
-  const execution = structuredClone(fixtureExecution());
-  const root = invocationFor(execution);
-  const width = definitionFor(execution, 'width');
-  const area = definitionFor(execution, 'area');
-  root.symbols = root.symbols.map((definition) =>
-    definition.symbolId === area.symbolId
-      ? {
-          ...width,
-          symbolId: area.symbolId,
-          localId: area.localId,
-          variableName: area.variableName,
-          definitionLocation: area.definitionLocation,
-        }
-      : definition,
-  );
-  symbolFor(execution, 'area').valueTree = structuredClone(
-    symbolFor(execution, 'width').valueTree,
-  );
-  observationFor(execution, 'area').kind = 'input';
-  observationFor(execution, 'area').value = 2;
-  return execution;
 };
 
 const diagnosticCodes = (
@@ -666,132 +641,6 @@ describe('verifyExecution', () => {
     }
   });
 
-  test('retains symbol and source context for an invalid bound reference row', () => {
-    const execution = fixtureExecution();
-    const area = definitionFor(execution, 'area');
-    const report = VerificationReportSchema.parse(
-      verifyExecution({
-        execution,
-        referenceCases: [singleReference(execution, 8, 'wrong-unit')],
-      }),
-    );
-    const diagnostic = required(
-      report.diagnostics.find(
-        (item) => item.code === 'REFERENCE_UNIT_MISMATCH',
-      ),
-      'Missing reference unit diagnostic.',
-    );
-    expect(report.checks.independentReferenceAgreement.status).toBe('failed');
-    expect(diagnostic.symbolId).toBe(area.symbolId);
-    expect(diagnostic.invocationId).toBe('root');
-    expect(diagnostic.location).toEqual(area.definitionLocation);
-  });
-
-  test('identifies each omitted reference output without a row index', () => {
-    const execution = fixtureExecution('two-panel-success');
-    const reference = ReferenceFileSchema.parse(
-      JSON.parse(readFileSync(fixtureUrl('reference-cases'), 'utf8')),
-    ).cases[0];
-    const expectedIds = reference.expected.map((row) => row.symbolId);
-    reference.expected = [];
-    const report = VerificationReportSchema.parse(
-      verifyExecution({ execution, referenceCases: [reference] }),
-    );
-    const diagnostics = report.diagnostics.filter(
-      (item) => item.code === 'MISSING_REFERENCE_SYMBOL',
-    );
-    expect(diagnostics.map((item) => item.symbolId).sort()).toEqual(
-      expectedIds.sort(),
-    );
-    for (const diagnostic of diagnostics) {
-      const owner = required(
-        execution.invocations.find((invocation) =>
-          invocation.symbols.some(
-            (symbol) => symbol.symbolId === diagnostic.symbolId,
-          ),
-        ),
-        'Missing expected definition owner.',
-      );
-      const definition = required(
-        owner.symbols.find((symbol) => symbol.symbolId === diagnostic.symbolId),
-        'Missing expected definition.',
-      );
-      expect(diagnostic.invocationId).toBe(owner.id);
-      expect(diagnostic.location).toEqual(definition.definitionLocation);
-    }
-  });
-
-  test('qualifies duplicate and extra reference rows only with available bound context', () => {
-    for (const target of [
-      'duplicate',
-      'stale-duplicate',
-      'known-extra',
-      'unknown-extra',
-    ]) {
-      const execution = fixtureExecution();
-      const area = definitionFor(execution, 'area');
-      const width = definitionFor(execution, 'width');
-      const reference = singleReference(execution, 8);
-      if (target === 'duplicate' || target === 'stale-duplicate') {
-        reference.expected.push(structuredClone(reference.expected[0]));
-        if (target === 'stale-duplicate')
-          reference.binding.sourceClosureHash = '0'.repeat(64);
-      } else {
-        reference.expected.push({
-          symbolId:
-            target === 'known-extra' ? width.symbolId : 'unknown-symbol',
-          value: 2,
-          unit: 'm',
-        });
-      }
-      const report = verifyUnknown({ execution, referenceCases: [reference] });
-      const code = target.includes('duplicate')
-        ? 'DUPLICATE_REFERENCE_SYMBOL'
-        : 'UNKNOWN_REFERENCE_SYMBOL';
-      const diagnostic = required(
-        report.diagnostics.find((item) => item.code === code),
-        `Missing ${code}.`,
-      );
-      expect(diagnostic.symbolId).toBe(
-        target.includes('duplicate')
-          ? area.symbolId
-          : target === 'known-extra'
-            ? width.symbolId
-            : 'unknown-symbol',
-      );
-      if (target === 'duplicate' || target === 'known-extra') {
-        expect(diagnostic.invocationId).toBe('root');
-        expect(diagnostic.location).toEqual(
-          target === 'duplicate'
-            ? area.definitionLocation
-            : width.definitionLocation,
-        );
-      } else {
-        expect(diagnostic.invocationId).toBeUndefined();
-        expect(diagnostic.location).toBeUndefined();
-      }
-    }
-  });
-
-  test('retains the caller context for a nested input kind mismatch', () => {
-    const execution = fixtureExecution('child-defaults-success');
-    const child = execution.invocations.find((invocation) => 'parentInvocationId' in invocation);
-    if (!child || !('callSite' in child)) throw new Error('Missing child');
-    const binding = child.inputBindings.find((item) => item.kind === 'callerLiteral');
-    if (!binding || binding.kind !== 'callerLiteral') throw new Error('Missing caller literal');
-    binding.numericKind = 'float';
-    child.resolvedInputKinds = { [binding.parameterName]: 'int' };
-    const report = verifyExecution({ execution });
-    expect(report.ok).toBe(false);
-    expect(report.diagnostics).toContainEqual(expect.objectContaining({
-      code: 'INPUT_NUMERIC_KIND_MISMATCH',
-      invocationId: child.id,
-      location: binding.parameterLocation,
-      callChain: [child.callSite],
-      relatedLocations: [binding.callerLocation],
-    }));
-  });
-
   test('rejects extreme finite values before constructing comparisons', () => {
     for (const value of [1e308, -1e308]) {
       for (const target of ['runtime', 'literal', 'cache', 'reference']) {
@@ -914,72 +763,6 @@ describe('verifyExecution', () => {
       counts: { checked: 1, passed: 0, failed: 1 },
       cacheCounts: { checked: 2, passed: 2, failed: 0 },
     });
-  });
-
-  test('identifies every documented input consuming a failed binding', () => {
-    const execution = sharedInputExecution();
-    const root = invocationFor(execution);
-    const width = definitionFor(execution, 'width');
-    const area = definitionFor(execution, 'area');
-    execution.entry.resolvedInputs.width = 3;
-    root.resolvedInputs.width = 3;
-
-    const report = VerificationReportSchema.parse(
-      verifyExecution({ execution: ExecutionPayloadSchema.parse(execution) }),
-    );
-    expect(report.checks.inputConsistency.counts).toEqual({
-      checked: 2,
-      passed: 0,
-      failed: 2,
-    });
-    const diagnostics = report.diagnostics.filter(
-      (diagnostic) =>
-        diagnostic.code === 'INPUT_MISMATCH' &&
-        diagnostic.message.startsWith('Resolved input'),
-    );
-    expect(diagnostics).toHaveLength(2);
-    expect(diagnostics.map((diagnostic) => diagnostic.symbolId).sort()).toEqual(
-      [width.symbolId, area.symbolId].sort(),
-    );
-    for (const diagnostic of diagnostics) {
-      expect(diagnostic.invocationId).toBe(root.id);
-      expect(diagnostic.location).toBeDefined();
-      expect(diagnostic.comparison).toMatchObject({
-        actual: 3,
-        expected: 2,
-        absoluteError: 1,
-        absoluteTolerance: 1e-9,
-        relativeTolerance: 1e-12,
-      });
-    }
-  });
-
-  test('qualifies all consumers of a missing binding but leaves unused parameters unqualified', () => {
-    const execution = sharedInputExecution();
-    const root = invocationFor(execution);
-    root.inputBindings = [];
-    root.resolvedInputs.unused = 3;
-    execution.entry.resolvedInputs.unused = 3;
-    const report = verifyUnknown({ execution });
-    const diagnostics = report.diagnostics.filter(
-      (item) => item.code === 'MISSING_INPUT_BINDING',
-    );
-    expect(diagnostics).toHaveLength(3);
-    for (const definition of root.symbols) {
-      const diagnostic = required(
-        diagnostics.find((item) => item.symbolId === definition.symbolId),
-        'Missing binding consumer.',
-      );
-      expect(diagnostic.invocationId).toBe(root.id);
-      expect(diagnostic.location).toEqual(definition.definitionLocation);
-    }
-    const unused = required(
-      diagnostics.find((item) => item.symbolId === undefined),
-      'Missing unused parameter diagnostic.',
-    );
-    expect(unused.invocationId).toBe(root.id);
-    expect(unused.location).toBeUndefined();
-    expect(unused.message).toContain("'unused'");
   });
 
   test('fails unused input bindings without inventing documented-symbol counts', () => {

@@ -246,6 +246,19 @@ export const DiagnosticSchema = z
         containerRight: z.number(),
         overflowPx: z.number().nonnegative(),
       })
+      .refine(
+        (bounds) =>
+          bounds.overflowPx ===
+          Math.max(
+            0,
+            bounds.containerLeft - bounds.left,
+            bounds.right - bounds.containerRight,
+          ),
+        {
+          message: 'Layout overflow must match its measured bounds',
+          path: ['overflowPx'],
+        },
+      )
       .optional(),
     valueDisplay: z
       .strictObject({

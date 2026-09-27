@@ -86,8 +86,8 @@ narrative, including formulas, substitutions, units, explanations and results.
 
 Without `--check-layout`, no browser runs. Execution and prepared-document checks
 must pass; `rendering` is `not_applicable` and `visualInspection` is `pending`.
-This mode permits inspection of a layout that needs repair. Image signatures and
-source bindings are checked during capture; image decoding, passive SVG policy
+This mode permits inspection of a layout that needs repair. Image signatures are checked during capture and
+source bindings during document preparation; image decoding, passive SVG policy
 and browser presentation checks require `--check-layout`.
 
 `--check-layout` uses Chromium to check assets, presentation and MathML bounds in

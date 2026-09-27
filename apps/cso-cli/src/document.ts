@@ -38,10 +38,10 @@ export async function documentCommand(
     });
     const retained = retainSource(result.capture, document);
     report.checks.documentContent = { status: 'passed' };
-    stage = 'rendering';
     let bytes: Buffer;
     let presentation: PresentationMapping[] = [];
     if (options.command === 'pdf') {
+      stage = 'rendering';
       const rendered = await renderPreparedPdf(document);
       bytes = rendered.pdf;
       presentation = rendered.presentation;
@@ -50,6 +50,7 @@ export async function documentCommand(
       const html = buildPreparedHtml(document);
       bytes = Buffer.from(html);
       if (options.checkLayout) {
+        stage = 'rendering';
         presentation = await inspectPreparedHtml(document, html);
         report.checks.rendering = { status: 'passed' };
       }

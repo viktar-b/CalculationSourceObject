@@ -26,7 +26,9 @@ Reuse their public-interface sequence before writing another standalone harness.
    diagnostics. Inspect affected HTML formulas at their intended width. Use PDF
    checks when print behavior or PDF delivery is in scope. Done when the displayed
    formulas and results can be traced to the same capture and the changed behavior
-   has matching evidence.
+   has matching evidence. Mechanical layout failures need browser regressions
+   with source-placement diagnostics when a placement exists, or actionable
+   document-level diagnostics otherwise.
 5. Apply the [delivery checks](../../docs/rendering.md#printing-and-inspection)
    to artifacts being delivered. Leave unrelated generated test artifacts marked
    with their actual review status. Report numerical checks, browser checks and
