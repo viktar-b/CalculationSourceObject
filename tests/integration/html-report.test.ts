@@ -15,7 +15,7 @@ import { chromium, type Page } from 'playwright';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 
 const directory = mkdtempSync(join(tmpdir(), 'cso-html-'));
-const cli = resolve('apps/cso-cli/dist/cli.js');
+const cli = resolve('packages/cso-cli/dist/cli.js');
 const python = process.env.PYTHON ?? 'python3';
 const panels = join(directory, 'panels');
 const hash = (bytes: Uint8Array) =>

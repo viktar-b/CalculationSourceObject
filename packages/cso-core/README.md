@@ -11,7 +11,7 @@ prepared engineering document. Parse unknown data at these boundaries.
 `verifyExecution` evaluates documented formulas from a captured execution and
 compares them with observations, caches and public outputs. Independent references
 are optional and checked separately. See [verification](src/verification/verify.ts),
-[numeric policy](src/verification/numeric.ts) and [CLI semantics](../../apps/cso-cli/README.md).
+[numeric policy](src/verification/numeric.ts) and [CLI semantics](../../packages/cso-cli/README.md).
 
 The [contracts](src/contracts/) define execution, references, prepared documents
 and reports. New Python captures use protocol v2; core also reads v1 without

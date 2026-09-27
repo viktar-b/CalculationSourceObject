@@ -140,11 +140,11 @@ process.stdout.write(`Installed acceptance artifacts: ${root}\n`);
 try {
   mkdirSync(archives);
   run(repo, 'npm', ['run', 'build:lib']);
-  run(join(repo, 'apps/cso-cli'), 'npm', ['run', 'build']);
+  run(join(repo, 'packages/cso-cli'), 'npm', ['run', 'build']);
   for (const directory of [
     'packages/cso-core',
     'packages/cso-react',
-    'apps/cso-cli',
+    'packages/cso-cli',
   ]) {
     run(join(repo, directory), 'npm', ['pack', '--pack-destination', archives]);
   }

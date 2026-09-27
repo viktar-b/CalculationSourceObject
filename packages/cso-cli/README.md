@@ -8,7 +8,7 @@ retain the unverified development paths.
 ## Run
 
 Follow [setup](../../docs/development.md#setup). In the workspace use
-`node apps/cso-cli/dist/cli.js`; an installed consumer uses `cso`.
+`node packages/cso-cli/dist/cli.js`; an installed consumer uses `cso`.
 `PYTHON` selects the interpreter with the installed `cso-python` wheel.
 
 ```sh

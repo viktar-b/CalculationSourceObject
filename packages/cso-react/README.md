@@ -30,7 +30,7 @@ commands and packaged ESM, CommonJS, declarations and CSS.
 
 Call `printFormulaSheet` from a browser event handler for browser printing.
 Its boolean return means the request was accepted; use `onError` for deferred
-failures. For verified output use [the CLI](../../apps/cso-cli/README.md).
+failures. For verified output use [the CLI](../../packages/cso-cli/README.md).
 Neither printing nor document preparation proves numerical agreement.
 
 Install local core and React archives together using [consumer setup](../../docs/development.md#local-package-consumers).

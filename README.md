@@ -52,7 +52,7 @@ the exact PDF, so you can identify the source, inputs and checks behind it.
 
 You can supply independently established reference results for an additional
 numerical check. The reports distinguish successful, failed and inapplicable
-checks. The [CLI guide](apps/cso-cli/README.md) explains their scope.
+checks. The [CLI guide](packages/cso-cli/README.md) explains their scope.
 
 These safeguards establish agreement between the calculation and its document.
 An engineer still reviews whether the inputs, assumptions, units and method are
@@ -97,7 +97,7 @@ methods in one report.
 
 ## Create a local report project
 
-The [initializer](apps/create-cs-object/README.md) creates a standalone project
+The [initializer](packages/create-cs-object/README.md) creates a standalone project
 with a Python calculation and a browser app. It requires Node 24 and Python 3.11+.
 After the `0.1.0` packages are published, create and start a project with:
 
@@ -134,12 +134,12 @@ CLI and browser required for PDF generation. Then check the worked example
 from the repository root:
 
 ```sh
-node apps/cso-cli/dist/cli.js verify examples/two-panel/estimate.cso.py \
+node packages/cso-cli/dist/cli.js verify examples/two-panel/estimate.cso.py \
   --function estimate --input width=2 \
   --reference examples/two-panel/reference.json --format json
 ```
 
-The [CLI guide](apps/cso-cli/README.md) covers HTML/PDF generation and verification
+The [CLI guide](packages/cso-cli/README.md) covers HTML/PDF generation and verification
 reports. To explore the example locally, run `npm run dev` after setup.
 
 ## Project status and documentation
@@ -152,6 +152,8 @@ verification after upgrades.
 - [Python library](packages/cso-python/README.md),
   [core library](packages/cso-core/README.md) and
   [React components](packages/cso-react/README.md)
+- [CLI](packages/cso-cli/README.md) and
+  [project initializer](packages/create-cs-object/README.md)
 - [Local demo](apps/demo/README.md)
 - [Development and checks](docs/development.md), [code map](docs/code-map.md) and
   [agent guidance](AGENTS.md)

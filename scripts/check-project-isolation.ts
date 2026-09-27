@@ -82,9 +82,9 @@ const dependencies = new Map<string, string>();
 for (const [name, relative] of [
   ['core', 'packages/cso-core'],
   ['react', 'packages/cso-react'],
-  ['cli', 'apps/cso-cli'],
+  ['cli', 'packages/cso-cli'],
   ['demo', 'apps/demo'],
-  ['initializer', 'apps/create-cs-object'],
+  ['initializer', 'packages/create-cs-object'],
 ]) {
   const directory = copyProject(relative, name);
   const manifest = z

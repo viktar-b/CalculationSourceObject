@@ -275,7 +275,7 @@ Review changed formulas, source hashes and reference coverage before explicitly
 rebinding a reference; preserve independently established expected numbers.
 Never generate those expected numbers from the execution being checked.
 
-Run [verified CLI commands](../apps/cso-cli/README.md) for the selected function
+Run [verified CLI commands](../packages/cso-cli/README.md) for the selected function
 and inputs. Keep numerical consistency, independent agreement, content retention
 and page inspection separate. Before delivering a PDF, inspect every page for
 missing steps, unreadable notation, clipping and pagination. Account for every

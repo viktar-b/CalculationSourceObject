@@ -20,8 +20,8 @@ import {
   renderFormulaSheetHtml,
   renderPdfFromHtml,
   runPythonExporter,
-} from '../../apps/cso-cli/src/development.ts';
-import { renderPreparedPdf } from '../../apps/cso-cli/src/pdf-rendering.ts';
+} from '../../packages/cso-cli/src/development.ts';
+import { renderPreparedPdf } from '../../packages/cso-cli/src/pdf-rendering.ts';
 
 const repoRoot = new URL('../..', import.meta.url).pathname;
 let sourcePath: string;

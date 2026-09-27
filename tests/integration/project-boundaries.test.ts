@@ -8,7 +8,8 @@ const projects = [
   'packages/cso-core',
   'packages/cso-react',
   'packages/cso-python',
-  'apps/cso-cli',
+  'packages/cso-cli',
+  'packages/create-cs-object',
   'apps/demo',
 ];
 const ignored = new Set([

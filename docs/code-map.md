@@ -21,7 +21,7 @@ to React for document preparation, then publishes HTML or PDF and evidence.
 | Validate whole Value tree structure and compare formulas, observations, outputs and references | [verifyExecution](../packages/cso-core/src/verification/verify.ts), [evaluator](../packages/cso-core/src/verification/evaluate.ts), [operation roles and numeric policy](../packages/cso-core/src/verification/numeric.ts) | [verifier cases](../tests/fixtures/verifier-cases/check.mjs), [numeric tests](../packages/cso-core/tests/verifier-numeric.test.ts) |
 | Prepare ordered content bound to that execution | [prepareExecutionDocument](../packages/cso-react/src/prepare-document.ts), [document schemas](../packages/cso-core/src/contracts/document.ts) | [prepared-document tests](../tests/integration/react/prepared-document.test.ts) |
 | Select engineering context, operand details and retained-source pointers | [context preparation](../packages/cso-react/src/prepare-context.ts) | [context tests](../packages/cso-react/tests/prepared-context.test.ts) |
-| Capture assets, render and publish HTML/PDF | [document coordinator](../apps/cso-cli/src/document.ts), [shared HTML](../apps/cso-cli/src/prepared-html.ts), [browser inspection](../apps/cso-cli/src/pdf-rendering.ts), [evidence](../apps/cso-cli/src/evidence.ts) | [HTML and layout checks](../tests/integration/html-report.test.ts), [installed PDF cases](../tests/integration/installed/pdf-consumer.mjs), [evidence tests](../apps/cso-cli/tests/evidence.test.ts) |
+| Capture assets, render and publish HTML/PDF | [document coordinator](../packages/cso-cli/src/document.ts), [shared HTML](../packages/cso-cli/src/prepared-html.ts), [browser inspection](../packages/cso-cli/src/pdf-rendering.ts), [evidence](../packages/cso-cli/src/evidence.ts) | [HTML and layout checks](../tests/integration/html-report.test.ts), [installed PDF cases](../tests/integration/installed/pdf-consumer.mjs), [evidence tests](../packages/cso-cli/tests/evidence.test.ts) |
 
 Binding generation and invocation planning read the same static calculation
 definitions. Generated `.py` modules create callable handles; adjacent `.pyi`
@@ -31,15 +31,19 @@ and execution path above. See the [Python library](../packages/cso-python/README
 for the developer workflow and the [authoring guide](authoring.md#reuse-a-calculation)
 for composition.
 
-The [CLI entry point](../apps/cso-cli/src/cli.ts) separates verified commands
+The [CLI entry point](../packages/cso-cli/src/cli.ts) separates verified commands
 from `dev-export` and `dev-render`. The local `cso dev` command uses the
-[server](../apps/cso-cli/src/dev-server.ts) to validate requests and the
-[runtime](../apps/cso-cli/src/dev-runtime.ts) to retain verified runs.
-The [browser UI](../apps/cso-cli/src/dev-ui.ts) edits declared inputs.
+[server](../packages/cso-cli/src/dev-server.ts) to validate requests and the
+[runtime](../packages/cso-cli/src/dev-runtime.ts) to retain verified runs.
+The [browser UI](../packages/cso-cli/src/dev-ui.ts) edits declared inputs.
 The [legacy exporter](../packages/cso-python/src/cso_python/exporter.py)
 still serves older single-file sources. Development output is not verification.
 
 ## Ownership
+
+Installable libraries and tools live in `packages/`. `apps/demo` is the
+application that consumes them. The initializer keeps its template inside its
+package and creates user projects outside this repository.
 
 - Python owns source parsing, execution, generated handles and authoring rules.
 - Core owns public schemas, reference identity, notation parsing, formula evaluation and conversion.

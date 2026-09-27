@@ -11,7 +11,7 @@ import {
 } from '@cs-object/core';
 import { prepareExecutionDocument } from '@cs-object/react';
 import { afterEach, expect, it } from 'vitest';
-import { executeAndVerify } from '../../apps/cso-cli/src/verification.ts';
+import { executeAndVerify } from '../../packages/cso-cli/src/verification.ts';
 
 const directories: string[] = [];
 afterEach(() => {
