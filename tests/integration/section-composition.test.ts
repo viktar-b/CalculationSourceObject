@@ -6,9 +6,10 @@ import { ExecutionResponseSchema, verifyExecution } from '@cs-object/core';
 import { prepareExecutionDocument } from '@cs-object/react';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
-const directory = mkdtempSync(join(tmpdir(), 'cso-section-composition-'));
+let directory: string;
 const python = process.env.PYTHON ?? 'python3';
 beforeAll(() => {
+  directory = mkdtempSync(join(tmpdir(), 'cso-section-composition-'));
   cpSync(
     new URL('../../examples/section-properties/', import.meta.url),
     directory,

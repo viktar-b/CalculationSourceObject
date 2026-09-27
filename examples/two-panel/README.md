@@ -38,7 +38,8 @@ return them. Equal input values also do not merge the two panel invocations.
 ## Generate and verify
 
 Run from the repository root after [setup](../../docs/development.md#setup).
-These commands use the workspace CLI; an installed CLI also exposes `cso`.
+Binding generation uses the Python CLI; the remaining commands use the workspace
+CLI. An installed CLI also exposes `cso`.
 
 ```sh
 "$PYTHON" -m cso_python bindings examples/two-panel
