@@ -16,12 +16,20 @@ python3 -m venv .venv
 .venv/bin/python -m pip install --no-index --find-links artifacts --force-reinstall cso-python
 export PYTHON="$PWD/.venv/bin/python"
 npm run build:cli
+"$PYTHON" -m cso_python bindings examples/two-panel
+"$PYTHON" -m cso_python bindings examples/section-properties
 npx playwright install chromium
 ```
 
 Rebuild and reinstall the wheel after Python source changes. Exporting `PYTHON`
 selects the installed interpreter for the CLI and test runners. A source/editable
 install does not prove wheel contents or behavior outside the checkout.
+
+The binding commands prepare imports and editor types in the source checkout.
+Repeat them after changing calculation interfaces. Generated bindings stay
+Git-ignored; see [generation and project layout](authoring.md#binding-generation-and-project-layout).
+The demo and installed-consumer tests generate their own copies, so those runs
+do not replace this source-checkout setup step.
 
 Use `npm run dev` for the demo. The [launcher](../scripts/demo.ts) prepares the
 maintained two-panel width-2 example from a verified execution. Demo generation

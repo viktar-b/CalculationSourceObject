@@ -11,6 +11,7 @@ if (!consumer || !python)
   );
 for (const directory of [
   'examples/two-panel',
+  'examples/section-properties',
 ]) {
   cpSync(join(repository, directory), join(consumer, directory), {
     recursive: true,
@@ -29,6 +30,7 @@ cpSync(
 );
 for (const name of [
   'verify-consumer.mjs',
+  'section-consumer.mjs',
   'signed-zero-consumer.mjs',
   'pdf-consumer.mjs',
 ]) {
@@ -49,6 +51,7 @@ for (const name of [
 }
 for (const file of [
   'stage-a-results.json',
+  'section-results.json',
   'signed-zero-results.json',
   'pdf-results.json',
 ]) {
