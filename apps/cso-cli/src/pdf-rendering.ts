@@ -261,31 +261,53 @@ function inspectLayoutInPage(media: 'screen' | 'print'): Diagnostic[] {
         findings.set(key, diagnostic);
     }
   }
-  if (
-    findings.size === 0 &&
-    document.documentElement.scrollWidth >
-      document.documentElement.clientWidth + 2
-  ) {
-    // Retain the coarse document guard for overflow outside mathematical rows.
-    const right = document.documentElement.scrollWidth;
-    const containerRight = document.documentElement.clientWidth;
-    return [
-      {
+  // Element boxes alone miss text painted beyond an otherwise fitting block.
+  // Range rectangles measure that text against the same printable sheet bounds.
+  for (const element of sheet.querySelectorAll('*')) {
+    if (element.closest('math') || element.closest('svg')) continue;
+    const rectangles = [element.getBoundingClientRect()];
+    for (const node of element.childNodes) {
+      if (node.nodeType !== Node.TEXT_NODE || !node.textContent?.trim())
+        continue;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      rectangles.push(...range.getClientRects());
+    }
+    for (const bounds of rectangles) {
+      if (!bounds.width || !bounds.height) continue;
+      const overflowPx = Math.max(
+        0,
+        sheetBounds.left - bounds.left,
+        bounds.right - sheetBounds.right,
+      );
+      if (overflowPx <= 2) continue;
+      const placement = element.closest('[data-source-placement]');
+      const key = placement ?? sheet;
+      const previous = findings.get(key);
+      if (previous && (previous.layout?.overflowPx ?? 0) >= overflowPx)
+        continue;
+      const sourcePlacementId =
+        placement?.getAttribute('data-source-placement') ?? undefined;
+      const selector = sourcePlacementId
+        ? `[data-source-placement=${JSON.stringify(sourcePlacementId)}]`
+        : '[data-formula-sheet]';
+      findings.set(key, {
         code: 'DOCUMENT_LAYOUT_OVERFLOW',
         stage: 'rendering',
         check: 'rendering',
-        message: `Document exceeds viewport width in ${media} layout.`,
+        message: `Document content exceeds printable sheet width in ${media} layout: ${element.tagName}, ${overflowPx.toFixed(2)}px beyond content bounds.`,
         layout: {
           media,
-          selector: 'html',
-          left: 0,
-          right,
-          containerLeft: 0,
-          containerRight,
-          overflowPx: right - containerRight,
+          sourcePlacementId,
+          selector,
+          left: bounds.left,
+          right: bounds.right,
+          containerLeft: sheetBounds.left,
+          containerRight: sheetBounds.right,
+          overflowPx,
         },
-      },
-    ];
+      });
+    }
   }
   return [...findings.values()];
 }

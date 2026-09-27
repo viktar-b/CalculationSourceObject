@@ -159,23 +159,16 @@ test('checks the HTML in Chromium when requested', () => {
 test.each(['fraction', 'conditional', 'qualified'])(
   'rejects overflowing %s notation in HTML and PDF without replacing output',
   (kind) => {
-    const sum = Array.from(
-      { length: 16 },
-      (_, index) => `input_value ** ${index + 1}`,
-    ).join(' + ');
-    const expression = `(${sum}) / 2${kind === 'conditional' ? ' if input_value > 0 else 0' : ''}`;
     const source = join(directory, `${kind}.cso.py`);
-    writeFileSync(
-      source,
-      `from typing import Annotated
-from cso_python import CalculationResults, calculation, section, symbol
-@calculation(id="overflow", title="Synthetic layout regression")
-@section(id="polynomial", title="Polynomial")
-def polynomial(input_value: Annotated[float, symbol(glyph="${kind === 'qualified' ? 'x_{src,bs}' : 'x_{src}'}", description="Dimensionless input", unit="")] = 0.5) -> CalculationResults:
-    polynomial_sum: Annotated[float, symbol(glyph="S_{poly}", description="Sum of powers", unit="")] = ${expression}
-    return {"polynomial_sum": polynomial_sum}
-`,
+    let fixture = readFileSync(
+      'tests/integration/installed/fixtures/overflow.cso.py.txt',
+      'utf8',
     );
+    if (kind === 'conditional')
+      fixture = fixture.replace(' / 2', ' / 2 if input_value > 0 else 0');
+    if (kind === 'qualified')
+      fixture = fixture.replace('x_{src}', 'x_{src,bs}');
+    writeFileSync(source, fixture);
     const unchecked = run(
       'html',
       source,
@@ -241,3 +234,71 @@ test('preserves HTML on evidence-write failure and explains it without claiming 
     ),
   ).toBe(true);
 });
+
+test('rejects title text beyond the sheet even when it fits the browser viewport', async () => {
+  const source = join(directory, 'title.cso.py');
+  writeFileSync(
+    source,
+    readFileSync(
+      'tests/integration/installed/fixtures/overflow.cso.py.txt',
+      'utf8',
+    )
+      .replace('Synthetic layout regression', 'W'.repeat(45))
+      .replace(/\(input_value \*\* 1.*\) \/ 2/, 'input_value / 2'),
+  );
+  const preview = join(directory, 'title-preview.html');
+  const unchecked = run('html', source, 'polynomial', preview, [
+    '--no-evidence',
+  ]);
+  expect(unchecked.status, unchecked.stdout).toBe(0);
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    await page.goto(pathToFileURL(preview).href);
+    for (const media of ['screen', 'print'] satisfies Array<
+      'screen' | 'print'
+    >) {
+      await page.emulateMedia({ media });
+      const bounds = await page.evaluate(() => {
+        const title = document.querySelector('h1');
+        const sheet = document.querySelector('[data-formula-sheet]');
+        if (!title || !sheet) throw new Error('Missing title or sheet');
+        const range = document.createRange();
+        range.selectNodeContents(title);
+        return {
+          textRight: range.getBoundingClientRect().right,
+          sheetRight: sheet.getBoundingClientRect().right,
+          viewportRight: document.documentElement.clientWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+        };
+      });
+      expect(bounds.textRight).toBeGreaterThan(bounds.sheetRight + 2);
+      expect(bounds.textRight).toBeLessThan(bounds.viewportRight);
+      expect(bounds.scrollWidth).toBe(bounds.viewportRight);
+    }
+  } finally {
+    await browser.close();
+  }
+  for (const command of ['html', 'pdf'] satisfies Array<'html' | 'pdf'>) {
+    const output = join(directory, `title.${command}`);
+    writeFileSync(output, 'previous artifact');
+    const result = run(
+      command,
+      source,
+      'polynomial',
+      output,
+      command === 'html' ? ['--check-layout'] : [],
+    );
+    expect(result.status, result.stdout).toBe(1);
+    expect(readFileSync(output, 'utf8')).toBe('previous artifact');
+    expect(result.report.checks.rendering.status).toBe('failed');
+    expect(
+      result.report.diagnostics.some(
+        (item) =>
+          item.layout &&
+          item.layout.selector === '[data-formula-sheet]' &&
+          item.layout.overflowPx > 2,
+      ),
+    ).toBe(true);
+  }
+}, 30_000);

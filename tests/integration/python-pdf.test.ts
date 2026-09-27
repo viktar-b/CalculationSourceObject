@@ -66,7 +66,7 @@ describe('annotated Python PDF renderer', () => {
     });
     document.title = 'LongTitle'.repeat(200);
     await expect(renderPreparedPdf(document)).rejects.toThrow(
-      'Document exceeds viewport width',
+      'Document content exceeds printable sheet width',
     );
   }, 30_000);
 

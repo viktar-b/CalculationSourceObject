@@ -416,6 +416,21 @@ function validateCommandFailure(
   }
 }
 
+function documentPolicy(report: CommandReportData) {
+  const isDocument = report.command === 'pdf' || report.command === 'html';
+  const renderingAccepted =
+    report.checks.rendering.status === 'passed' ||
+    (report.command === 'html' &&
+      report.checks.rendering.status === 'not_applicable');
+  return {
+    isDocument,
+    readyToWrite:
+      isDocument &&
+      report.checks.documentContent.status === 'passed' &&
+      renderingAccepted,
+  };
+}
+
 function commandFailureExplained(report: CommandReportData) {
   if (report.checks.executionValidity.status === 'not_applicable') {
     return hasOwningDiagnostic(report.diagnostics, 'executionValidity', [
@@ -431,15 +446,11 @@ function commandFailureExplained(report: CommandReportData) {
       'reference',
     ]);
   if (report.command === 'verify') return referenceFailure;
-  if (report.command !== 'pdf' && report.command !== 'html') return false;
-  if (report.checks.documentContent.status === 'not_applicable') {
+  const policy = documentPolicy(report);
+  if (!policy.isDocument) return false;
+  if (report.checks.documentContent.status === 'not_applicable')
     return referenceFailure;
-  }
-  if (
-    report.command === 'pdf' &&
-    report.checks.rendering.status === 'not_applicable'
-  )
-    return false;
+  if (!policy.readyToWrite) return false;
   return report.diagnostics.some(
     (diagnostic) =>
       diagnostic.stage === 'write' && diagnostic.check === undefined,
@@ -454,7 +465,7 @@ export const CommandReportSchema = CommandReportObjectSchema.superRefine(
     validateCommandFailure(report, ctx);
     const verified = verificationPassed(report.checks);
     const documentPassed = report.checks.documentContent.status === 'passed';
-    const rendered = report.checks.rendering.status === 'passed';
+    const policy = documentPolicy(report);
     if (!report.ok && report.diagnostics.length === 0) {
       reportIssue(
         ctx,
@@ -478,12 +489,7 @@ export const CommandReportSchema = CommandReportObjectSchema.superRefine(
     if (
       report.ok &&
       (!verified ||
-        ((report.command === 'pdf' || report.command === 'html') &&
-          (!documentPassed ||
-            !report.output ||
-            (report.command === 'pdf'
-              ? !rendered
-              : report.checks.rendering.status === 'failed'))))
+        (policy.isDocument && (!policy.readyToWrite || !report.output)))
     ) {
       reportIssue(
         ctx,
@@ -494,8 +500,7 @@ export const CommandReportSchema = CommandReportObjectSchema.superRefine(
     }
     for (const key of ['documentContent', 'rendering'] as const) {
       if (
-        ((report.command !== 'pdf' && report.command !== 'html') ||
-          !verified) &&
+        (!policy.isDocument || !verified) &&
         report.checks[key].status !== 'not_applicable'
       ) {
         reportIssue(
@@ -517,16 +522,7 @@ export const CommandReportSchema = CommandReportObjectSchema.superRefine(
         'Rendering requires passed document preparation.',
       );
     }
-    if (
-      report.output &&
-      (!report.ok ||
-        (report.command !== 'pdf' && report.command !== 'html') ||
-        !verified ||
-        !documentPassed ||
-        (report.command === 'pdf'
-          ? !rendered
-          : report.checks.rendering.status === 'failed'))
-    ) {
+    if (report.output && (!report.ok || !verified || !policy.readyToWrite)) {
       reportIssue(
         ctx,
         ['output'],

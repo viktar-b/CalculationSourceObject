@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { z } from 'zod';
-import { sourceClosureHash } from '../src/contracts/common.ts';
+import {
+  DiagnosticSchema,
+  sourceClosureHash,
+} from '../src/contracts/common.ts';
 import {
   CheckSchema,
   CommandReportSchema,
@@ -1079,4 +1082,34 @@ describe('standalone inspection evidence', () => {
       'INSPECTION_FINDING_REQUIRED',
     );
   });
+});
+
+it('rejects layout diagnostics whose overflow disagrees with their bounds', () => {
+  const diagnostic = {
+    code: 'DOCUMENT_LAYOUT_OVERFLOW',
+    stage: 'rendering',
+    message: 'Overflow',
+    layout: {
+      media: 'print',
+      selector: 'h1',
+      left: 10,
+      right: 120,
+      containerLeft: 10,
+      containerRight: 100,
+      overflowPx: 20,
+    },
+  };
+  expect(DiagnosticSchema.safeParse(diagnostic).success).toBe(true);
+  expect(
+    DiagnosticSchema.safeParse({
+      ...diagnostic,
+      layout: { ...diagnostic.layout, overflowPx: 0 },
+    }).success,
+  ).toBe(false);
+  expect(
+    DiagnosticSchema.safeParse({
+      ...diagnostic,
+      layout: { ...diagnostic.layout, left: -20, right: 80, overflowPx: 30 },
+    }).success,
+  ).toBe(true);
 });
