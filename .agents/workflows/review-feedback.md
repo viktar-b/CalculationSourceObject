@@ -19,7 +19,7 @@ under the task's `.scratch/` directory using the
    established expected values. The [evidence decision](../../docs/adr/0002-evidence-and-engineering-presentation.md)
    owns those distinctions.
 4. Fix the owning module, add a regression at the affected interface, and run
-   [verification](verification.md). Inspect affected document output through
+   [verification](verification.md). For document findings, follow
    [execution evidence](execution-evidence.md). Done when the original failure
    is closed and the regression exercises it.
 5. Report local fixes separately from committed/pushed fixes. When GitHub updates

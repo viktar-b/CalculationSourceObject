@@ -129,7 +129,7 @@ export function parseCliArgs(args: readonly string[]): DevelopmentOptions {
   };
 }
 
-export const help = `Usage: cso <verify|pdf|bindings|dev-export|dev-render> [arguments]
+export const help = `Usage: cso <verify|html|pdf|bindings|dev-export|dev-render> [arguments]
 Use cso <command> --help for usage. Development commands require
 --source <file.cso.py> --function <name> --out <path>.
 
@@ -142,6 +142,7 @@ Commands:
   dev-export             Export CSO JSON using the selected installed Python module.
   dev-render             Export once and render a development PDF with installed React/CSS.
   verify                 Execute once and verify formulas; use cso verify --help.
+  html                   Verify once and publish standalone HTML; --check-layout adds browser checks.
   pdf                    Verify once, retain evidence unless --no-evidence, and atomically publish a PDF.
 
 Options:
@@ -152,5 +153,5 @@ Options:
 Paths resolve from the caller's directory. Set PYTHON to the interpreter with the
 cso-python wheel installed. dev-render requires Playwright Chromium.
 Development exit codes: 0 exported/rendered, 1 execution/render/write failed,
-2 invalid usage. verify/pdf --format json emit one public CommandReport.
+2 invalid usage. verify/html/pdf --format json emit one public CommandReport.
 `;

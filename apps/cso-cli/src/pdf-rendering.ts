@@ -1,26 +1,12 @@
-import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { chromium } from 'playwright';
-import { PreparedFormulaSheet } from '@cs-object/react';
-import type { PreparedDocument } from '@cs-object/core';
+import { chromium, type Page } from 'playwright';
+import type { Diagnostic, PreparedDocument } from '@cs-object/core';
 import type { PresentationMapping } from './evidence.ts';
+import { buildPreparedHtml } from './prepared-html.ts';
 
-function buildPreparedPdfHtml(preparedDocument: PreparedDocument): string {
-  const css = readFileSync(
-    createRequire(import.meta.url).resolve('@cs-object/react/style.css'),
-    'utf8',
-  );
-  const markup = renderToStaticMarkup(
-    createElement(PreparedFormulaSheet, { document: preparedDocument }),
-  );
-  return [
-    '<!doctype html><html lang="en"><head><meta charset="utf-8">',
-    '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data:; style-src \'unsafe-inline\'; font-src data:">',
-    `<style>${css}</style></head><body class="formula-sheet-printing">`,
-    `<div data-formula-sheet-print-root="true">${markup}</div></body></html>`,
-  ].join('');
+export class LayoutInspectionError extends Error {
+  constructor(readonly diagnostics: Diagnostic[]) {
+    super(diagnostics.map((diagnostic) => diagnostic.message).join('\n'));
+  }
 }
 
 // Each page.evaluate callback must be self-contained in the browser realm.
@@ -182,22 +168,6 @@ function inspectPreparedPresentationInPage(
         break;
     }
   }
-  function assertPrintWidth(): void {
-    for (const math of document.querySelectorAll('math')) {
-      const cell = math.closest('td') ?? math.parentElement;
-      if (
-        cell &&
-        math.getBoundingClientRect().width >
-          cell.getBoundingClientRect().width + 2
-      )
-        throw new Error('Mathematical notation overflows its cell');
-    }
-    if (
-      document.documentElement.scrollWidth >
-      document.documentElement.clientWidth + 2
-    )
-      throw new Error('Document exceeds page width');
-  }
 
   for (const [sectionIndex, section] of prepared.sections.entries()) {
     const pointer = `/sections/${sectionIndex}`;
@@ -228,14 +198,126 @@ function inspectPreparedPresentationInPage(
         selector: `[data-engineering-value=${JSON.stringify(pointer)}]`,
       });
   }
-  assertPrintWidth();
   return mappings;
 }
 
-export async function renderPreparedPdf(
-  preparedDocument: PreparedDocument,
-): Promise<{ pdf: Buffer; presentation: PresentationMapping[] }> {
-  const html = buildPreparedPdfHtml(preparedDocument);
+// Runs in the browser realm. Descendant bounds matter: an mfrac numerator can
+// overflow while the outer math box and its immediate parent still fit.
+function inspectLayoutInPage(media: 'screen' | 'print'): Diagnostic[] {
+  const sheet = document.querySelector('[data-formula-sheet]');
+  if (!sheet) throw new Error('Missing formula sheet');
+  const sheetBounds = sheet.getBoundingClientRect();
+  const findings = new Map<Element, Diagnostic>();
+  function recordOverflow({
+    element,
+    bounds,
+    containerLeft,
+    containerRight,
+    placement,
+    fallback,
+    message,
+  }: {
+    element: Element;
+    bounds: DOMRect;
+    containerLeft: number;
+    containerRight: number;
+    placement: Element | null;
+    fallback: Element;
+    message: string;
+  }) {
+    if (!bounds.width || !bounds.height) return;
+    const overflowPx = Math.max(
+      0,
+      containerLeft - bounds.left,
+      bounds.right - containerRight,
+    );
+    if (overflowPx <= 2) return;
+    const key = placement ?? fallback;
+    const previous = findings.get(key);
+    if (previous && (previous.layout?.overflowPx ?? 0) >= overflowPx) return;
+    const sourcePlacementId =
+      placement?.getAttribute('data-source-placement') ?? undefined;
+    const selector = sourcePlacementId
+      ? `[data-source-placement=${JSON.stringify(sourcePlacementId)}]`
+      : '[data-formula-sheet]';
+    findings.set(key, {
+      code: 'DOCUMENT_LAYOUT_OVERFLOW',
+      stage: 'rendering',
+      check: 'rendering',
+      message: `${message} in ${media} layout: ${selector}, ${element.tagName}, ${overflowPx.toFixed(2)}px beyond content bounds.`,
+      layout: {
+        media,
+        sourcePlacementId,
+        selector,
+        left: bounds.left,
+        right: bounds.right,
+        containerLeft,
+        containerRight,
+        overflowPx,
+      },
+    });
+  }
+  for (const math of sheet.querySelectorAll('math')) {
+    const placement = math.closest('[data-source-placement]');
+    const row = math.closest('.cso-symbol-row') ?? sheet;
+    const cell = math.closest('td') ?? row;
+    const rowBounds = cell.getBoundingClientRect();
+    let containerLeft = Math.max(sheetBounds.left, rowBounds.left);
+    let containerRight = Math.min(sheetBounds.right, rowBounds.right);
+    const parent = math.closest('td') ?? math.parentElement;
+    const parentOverflow =
+      parent &&
+      math.getBoundingClientRect().width >
+        parent.getBoundingClientRect().width + 2;
+    if (parentOverflow && parent) {
+      const parentBounds = parent.getBoundingClientRect();
+      containerLeft = Math.max(containerLeft, parentBounds.left);
+      containerRight = Math.min(containerRight, parentBounds.right);
+    }
+    for (const element of [math, ...math.querySelectorAll('*')]) {
+      recordOverflow({
+        element,
+        bounds: element.getBoundingClientRect(),
+        containerLeft,
+        containerRight,
+        placement,
+        fallback: row,
+        message: 'Mathematical notation overflows its cell or sheet',
+      });
+    }
+  }
+  // Element boxes alone miss text painted beyond an otherwise fitting block.
+  // Range rectangles measure that text against the same printable sheet bounds.
+  for (const element of sheet.querySelectorAll('*')) {
+    if (element.closest('math') || element.closest('svg')) continue;
+    const rectangles = [element.getBoundingClientRect()];
+    for (const node of element.childNodes) {
+      if (node.nodeType !== Node.TEXT_NODE || !node.textContent?.trim())
+        continue;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      rectangles.push(...range.getClientRects());
+    }
+    for (const bounds of rectangles) {
+      recordOverflow({
+        element,
+        bounds,
+        containerLeft: sheetBounds.left,
+        containerRight: sheetBounds.right,
+        placement: element.closest('[data-source-placement]'),
+        fallback: sheet,
+        message: 'Document content exceeds printable sheet width',
+      });
+    }
+  }
+  return [...findings.values()];
+}
+
+async function withPreparedPage<T>(
+  document: PreparedDocument,
+  html: string,
+  usePage: (page: Page, presentation: PresentationMapping[]) => Promise<T>,
+): Promise<T> {
   const browser = await chromium.launch({ headless: true, timeout: 30_000 });
   try {
     const page = await browser.newPage();
@@ -245,39 +327,68 @@ export async function renderPreparedPdf(
       requests.push(route.request().url());
       return route.abort();
     });
-    // Parse SVG as inert XML before decoding or inserting any image.
-    await page.evaluate(assertPassiveSvgAssetsInPage, preparedDocument.assets);
+    await page.evaluate(assertPassiveSvgAssetsInPage, document.assets);
     await page.setContent(html, { waitUntil: 'load', timeout: 15_000 });
-    await page.emulateMedia({ media: 'print' });
-    await page.evaluate(waitForPrintAssetsInPage);
+    const diagnostics: Diagnostic[] = [];
+    for (const media of ['screen', 'print'] satisfies Array<
+      'screen' | 'print'
+    >) {
+      await page.emulateMedia({ media });
+      await page.evaluate(waitForPrintAssetsInPage);
+      diagnostics.push(...(await page.evaluate(inspectLayoutInPage, media)));
+    }
     if (requests.length)
       throw new Error(
         `Document attempted external requests: ${requests.join(', ')}`,
       );
+    if (diagnostics.length) throw new LayoutInspectionError(diagnostics);
     const presentation = await page.evaluate(
       inspectPreparedPresentationInPage,
-      presentationInput(preparedDocument),
+      presentationInput(document),
     );
-    let printTimer: ReturnType<typeof setTimeout> | undefined;
-    try {
-      const pdf = await Promise.race([
-        page.pdf({
-          format: 'A4',
-          printBackground: true,
-          margin: { top: '0', right: '0', bottom: '0', left: '0' },
-        }),
-        new Promise<never>((_, reject) => {
-          printTimer = setTimeout(
-            () => reject(new Error('PDF printing timed out')),
-            30_000,
-          );
-        }),
-      ]);
-      return { pdf, presentation };
-    } finally {
-      clearTimeout(printTimer);
-    }
+    return await usePage(page, presentation);
   } finally {
     await browser.close();
   }
+}
+
+export function inspectPreparedHtml(
+  document: PreparedDocument,
+  html: string,
+): Promise<PresentationMapping[]> {
+  return withPreparedPage(
+    document,
+    html,
+    async (_page, presentation) => presentation,
+  );
+}
+
+export function renderPreparedPdf(
+  document: PreparedDocument,
+): Promise<{ pdf: Buffer; presentation: PresentationMapping[] }> {
+  return withPreparedPage(
+    document,
+    buildPreparedHtml(document),
+    async (page, presentation) => {
+      let printTimer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const pdf = await Promise.race([
+          page.pdf({
+            format: 'A4',
+            printBackground: true,
+            margin: { top: '0', right: '0', bottom: '0', left: '0' },
+          }),
+          new Promise<never>((_, reject) => {
+            printTimer = setTimeout(
+              () => reject(new Error('PDF printing timed out')),
+              30_000,
+            );
+          }),
+        ]);
+        return { pdf, presentation };
+      } finally {
+        clearTimeout(printTimer);
+      }
+    },
+  );
 }

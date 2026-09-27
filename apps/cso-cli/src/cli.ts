@@ -11,13 +11,13 @@ const [command, ...args] = process.argv.slice(2);
 if (
   command === '--help' ||
   command === undefined ||
-  (['verify', 'pdf', 'bindings', 'dev-export', 'dev-render'].includes(
+  (['verify', 'pdf', 'html', 'bindings', 'dev-export', 'dev-render'].includes(
     command,
   ) &&
     args.includes('--help'))
 ) {
   process.stdout.write(
-    command === 'verify' || command === 'pdf'
+    command === 'verify' || command === 'pdf' || command === 'html'
       ? verifiedHelp(command)
       : command === 'bindings'
         ? bindingsHelp
@@ -25,14 +25,17 @@ if (
   );
 } else if (command === 'bindings') {
   process.exitCode = bindingsCommand(args);
-} else if (command === 'verify' || command === 'pdf') {
+} else if (command === 'verify' || command === 'pdf' || command === 'html') {
   let outcome: ReturnType<typeof verifyCommand> & {
     stdoutBytes?: Buffer;
     evidence?: { path: string; sha256: string };
   };
   try {
     const options = parseVerifiedArgs(command, args);
-    if (options.command === 'pdf') {
+    if (options.command === 'html') {
+      const { htmlCommand } = await import('./html.ts');
+      outcome = await htmlCommand(options);
+    } else if (options.command === 'pdf') {
       const { pdfCommand } = await import('./pdf.ts');
       outcome = await pdfCommand(options);
     } else {

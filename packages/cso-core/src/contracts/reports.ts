@@ -326,7 +326,7 @@ const OutputSchema = z.strictObject({
 const CommandReportObjectSchema = z.strictObject({
   ...verificationFields,
   reportVersion: z.literal('1'),
-  command: z.enum(['verify', 'pdf']).optional(),
+  command: z.enum(['verify', 'pdf', 'html']).optional(),
   toolVersion: NonemptyStringSchema,
   provenance: ProvenanceSchema,
   checks: CommandChecksSchema,
@@ -416,6 +416,21 @@ function validateCommandFailure(
   }
 }
 
+function documentPolicy(report: CommandReportData) {
+  const isDocument = report.command === 'pdf' || report.command === 'html';
+  const renderingAccepted =
+    report.checks.rendering.status === 'passed' ||
+    (report.command === 'html' &&
+      report.checks.rendering.status === 'not_applicable');
+  return {
+    isDocument,
+    readyToWrite:
+      isDocument &&
+      report.checks.documentContent.status === 'passed' &&
+      renderingAccepted,
+  };
+}
+
 function commandFailureExplained(report: CommandReportData) {
   if (report.checks.executionValidity.status === 'not_applicable') {
     return hasOwningDiagnostic(report.diagnostics, 'executionValidity', [
@@ -431,11 +446,11 @@ function commandFailureExplained(report: CommandReportData) {
       'reference',
     ]);
   if (report.command === 'verify') return referenceFailure;
-  if (report.command !== 'pdf') return false;
-  if (report.checks.documentContent.status === 'not_applicable') {
+  const policy = documentPolicy(report);
+  if (!policy.isDocument) return false;
+  if (report.checks.documentContent.status === 'not_applicable')
     return referenceFailure;
-  }
-  if (report.checks.rendering.status === 'not_applicable') return false;
+  if (!policy.readyToWrite) return false;
   return report.diagnostics.some(
     (diagnostic) =>
       diagnostic.stage === 'write' && diagnostic.check === undefined,
@@ -450,7 +465,7 @@ export const CommandReportSchema = CommandReportObjectSchema.superRefine(
     validateCommandFailure(report, ctx);
     const verified = verificationPassed(report.checks);
     const documentPassed = report.checks.documentContent.status === 'passed';
-    const rendered = report.checks.rendering.status === 'passed';
+    const policy = documentPolicy(report);
     if (!report.ok && report.diagnostics.length === 0) {
       reportIssue(
         ctx,
@@ -474,26 +489,25 @@ export const CommandReportSchema = CommandReportObjectSchema.superRefine(
     if (
       report.ok &&
       (!verified ||
-        (report.command === 'pdf' &&
-          (!documentPassed || !rendered || !report.output)))
+        (policy.isDocument && (!policy.readyToWrite || !report.output)))
     ) {
       reportIssue(
         ctx,
         ['ok'],
         'REPORT_OK_MISMATCH',
-        'Command success requires verification and, for PDF, prepared content and written output.',
+        'Command success requires verification and, for documents, prepared content and written output; PDF also requires browser rendering.',
       );
     }
     for (const key of ['documentContent', 'rendering'] as const) {
       if (
-        (report.command !== 'pdf' || !verified) &&
+        (!policy.isDocument || !verified) &&
         report.checks[key].status !== 'not_applicable'
       ) {
         reportIssue(
           ctx,
           ['checks', key, 'status'],
           'REPORT_PREREQUISITE_FAILED',
-          'Document stages require a PDF command and passed verification.',
+          'Document stages require an HTML or PDF command and passed verification.',
         );
       }
     }
@@ -508,19 +522,12 @@ export const CommandReportSchema = CommandReportObjectSchema.superRefine(
         'Rendering requires passed document preparation.',
       );
     }
-    if (
-      report.output &&
-      (!report.ok ||
-        report.command !== 'pdf' ||
-        !verified ||
-        !documentPassed ||
-        !rendered)
-    ) {
+    if (report.output && (!report.ok || !verified || !policy.readyToWrite)) {
       reportIssue(
         ctx,
         ['output'],
         'REPORT_OUTPUT_WITHOUT_SUCCESS',
-        'Output identifies a successfully verified and written PDF only.',
+        'Output identifies a successfully verified and written document only.',
       );
     }
     const inspectionStatus = report.output ? 'pending' : 'not_applicable';
@@ -529,7 +536,7 @@ export const CommandReportSchema = CommandReportObjectSchema.superRefine(
         ctx,
         ['checks', 'visualInspection', 'status'],
         'REPORT_INSPECTION_STATUS_MISMATCH',
-        'New PDF output awaits inspection; a command without output has no inspection.',
+        'New document output awaits inspection; a command without output has no inspection.',
       );
     }
   },

@@ -235,6 +235,31 @@ export const DiagnosticSchema = z
     relatedLocations: z.array(SourceSpanSchema).optional(),
     callChain: z.array(SourceSpanSchema).optional(),
     comparison: ComparisonSchema.optional(),
+    layout: z
+      .strictObject({
+        media: z.enum(['screen', 'print']),
+        sourcePlacementId: UnicodeStringSchema.optional(),
+        selector: NonemptyStringSchema,
+        left: z.number(),
+        right: z.number(),
+        containerLeft: z.number(),
+        containerRight: z.number(),
+        overflowPx: z.number().nonnegative(),
+      })
+      .refine(
+        (bounds) =>
+          bounds.overflowPx ===
+          Math.max(
+            0,
+            bounds.containerLeft - bounds.left,
+            bounds.right - bounds.containerRight,
+          ),
+        {
+          message: 'Layout overflow must match its measured bounds',
+          path: ['overflowPx'],
+        },
+      )
+      .optional(),
     valueDisplay: z
       .strictObject({
         kind: z.enum(['python-int', 'python-float', 'unsupported']),

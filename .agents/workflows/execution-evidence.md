@@ -20,15 +20,19 @@ Reuse their public-interface sequence before writing another standalone harness.
    a wrapper, not a bare `SheetDocument`. Execute the generated Python and compare
    the intended output by Symbol ID, including kind and signed zero when relevant.
    Done when the round trip preserves the quantity being checked.
-4. For document evidence, prepare and render the same execution through the
-   [React path](../../docs/rendering.md#engineering-presentation). Capture the
-   actual renderer output. If a demo also offers live browser calculations,
-   label those separately from saved Python verification. Done when the displayed
-   formulas and results can be traced to the capture.
-5. Inspect every delivered PDF page and bind findings to its exact bytes, as
-   required by the [printing guide](../../docs/rendering.md#printing-and-inspection).
-   For HTML evidence, inspect the affected formulas at their intended width.
-   Report numerical checks and visual inspection separately.
+4. For document evidence, choose the checks using the
+   [rendering guide](../../docs/rendering.md#choose-verification-by-change).
+   Use `cso html` for an inspectable report and `--check-layout` for shared browser
+   diagnostics. Inspect affected HTML formulas at their intended width. Use PDF
+   checks when print behavior or PDF delivery is in scope. Done when the displayed
+   formulas and results can be traced to the same capture and the changed behavior
+   has matching evidence. Mechanical layout failures need browser regressions
+   with source-placement diagnostics when a placement exists, or actionable
+   document-level diagnostics otherwise.
+5. Apply the [delivery checks](../../docs/rendering.md#printing-and-inspection)
+   to artifacts being delivered. Leave unrelated generated test artifacts marked
+   with their actual review status. Report numerical checks, browser checks and
+   visual inspection separately.
 
 When converting a prototype into maintained support, put regression cases in
 the owning package or root integration suite. Generated demos and cached test

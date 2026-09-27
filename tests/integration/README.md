@@ -27,6 +27,11 @@ Tests copy sources into temporary consumers before changing them and generate
 their own bindings. Expected numerical values remain independently authored.
 Source-to-document consistency and independent agreement are separate checks.
 
+Use the [rendering guide](../../docs/rendering.md#choose-verification-by-change)
+to select HTML or PDF checks. Automatic generation leaves visual inspection
+pending. Test artifacts require manual review only when they are being delivered
+or their visual behavior is part of the change.
+
 The section-property comparisons generate bindings in a temporary consumer,
 reuse each canonical reference calculation twice and forward outputs to a shared
 comparison. Equal-depth cases check ratios of 1 and preserve every child formula

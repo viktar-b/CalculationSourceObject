@@ -2,7 +2,7 @@
 
 Python captures source and runtime observations. Core validates that evidence
 and evaluates the formulas independently. The CLI passes one verified execution
-to React for document preparation, then publishes the PDF and evidence.
+to React for document preparation, then publishes HTML or PDF and evidence.
 
 ## Follow a calculation
 
@@ -20,7 +20,7 @@ to React for document preparation, then publishes the PDF and evidence.
 | Validate whole Value tree structure and compare formulas, observations, outputs and references | [verifyExecution](../packages/cso-core/src/verification/verify.ts), [evaluator](../packages/cso-core/src/verification/evaluate.ts), [operation roles and numeric policy](../packages/cso-core/src/verification/numeric.ts) | [verifier cases](../tests/fixtures/verifier-cases/check.mjs), [numeric tests](../packages/cso-core/tests/verifier-numeric.test.ts) |
 | Prepare ordered content bound to that execution | [prepareExecutionDocument](../packages/cso-react/src/prepare-document.ts), [document schemas](../packages/cso-core/src/contracts/document.ts) | [prepared-document tests](../tests/integration/react/prepared-document.test.ts) |
 | Select engineering context, operand details and retained-source pointers | [context preparation](../packages/cso-react/src/prepare-context.ts) | [context tests](../packages/cso-react/tests/prepared-context.test.ts) |
-| Capture assets, render and publish | [pdfCommand](../apps/cso-cli/src/pdf.ts), [assets](../apps/cso-cli/src/assets.ts), [evidence](../apps/cso-cli/src/evidence.ts) | [installed PDF cases](../tests/integration/installed/pdf-consumer.mjs), [evidence tests](../apps/cso-cli/tests/evidence.test.ts) |
+| Capture assets, render and publish HTML/PDF | [document coordinator](../apps/cso-cli/src/document.ts), [shared HTML](../apps/cso-cli/src/prepared-html.ts), [browser inspection](../apps/cso-cli/src/pdf-rendering.ts), [evidence](../apps/cso-cli/src/evidence.ts) | [HTML and layout checks](../tests/integration/html-report.test.ts), [installed PDF cases](../tests/integration/installed/pdf-consumer.mjs), [evidence tests](../apps/cso-cli/tests/evidence.test.ts) |
 
 Binding generation and invocation planning read the same static calculation
 definitions. Generated `.py` modules create callable handles; adjacent `.pyi`
@@ -41,7 +41,7 @@ still serves older single-file sources. Development output is not verification.
   It needs no Python, React, browser or filesystem access to verify supplied data.
 - React owns preparation, MathML rendering and engineering presentation.
   It receives captured assets; it does not execute calculations or fetch files.
-- CLI owns process and filesystem access, reports, asset policy and PDF publication.
+- CLI owns process and filesystem access, reports, asset policy and HTML/PDF publication.
 - Demo consumes packages and explicit data directories through its
   [workspace launcher](../scripts/demo.ts). Root [example preparation](../scripts/prepare-demo-examples.ts)
   reuses CLI verification and asset capture to supply the canonical prepared document.

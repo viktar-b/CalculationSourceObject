@@ -13,8 +13,8 @@ and human engineering approval.
   reference-rebinding rules. Apply the same notation to diagram labels.
 - Before changing package ownership or execution flow, read [the code map](docs/code-map.md),
   [CONTEXT.md](CONTEXT.md) and the relevant [ADRs](docs/adr/).
-- Before changing document preparation, notation or printing, read
-  [rendering](docs/rendering.md) and inspect the affected example output.
+- For document content, notation, layout or print changes, use
+  [rendering](docs/rendering.md#choose-verification-by-change) to select HTML or PDF checks.
 - For setup and verification commands, use [development](docs/development.md)
   and the owning package's scripts. CLI behavior is in [its guide](apps/cso-cli/README.md).
 - For function support, cross-package verification, execution evidence or
@@ -31,15 +31,14 @@ Keep engineering examples in one canonical location. Cross-project checks belong
 temporary consumers when mutation is needed. Package fixtures are small synthetic
 behavior cases; generate their bindings in temporary directories.
 
-## Calculation and PDF review
+## Calculation review
 
 Use the maintained examples and synthetic fixtures to check document structure,
 notation, detail and context. Account for every input, unit, formula, explanation,
 figure and result when changing document generation.
 
-Before delivering a PDF, inspect every page for missing content, unreadable
-notation, clipping and pagination. Bind findings to the exact PDF bytes.
-Report failed or uncompleted checks separately from successful checks.
+Use the [inspection guide](docs/rendering.md#printing-and-inspection) for artifact
+delivery. Report failed or uncompleted checks separately from successful checks.
 
 ## Keep guidance small
 

@@ -29,6 +29,7 @@
 }
 
 :root {
+  --cso-print-content-width: 190mm;
   color-scheme: light;
   background: #f3f4f6;
 }
@@ -74,7 +75,7 @@ math {
   body.formula-sheet-printing [data-formula-sheet-print-root] {
     display: block !important;
     min-height: 0;
-    width: 190mm;
+    width: var(--cso-print-content-width);
     margin: 0 auto;
     background: white;
   }
@@ -82,7 +83,7 @@ math {
   body.formula-sheet-printing
     [data-formula-sheet-print-root]
     [data-formula-sheet] {
-    width: 190mm !important;
+    width: var(--cso-print-content-width) !important;
     max-width: none !important;
     min-height: 0 !important;
     margin: 0 !important;
@@ -122,7 +123,7 @@ math {
 .cso-symbol-row { break-inside: avoid; page-break-inside: avoid; }
 .cso-symbol-placement { overflow-wrap: anywhere; }
 @media print {
-  [data-formula-sheet] { width: 190mm !important; min-width: 0 !important; min-height: 0 !important; padding: 0 !important; border: none !important; display: block !important; }
+  [data-formula-sheet] { width: var(--cso-print-content-width) !important; min-width: 0 !important; min-height: 0 !important; padding: 0 !important; border: none !important; display: block !important; }
   .cso-document { margin: 0; }
   .cso-section, .cso-symbol-placement { display: block; }
 }
@@ -134,3 +135,13 @@ math {
 .cso-engineering-context dt { font-weight: 600; break-after: avoid; }
 .cso-engineering-context dd { margin: 0; }
 .cso-engineering-context ul { list-style: disc; padding-left: 5mm; }
+
+@media screen {
+  body.cso-standalone-report [data-formula-sheet-print-root] {
+    display: block; width: var(--cso-print-content-width); margin: 10mm auto; background: white;
+  }
+  body.cso-standalone-report [data-formula-sheet] {
+    width: var(--cso-print-content-width); min-width: 0; min-height: 0; padding: 0;
+    margin: 0; border: none; display: block;
+  }
+}

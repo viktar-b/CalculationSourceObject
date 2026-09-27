@@ -3,6 +3,50 @@ import { parseStrictJson } from '../src/strict-json.ts';
 import { parseVerifiedArgs, verifiedHelp } from '../src/verified-arguments.ts';
 
 const base = ['input with spaces.cso.py', '--function', 'calculate'];
+test('HTML export requires a destination and explicitly opts into browser checks', () => {
+  expect(() => parseVerifiedArgs('html', base)).toThrow('--out is required');
+  expect(
+    parseVerifiedArgs('html', [...base, '--out', 'report.html']),
+  ).toMatchObject({
+    command: 'html',
+    checkLayout: false,
+    retainEvidence: true,
+  });
+  expect(
+    parseVerifiedArgs('html', [
+      ...base,
+      '--out',
+      'report.html',
+      '--check-layout',
+      '--no-evidence',
+    ]),
+  ).toMatchObject({
+    command: 'html',
+    checkLayout: true,
+    retainEvidence: false,
+  });
+  expect(() =>
+    parseVerifiedArgs('html', [
+      ...base,
+      '--out',
+      'report.html',
+      '--check-layout',
+      '--check-layout',
+    ]),
+  ).toThrow('more than once');
+  expect(() =>
+    parseVerifiedArgs('verify', [...base, '--check-layout']),
+  ).toThrow('Unknown option');
+  expect(() =>
+    parseVerifiedArgs('pdf', [
+      ...base,
+      '--out',
+      'report.pdf',
+      '--check-layout',
+    ]),
+  ).toThrow('Unknown option');
+  expect(verifiedHelp('html')).toContain('rendering is not_applicable');
+});
 describe('verified usage and strict capture', () => {
   test('resolves caller paths, normalizes identifiers and keeps distinct inputs', () => {
     expect(

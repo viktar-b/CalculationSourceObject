@@ -33,6 +33,7 @@ for (const name of [
   'section-consumer.mjs',
   'signed-zero-consumer.mjs',
   'pdf-consumer.mjs',
+  'html-consumer.mjs',
 ]) {
   cpSync(
     join(repository, 'tests/integration/installed', name),
@@ -54,6 +55,7 @@ for (const file of [
   'section-results.json',
   'signed-zero-results.json',
   'pdf-results.json',
+  'html-results.json',
 ]) {
   const report = JSON.parse(readFileSync(join(consumer, file), 'utf8'));
   if (!report.ok) throw new Error(`${file} failed`);

@@ -50,6 +50,26 @@ afterEach(() => {
 });
 
 describe('annotated Python PDF renderer', () => {
+  test('retains the document-width guard for content outside mathematical rows', async () => {
+    const response = ExecutionResponseSchema.parse(
+      JSON.parse(
+        readFileSync(
+          join(repoRoot, 'tests/fixtures/contract-cases/single-success.json'),
+          'utf8',
+        ),
+      ),
+    );
+    if (!response.ok) throw new Error('Expected successful fixture');
+    const document = prepareExecutionDocument({
+      execution: response.execution,
+      assets: [],
+    });
+    document.title = 'LongTitle'.repeat(200);
+    await expect(renderPreparedPdf(document)).rejects.toThrow(
+      'Document content exceeds printable sheet width',
+    );
+  }, 30_000);
+
   test('rejects a glyph wider than its symbol cell before writing a PDF', async () => {
     const response = ExecutionResponseSchema.parse(
       JSON.parse(

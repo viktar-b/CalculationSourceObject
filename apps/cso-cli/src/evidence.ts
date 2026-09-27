@@ -83,36 +83,38 @@ export function retainSource(
   };
 }
 
-export function publishPdfEvidence(options: {
+export function publishDocumentEvidence(options: {
   outPath: string;
-  pdf: Buffer;
+  artifact: { kind: 'html' | 'pdf'; bytes: Buffer };
+  presentationCheck: 'passed' | 'not_applicable';
   reportBytes: Buffer;
   retained: ReturnType<typeof retainSource>;
   presentation: PresentationMapping[];
   retainEvidence?: boolean;
 }): { path: string; sha256: string } | undefined {
-  const { outPath, pdf } = options;
+  const { outPath, artifact } = options;
+  const bytes = artifact.bytes;
   mkdirSync(dirname(outPath), { recursive: true });
-  const temporaryPdf = join(
+  const temporaryOutput = join(
     dirname(outPath),
     `.${basename(outPath)}.${randomUUID()}.tmp`,
   );
   try {
-    writeFileSync(temporaryPdf, pdf, { flag: 'wx' });
-    if (!readFileSync(temporaryPdf).equals(pdf)) {
-      throw new Error('Temporary PDF byte verification failed');
+    writeFileSync(temporaryOutput, bytes, { flag: 'wx' });
+    if (!readFileSync(temporaryOutput).equals(bytes)) {
+      throw new Error('Temporary document byte verification failed');
     }
     const evidence =
       options.retainEvidence === false
         ? undefined
         : publishEvidenceBundle(options);
     // Last filesystem commit. A complete unused bundle can remain if this fails.
-    renameSync(temporaryPdf, outPath);
+    renameSync(temporaryOutput, outPath);
     return evidence;
   } finally {
-    // Cleanup cannot turn an already published PDF into a reported failure.
+    // Cleanup cannot turn an already published document into a reported failure.
     try {
-      rmSync(temporaryPdf, { force: true });
+      rmSync(temporaryOutput, { force: true });
     } catch {
       /* Preserve the owning failure. */
     }
@@ -120,9 +122,9 @@ export function publishPdfEvidence(options: {
 }
 
 function publishEvidenceBundle(
-  options: Parameters<typeof publishPdfEvidence>[0],
+  options: Parameters<typeof publishDocumentEvidence>[0],
 ): { path: string; sha256: string } {
-  const { outPath, pdf, reportBytes, retained, presentation } = options;
+  const { outPath, artifact, reportBytes, retained, presentation } = options;
   const payloads = [
     ...retained.payloads,
     {
@@ -139,11 +141,11 @@ function publishEvidenceBundle(
   ];
   const manifest = jsonBytes({
     manifestVersion: '1',
-    pdf: { path: outPath, sha256: sha256(pdf) },
+    [artifact.kind]: { path: outPath, sha256: sha256(artifact.bytes) },
     prospectiveCommandReport: {
       sha256: sha256(reportBytes),
       publication:
-        'Requires the actual successful stdout report and matching PDF; this manifest alone is not a publication receipt.',
+        'Requires the actual successful stdout report and matching document; this manifest alone is not a publication receipt.',
     },
     artifacts: payloads.map(({ path, bytes }) => ({
       path,
@@ -155,7 +157,7 @@ function publishEvidenceBundle(
         fields: retained.retainedFields.length,
       },
       engineeringPresentation: {
-        automatic: 'passed',
+        automatic: options.presentationCheck,
         visualInspection: 'pending',
       },
       sourceToDocumentConsistency: {
@@ -216,4 +218,18 @@ function publishEvidenceBundle(
     }
   }
   return { path: join(destination, 'manifest.json'), sha256: hash };
+}
+
+// Preserve the PDF publication API and manifest shape for existing consumers.
+export function publishPdfEvidence(
+  options: Omit<
+    Parameters<typeof publishDocumentEvidence>[0],
+    'artifact' | 'presentationCheck'
+  > & { pdf: Buffer },
+) {
+  return publishDocumentEvidence({
+    ...options,
+    artifact: { kind: 'pdf', bytes: options.pdf },
+    presentationCheck: 'passed',
+  });
 }
