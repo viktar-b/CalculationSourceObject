@@ -1,0 +1,37 @@
+{
+  "name": "create-cs-object",
+  "version": "0.1.0",
+  "description": "Create a local CalculationSourceObject report project.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "create-cs-object": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "template",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsup",
+    "prepack": "npm run build",
+    "pretest": "npm run build",
+    "test": "node --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit --pretty false",
+    "lint": "biome lint src tests template/scripts"
+  },
+  "overrides": {
+    "esbuild": "0.28.2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@types/node": "^26",
+    "tsup": "^8.5.1",
+    "typescript": "^5"
+  }
+}
