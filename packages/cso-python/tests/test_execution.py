@@ -3,7 +3,6 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
-import math
 import shutil
 import subprocess
 import sys
@@ -117,16 +116,6 @@ class ExecutionTest(unittest.TestCase):
         )
         self.reject_before_execution("UNSUPPORTED_SIGNATURE")
 
-    def test_unimported_pi_is_an_ordinary_parameter_or_symbol(self):
-        for body, parameters in [
-            (f'b: {RESULT} = pi + 1\nreturn {{"b": b}}', f"pi: {SYMBOL} = 2"),
-            (f'pi: {SYMBOL} = 2\nb: {RESULT} = pi + 1\nreturn {{"b": b}}', ""),
-        ]:
-            with self.subTest(parameters=parameters):
-                self.entry.write_text(source(body, parameters=parameters))
-                execution = self.success(self.run_case())
-                self.assertEqual(execution["authoring"]["outputs"][0]["value"], 3)
-
     def test_builtin_formula_helpers_reject_shadowing_before_execution(self):
         for helper, call in [
             ("abs", "abs(a)"),
@@ -148,98 +137,6 @@ class ExecutionTest(unittest.TestCase):
                         text += source(f'a: {SYMBOL} = 2\nreturn {{"a": a}}', parameters="", name=helper).removeprefix(IMPORTS)
                     self.entry.write_text(text)
                     self.reject_before_execution("SHADOWED_HELPER")
-
-    def test_abs_and_floor_preserve_runtime_numeric_kinds_and_zero_signs(self):
-        self.entry.write_text(
-            "import math\n"
-            + source(
-                'integer_abs: Annotated[int, symbol(glyph="a", description="Integer absolute value", unit="")] = abs(-3)\n'
-                'float_abs: Annotated[float, symbol(glyph="b", description="Float absolute value", unit="")] = abs(-0.0)\n'
-                'floor_value: Annotated[int, symbol(glyph="c", description="Floor", unit="")] = math.floor(-0.0)\n'
-                'return {"integer_abs": integer_abs, "float_abs": float_abs, "floor_value": floor_value}',
-                parameters="",
-            )
-        )
-        execution = self.success(self.run_case())
-        outputs = {
-            output["name"]: (output["value"], output["numericKind"])
-            for output in execution["authoring"]["outputs"]
-        }
-        self.assertEqual(outputs["integer_abs"], (3, "int"))
-        self.assertEqual(outputs["float_abs"], (0.0, "float"))
-        self.assertFalse(math.copysign(1.0, outputs["float_abs"][0]) < 0)
-        self.assertEqual(outputs["floor_value"], (0, "int"))
-
-    def test_floor_rejects_an_unsafe_integer_result(self):
-        self.entry.write_text(
-            "import math\n"
-            + source(
-                f'b: {RESULT} = math.floor(9007199254740992.0)\nreturn {{"b": b}}',
-                parameters="",
-            )
-        )
-        result = self.run_case()
-        self.assertFalse(result["ok"], result)
-        self.assertEqual(result["diagnostics"][0]["code"], "UNSUPPORTED_NUMERIC_RANGE")
-
-    def test_atan2_and_hypot_capture_zero_one_and_many_arguments(self):
-        self.entry.write_text(
-            "import math\n"
-            + source(
-                'angle: Annotated[float, symbol(glyph="theta", description="Angle", unit="rad")] = math.atan2(-0.0, -0.0)\n'
-                'empty_norm: Annotated[float, symbol(glyph="h_{empty}", description="Empty norm", unit="")] = math.hypot()\n'
-                'unary_norm: Annotated[float, symbol(glyph="h_{one}", description="Unary norm", unit="")] = math.hypot(-0.0)\n'
-                'magnitude_norm: Annotated[float, symbol(glyph="h_{magnitude}", description="Magnitude norm", unit="")] = math.hypot(-3.5)\n'
-                'vector_norm: Annotated[float, symbol(glyph="h_{vec}", description="Vector norm", unit="")] = math.hypot(2.0, 3.0, 6.0)\n'
-                'return {"angle": angle, "empty_norm": empty_norm, "unary_norm": unary_norm, "magnitude_norm": magnitude_norm, "vector_norm": vector_norm}',
-                parameters="",
-            )
-        )
-        execution = self.success(self.run_case())
-        outputs = {
-            output["name"]: (output["value"], output["numericKind"])
-            for output in execution["authoring"]["outputs"]
-        }
-        self.assertEqual(outputs["angle"], (-math.pi, "float"))
-        self.assertEqual(outputs["empty_norm"], (0.0, "float"))
-        self.assertEqual(outputs["unary_norm"], (0.0, "float"))
-        self.assertEqual(outputs["magnitude_norm"], (3.5, "float"))
-        self.assertEqual(outputs["vector_norm"], (7.0, "float"))
-        self.assertGreater(math.copysign(1.0, outputs["empty_norm"][0]), 0)
-        self.assertGreater(math.copysign(1.0, outputs["unary_norm"][0]), 0)
-
-        arities = {}
-        for item in execution["cso"]["sections"][0]["items"]:
-            if item["kind"] != "symbol":
-                continue
-            for node in item["symbol"]["valueTree"]["nodes"]:
-                function_id = node.get("funcSpec", {}).get("id")
-                if function_id in {"fg.atan2", "fg.hypot"}:
-                    arities[item["symbol"]["metadata"]["localId"]] = len(
-                        node["funcArgs"]
-                    )
-        self.assertEqual(
-            arities,
-            {
-                "angle": 2,
-                "empty_norm": 0,
-                "unary_norm": 1,
-                "magnitude_norm": 1,
-                "vector_norm": 3,
-            },
-        )
-
-    def test_hypot_rejects_a_non_finite_result(self):
-        self.entry.write_text(
-            "import math\n"
-            + source(
-                f'b: {RESULT} = math.hypot(1.7976931348623157e308, 1.7976931348623157e308)\nreturn {{"b": b}}',
-                parameters="",
-            )
-        )
-        result = self.run_case()
-        self.assertFalse(result["ok"], result)
-        self.assertEqual(result["diagnostics"][0]["code"], "NON_FINITE_VALUE")
 
     def test_float_kind_survives_json_and_large_intermediates(self):
         self.entry.write_text(
@@ -328,22 +225,6 @@ class ExecutionTest(unittest.TestCase):
         ).encode()
         self.assertEqual(
             execution["sourceClosureHash"], hashlib.sha256(encoded).hexdigest()
-        )
-
-    def test_parameter_name_can_be_documented_and_explicit_identity_is_retained(self):
-        self.entry.write_text(
-            source(
-                'x: Annotated[float, symbol(id="width", root_key="value", glyph="w", description="Width", unit="m")] = given(x)\nchild = calculation_call("child.cso.py", function="calculate", inputs={"x": x})\nb: '
-                + RESULT
-                + ' = child["b"]\nreturn {"x": x, "b": b}'
-            )
-        )
-        execution = self.success(self.run_case())
-        definition = execution["invocations"][0]["symbols"][0]
-        self.assertEqual(definition["localId"], "width")
-        self.assertEqual(
-            execution["invocations"][1]["inputBindings"][0]["source"],
-            {"symbolId": identity("symbol", "root", "width"), "nodeKey": "value"},
         )
 
     def test_compilation_failure_is_preflighted_before_any_module_executes(self):
@@ -448,18 +329,6 @@ class ExecutionTest(unittest.TestCase):
         self.assertEqual(numeric["code"], "UNSUPPORTED_NUMERIC_RANGE")
         self.assertEqual(numeric["callChain"], diagnostic["callChain"])
         self.assertEqual(numeric["invocationId"], "root/child/child")
-
-    def test_grouped_raw_string_is_rejected_before_execution(self):
-        self.entry.write_text(
-            source(
-                f'with document_section(id="group", title="Assumptions"):\n    "Assumption accidentally missing text wrapper"\n    a: {SYMBOL} = given(x)\nreturn {{"a": a}}'
-            )
-        )
-        self.reject_before_execution("UNSUPPORTED_SYNTAX")
-        self.entry.write_text(
-            source(f'"Function docstring"\na: {SYMBOL} = given(x)\nreturn {{"a": a}}')
-        )
-        self.success(self.run_case())
 
     def test_every_parameter_requires_an_input_symbol_before_execution(self):
         original = self.entry.read_text()

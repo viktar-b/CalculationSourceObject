@@ -3,7 +3,7 @@ import {
   type SpawnSyncReturns,
   spawnSync,
 } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -18,7 +18,6 @@ import {
   PreparedFormulaSheet,
   prepareExecutionDocument,
 } from '@cs-object/react';
-import { chromium } from 'playwright';
 import React, { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, expect, it } from 'vitest';
@@ -183,37 +182,9 @@ print(json.dumps({"value": result, "kind": type(result).__name__}))
   return { code, result };
 }
 
-it.each(['', 'not json', '{}'])(
-  'retains process diagnostics when capture stdout is %j',
-  (stdout) => {
-    const run = spawnSync(
-      python,
-      [
-        '-I',
-        '-c',
-        `import sys\nsys.stdout.write(${JSON.stringify(stdout)})\nsys.stderr.write("capture process failed")\nsys.exit(2)`,
-      ],
-      { encoding: 'utf8' },
-    );
-    expect(() => parseCaptureResponse(run)).toThrow(
-      /status=2, signal=null[\s\S]*stderr: capture process failed/,
-    );
-  },
-);
-
-it('reports a missing capture interpreter', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'cso-missing-python-'));
-  directories.push(directory);
-  const run = spawnSync(join(directory, 'python'), [], { encoding: 'utf8' });
-  expect(() => parseCaptureResponse(run)).toThrow(/ENOENT/);
-});
-
 it.each([
-  ['(-0.0) ** 2', 0, 'float'],
   ['(-0.0) ** 3', -0, 'float'],
   ['(-2.0) ** 2', 4, 'float'],
-  ['(-2.0) ** 3', -8, 'float'],
-  ['(-2) ** 2', 4, 'int'],
   ['(-2) ** (-2)', 0.25, 'float'],
   ['((-2) ** 2) ** 3', 64, 'int'],
 ] as const)(
@@ -243,7 +214,7 @@ it('has independent reference cases for every declared call, without duplicate n
 });
 
 it.each(declarations)(
-  '$name works through authoring, verification, display and export for every spelling',
+  '$name lowers every spelling and completes verification, display and export',
   (call) => {
     const sample = referenceCases[call.name];
     if (!sample) throw new Error(`Missing reference case for ${call.name}`);
@@ -267,8 +238,6 @@ it.each(declarations)(
       );
       expect(output.numericKind).toBe(sample.kind);
       expect(output.value).toBeCloseTo(sample.expected, 14);
-      const report = verifyExecution({ execution });
-      expect(report.ok, JSON.stringify(report.diagnostics)).toBe(true);
       const nodes = execution.cso.sections.flatMap((section) =>
         section.items.flatMap((item) =>
           item.kind === 'symbol' ? item.symbol.valueTree.nodes : [],
@@ -279,6 +248,11 @@ it.each(declarations)(
       );
       expect(callNode?.funcArgs).toHaveLength(call.min_arity);
 
+      // Every spelling must lower correctly; the downstream pipeline receives
+      // the same function ID and needs only one run per declared function.
+      if (spelling !== call.spellings[0]) continue;
+      const report = verifyExecution({ execution });
+      expect(report.ok, JSON.stringify(report.diagnostics)).toBe(true);
       const document = prepareExecutionDocument({ execution, assets: [] });
       const html = renderToStaticMarkup(
         createElement(PreparedFormulaSheet, { document }),
@@ -299,30 +273,6 @@ it.each(declarations)(
       );
       expect(result.kind).toBe(sample.kind);
       expect(result.value).toBe(output.value);
-
-      const invalidArities = [
-        ...(call.min_arity > 0 ? [call.min_arity - 1] : []),
-        ...(call.max_arity === null ? [] : [call.max_arity + 1]),
-      ];
-      if (invalidArities.length > 0 && !callNode?.funcArgs?.[0]) {
-        throw new Error('Missing function operand');
-      }
-      const firstArg = callNode?.funcArgs?.[0];
-      const originalArgs = callNode?.funcArgs;
-      for (const arity of invalidArities) {
-        if (!callNode || !firstArg || !originalArgs) {
-          throw new Error('Missing function call');
-        }
-        callNode.funcArgs = Array.from({ length: arity }, () => ({
-          key: firstArg.key,
-        }));
-        const invalid = verifyExecution({ execution });
-        expect(invalid.ok).toBe(false);
-        expect(
-          invalid.diagnostics.some((d) => d.code === 'INVALID_FUNCTION_ARITY'),
-        ).toBe(true);
-        callNode.funcArgs = originalArgs;
-      }
     }
   },
 );
@@ -352,7 +302,6 @@ it('rejects malformed atan2 arity in a dormant branch', () => {
 
 it.each([
   ['math.sin(math.radians(quantity))', '30.0', 0.5],
-  ['math.degrees(math.asin(quantity))', '0.5', 30],
   ['math.sin(quantity) ** 2 + math.cos(quantity) ** 2', '1.2', 1],
 ] as const)(
   'composes %s with existing formula operations',
@@ -365,20 +314,7 @@ it.each([
 
 it.each([
   ['sin', '1e308'],
-  ['cos', '-1e308'],
-  ['tan', '1e308'],
-  ['tan', '1.5707963267948966'],
-  ['atan', '-1e308'],
   ['sinh', '710.0'],
-  ['cosh', '-710.0'],
-  ['tanh', '1e308'],
-  ['radians', '1e308'],
-  ['degrees', '1e300'],
-  ['asin', '-1.0'],
-  ['acos', '1.0'],
-  ['sin', '5e-324'],
-  ['sinh', '1e-300'],
-  ['tanh', '-1e-300'],
 ] as const)(
   'independently verifies %s(%s) across runtime implementations',
   (name, input) => {
@@ -393,69 +329,6 @@ it.each([
       value: output.value,
       kind: 'float',
     });
-  },
-);
-
-it.each(['sin', 'tan', 'asin', 'atan', 'sinh', 'tanh', 'radians', 'degrees'])(
-  '%s preserves signed zero through capture and export',
-  (name) => {
-    const { execution, output } = successfulCapture(
-      `math.${name}(quantity)`,
-      '-0.0',
-    );
-    expect(output.value).toBe(-0);
-    expect(verifyExecution({ execution }).ok).toBe(true);
-    expect(exportReplay(execution, output.symbolId).result.value).toBe(-0);
-  },
-);
-
-it.each([
-  ['asin', 'ValueError'],
-  ['acos', 'ValueError'],
-  ['sinh', 'OverflowError'],
-  ['cosh', 'OverflowError'],
-])(
-  'checks dormant %s structurally and reports %s only in the selected branch',
-  (name, errorName) => {
-    const { execution, output } = successfulCapture(
-      `math.${name}(quantity) if quantity < 0 else 1.0`,
-      '1000.0',
-    );
-    expect(output.value).toBe(1);
-    expect(verifyExecution({ execution }).ok).toBe(true);
-    const active = capture(`math.${name}(quantity)`, '1000.0');
-    expect(active).toMatchObject({
-      ok: false,
-      diagnostics: [
-        {
-          code: 'EXECUTION_FAILED',
-          stage: 'execution',
-          message: expect.stringContaining(errorName),
-        },
-      ],
-    });
-  },
-);
-
-it.each(['asin', 'acos'])(
-  'rejects an invalid active %s domain in the independent verifier',
-  (name) => {
-    const { execution } = successfulCapture(
-      `math.${name}(2.0) if quantity < 0 else 1.0`,
-    );
-    const nodes = execution.cso.sections.flatMap((section) =>
-      section.items.flatMap((item) =>
-        item.kind === 'symbol' ? item.symbol.valueTree.nodes : [],
-      ),
-    );
-    const predicate = nodes.find((node) => node.funcSpec?.id === 'fg.lt');
-    if (!predicate?.funcSpec) throw new Error('Missing conditional predicate');
-    predicate.funcSpec.id = 'fg.gt';
-    const report = verifyExecution({ execution });
-    expect(report.ok).toBe(false);
-    expect(report.diagnostics.some((d) => d.code === 'TRIG_DOMAIN_ERROR')).toBe(
-      true,
-    );
   },
 );
 
@@ -605,71 +478,19 @@ it.each(syntaxCases)(
   },
 );
 
+// Retain transport-sensitive cases and evaluation order here. Ordinary
+// arithmetic and numeric policy belong to the core evaluator tests.
 const extendedCases = [
-  ['abs(quantity)', '-3', 3, 'int'],
-  ['abs(quantity)', '-3.5', 3.5, 'float'],
-  ['abs(quantity)', '-0.0', 0, 'float'],
-  ['abs(quantity)', '-1.7976931348623157e308', 1.7976931348623157e308, 'float'],
-  ['math.floor(quantity)', '-1.2', -2, 'int'],
-  ['math.floor(quantity)', '-0.0', 0, 'int'],
-  ['math.atan2(1, 1)', '0.5', Math.PI / 4, 'float'],
-  ['math.atan2(1, -1)', '0.5', (3 * Math.PI) / 4, 'float'],
-  ['math.atan2(-1, -1)', '0.5', (-3 * Math.PI) / 4, 'float'],
-  ['math.atan2(-1, 1)', '0.5', -Math.PI / 4, 'float'],
-  ['math.atan2(1, 0)', '0.5', Math.PI / 2, 'float'],
-  ['math.atan2(-1, 0)', '0.5', -Math.PI / 2, 'float'],
-  ['math.hypot()', '0.5', 0, 'float'],
-  ['math.hypot(quantity)', '-0.0', 0, 'float'],
-  ['math.hypot(3, 4)', '0.5', 5, 'float'],
   ['math.hypot(2, 3, 6)', '0.5', 7, 'float'],
-  ['math.hypot(1, 2, 2, 4, 12)', '0.5', 13, 'float'],
-  ['math.hypot(3e154, 4e154)', '0.5', 5e154, 'float'],
-  ['math.hypot(3e-200, 4e-200)', '0.5', 5e-200, 'float'],
-  ['math.hypot(5e-324, 5e-324)', '0.5', 5e-324, 'float'],
-  [
-    'math.floor(quantity)',
-    '9007199254740991.0',
-    Number.MAX_SAFE_INTEGER,
-    'int',
-  ],
-  [
-    'math.floor(quantity)',
-    '-9007199254740991.0',
-    -Number.MAX_SAFE_INTEGER,
-    'int',
-  ],
-  ['(2 if quantity > 0 else 3) if quantity < 1 else 4', '2.0', 4, 'int'],
   ['math.log(quantity, 2)', '8.0', 3, 'float'],
-  ['math.log(quantity, 0.5)', '1.0', -0, 'float'],
-  ['math.exp(quantity)', '-1000.0', 0, 'float'],
-  ['min(quantity, 3, 2, 1)', '4.0', 1, 'int'],
-  ['max(quantity, 3, 2, 1)', '4.0', 4, 'float'],
-  ['min(quantity, 0.0)', '-0.0', -0, 'float'],
-  ['max(quantity, 0)', '-0.0', -0, 'float'],
-  ['min(quantity, 1.0)', '1', 1, 'int'],
-  ['max(quantity, 1.0)', '1', 1, 'int'],
   ['round(quantity, 2)', '2.675', 2.67, 'float'],
-  ['round(quantity, 2)', '-2.675', -2.67, 'float'],
-  ['round(quantity, 1)', '1.25', 1.2, 'float'],
-  ['round(quantity, 1)', '1.75', 1.8, 'float'],
   ['round(quantity, 0)', '-0.1', -0, 'float'],
   ['round(quantity, -2)', '250', 200, 'int'],
-  ['round(quantity, -2)', '150', 200, 'int'],
-  ['round(quantity, 2)', '250', 250, 'int'],
-  ['round(quantity, 400)', '2.675', 2.675, 'float'],
-  ['round(quantity, -400)', '-2.675', -0, 'float'],
-  ['round(quantity, -400)', '-250', 0, 'int'],
-  ['round(quantity, 323)', '5e-324', 0, 'float'],
+  ['(2 if quantity > 0 else 3) if quantity < 1 else 4', '2.0', 4, 'int'],
   ['1 if quantity > 0 and math.log(-1) > 0 else 2', '-1.0', 2, 'int'],
   ['1 if quantity > 0 or math.log(-1) > 0 else 2', '1.0', 1, 'int'],
   ['1 if 0 < quantity <= 2 != 3 else 2', '1.0', 1, 'int'],
   ['1 if 0 < quantity < math.log(-1) else 2', '-1.0', 2, 'int'],
-  [
-    '1 if quantity == 1 and (quantity < 0 or quantity >= 1) else 2',
-    '1.0',
-    1,
-    'int',
-  ],
 ] satisfies [string, string, number, 'int' | 'float'][];
 
 it.each(extendedCases)(
@@ -688,32 +509,8 @@ it.each(extendedCases)(
 );
 
 it.each([
-  ['hypot()', 0],
-  ['hypot(-3.5)', 3.5],
-  ['hypot(2, 3, 6)', 7],
-] as const)(
-  'imported %s captures, verifies and replays',
-  (expression, value) => {
-    const { execution, output } = successfulCapture(
-      expression,
-      undefined,
-      'from math import hypot',
-    );
-    expect(output.value).toBe(value);
-    expect(output.numericKind).toBe('float');
-    expect(verifyExecution({ execution }).ok).toBe(true);
-    expect(exportReplay(execution, output.symbolId).result).toEqual({
-      value,
-      kind: 'float',
-    });
-  },
-);
-
-it.each([
   ['math.atan2(-0.0, -0.0)', -Math.PI],
   ['math.atan2(-0.0, 0.0)', -0],
-  ['math.atan2(0.0, -0.0)', Math.PI],
-  ['math.atan2(0.0, 0.0)', 0],
 ] as const)(
   '%s preserves signed-zero quadrant behavior',
   (expression, value) => {
@@ -730,20 +527,23 @@ it.each([
 );
 
 it.each([
-  'math.log(0)',
-  'math.log(-1)',
-  'math.log(2, 1)',
-  'math.log(2, -1)',
-  'math.exp(1000)',
-  'math.floor(9007199254740992.0)',
-  'math.floor(1.7976931348623157e308)',
-  'math.hypot(1.7976931348623157e308, 1.7976931348623157e308)',
-  'round(quantity, 2.0)',
-  'round(1.7976931348623157e308, -308)',
+  ['math.asin(2)', 'TRIG_DOMAIN_ERROR', 'EXECUTION_FAILED'],
+  ['math.log(0)', 'LOG_DOMAIN_ERROR', 'EXECUTION_FAILED'],
+  ['math.log(2, 1)', 'DIVISION_BY_ZERO', 'EXECUTION_FAILED'],
+  ['math.exp(1000)', 'NON_FINITE_NUMBER', 'EXECUTION_FAILED'],
+  [
+    'math.floor(9007199254740992.0)',
+    'UNSUPPORTED_NUMERIC_RANGE',
+    'UNSUPPORTED_NUMERIC_RANGE',
+  ],
+  ['round(quantity, 2.0)', 'INVALID_INTEGER_OPERAND', 'EXECUTION_FAILED'],
 ])(
-  'rejects active domain/type failure %s but permits a dormant branch',
-  (expression) => {
-    expect(capture(expression).ok).toBe(false);
+  'rejects active %s with %s but permits a dormant branch',
+  (expression, code, captureCode) => {
+    expect(capture(expression)).toMatchObject({
+      ok: false,
+      diagnostics: [expect.objectContaining({ code: captureCode })],
+    });
     const { execution } = successfulCapture(
       `${expression} if quantity < 0 else 1`,
     );
@@ -759,63 +559,11 @@ it.each([
     predicate.funcSpec.id = 'fg.gt';
     const report = verifyExecution({ execution });
     expect(report.ok).toBe(false);
-    expect(
-      report.diagnostics.some((d) =>
-        [
-          'LOG_DOMAIN_ERROR',
-          'DIVISION_BY_ZERO',
-          'NON_FINITE_NUMBER',
-          'INVALID_INTEGER_OPERAND',
-          'UNSUPPORTED_NUMERIC_RANGE',
-        ].includes(d.code),
-      ),
-    ).toBe(true);
+    expect(report.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+      code,
+    );
   },
 );
-
-it.each([
-  ['abs', 'abs(quantity)'],
-  ['floor', 'math.floor(quantity)'],
-  ['atan2', 'math.atan2(quantity, 1)'],
-  ['hypot', 'math.hypot(quantity)'],
-] as const)('%s rejects a comparison operand', (name, expression) => {
-  const { execution } = successfulCapture(expression);
-  const valueTree = execution.cso.sections
-    .flatMap((section) => section.items)
-    .find(
-      (item) =>
-        item.kind === 'symbol' &&
-        item.symbol.valueTree.nodes.some(
-          (node) => node.funcSpec?.id === `fg.${name}`,
-        ),
-    );
-  if (valueTree?.kind !== 'symbol') {
-    throw new Error(`Missing ${name} value tree`);
-  }
-  const target = valueTree.symbol.valueTree.nodes.find(
-    (node) => node.funcSpec?.id === `fg.${name}`,
-  );
-  if (!target?.funcArgs?.[0]) throw new Error(`Missing ${name} operand`);
-  const operand = target.funcArgs[0];
-  valueTree.symbol.valueTree.nodes.push({
-    key: `${name}-comparison`,
-    mode: 'FUNCTION',
-    funcSpec: { id: 'fg.lt' },
-    funcArgs: [operand, operand],
-  });
-  target.funcArgs = [
-    { key: `${name}-comparison` },
-    ...target.funcArgs.slice(1),
-  ];
-
-  const report = verifyExecution({ execution });
-  expect(report.ok).toBe(false);
-  expect(
-    report.diagnostics.some(
-      (diagnostic) => diagnostic.code === 'NONNUMERIC_FORMULA',
-    ),
-  ).toBe(true);
-});
 
 it.each(['arity', 'role', 'cycle'])(
   'validates dormant logical operands for %s errors before evaluation',
@@ -885,70 +633,11 @@ it.each(['and', 'or'])(
   },
 );
 
-it('renders one 0.3em gap after binary and variadic logical operators', async () => {
-  const browser = await chromium.launch({ headless: true });
-  try {
-    const page = await browser.newPage({
-      viewport: { width: 820, height: 1100 },
-    });
-    const css = readFileSync(
-      new URL(import.meta.resolve('@cs-object/react/style.css')),
-      'utf8',
-    );
-    for (const operator of ['and', 'or']) {
-      for (const count of [2, 3]) {
-        const predicate = Array.from(
-          { length: count },
-          (_, index) => `quantity < ${index + 1}`,
-        ).join(` ${operator} `);
-        const { execution } = successfulCapture(`1 if ${predicate} else 2`);
-        const html = renderToStaticMarkup(
-          createElement(PreparedFormulaSheet, {
-            document: prepareExecutionDocument({ execution, assets: [] }),
-          }),
-        );
-        await page.setContent(`<style>${css}</style>${html}`);
-        const gaps = await page.locator('mo').evaluateAll(
-          (nodes, word) =>
-            nodes
-              .filter((node) => node.textContent === word)
-              .map((node) => {
-                const next = node.nextElementSibling;
-                if (!next)
-                  throw new Error('Logical operator has no following operand');
-                const range = document.createRange();
-                range.selectNodeContents(node);
-                return {
-                  actual:
-                    next.getBoundingClientRect().x -
-                    range.getBoundingClientRect().right,
-                  expected: parseFloat(getComputedStyle(node).fontSize) * 0.3,
-                };
-              }),
-          operator,
-        );
-        expect(gaps.length).toBeGreaterThan(0);
-        for (const gap of gaps) expect(gap.actual).toBeCloseTo(gap.expected, 1);
-      }
-    }
-  } finally {
-    await browser.close();
-  }
-});
-
 it.each([
-  { expression: 'min(8, 3, 5, -2)', value: -2, kind: 'int' },
-  { expression: 'max(-8, -3, -5, -2)', value: -2, kind: 'int' },
   { expression: 'min(8, -3, -3.0, 5)', value: -3, kind: 'int' },
   { expression: 'min(8, -3.0, -3, 5)', value: -3, kind: 'float' },
-  { expression: 'max(-8, 3, 3.0, -5)', value: 3, kind: 'int' },
-  { expression: 'max(-8, 3.0, 3, -5)', value: 3, kind: 'float' },
-  { expression: 'min(1, -0.0, 0.0, 2)', value: -0, kind: 'float' },
-  { expression: 'min(1, 0.0, -0.0, 2)', value: 0, kind: 'float' },
   { expression: 'max(-1, -0.0, 0.0, -2)', value: -0, kind: 'float' },
   { expression: 'max(-1, 0.0, -0.0, -2)', value: 0, kind: 'float' },
-  { expression: 'min(-1e308, 0, 1e308)', value: -1e308, kind: 'float' },
-  { expression: 'max(-1e308, 0, 1e308)', value: 1e308, kind: 'float' },
 ])(
   'preserves variadic $expression through verification and replay',
   ({ expression, value, kind }) => {

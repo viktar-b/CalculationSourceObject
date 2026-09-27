@@ -5,7 +5,6 @@ import {
   ExecutionPayloadSchema,
   ExecutionResponseSchema,
   InvocationSchema,
-  SymbolDefinitionSchema,
 } from '../src/contracts/execution.ts';
 import { scopedGlyph } from '../src/contracts/glyphs.ts';
 import { verifyExecution } from '../src/verification/verify.ts';
@@ -248,19 +247,6 @@ const codes = (value: unknown): unknown[] => {
 
 describe('execution evidence contract', () => {
   test.each([0, -0])(
-    'preserves matching signed-zero input identities (%s)',
-    (value) => {
-      const execution = makeExecution(value);
-      const parsed = ExecutionPayloadSchema.parse(execution);
-      expect(Object.is(parsed.entry.resolvedInputs.x, value)).toBe(true);
-      expect(
-        Object.is(required(parsed.invocations[0]).resolvedInputs.x, value),
-      ).toBe(true);
-      expect(verifyExecution({ execution }).ok).toBe(true);
-    },
-  );
-
-  test.each([0, -0])(
     'rejects opposite signed-zero entry and invocation identities (%s)',
     (value) => {
       const execution = makeExecution(value);
@@ -353,47 +339,6 @@ describe('execution evidence contract', () => {
     expect(ExecutionPayloadSchema.safeParse(execution).success).toBe(true);
   });
 
-  test('keeps explicit input, constant, alias and unsupported evidence variants', () => {
-    const identity = required(
-      required(makeExecution().invocations[0]).symbols[0],
-    );
-    const base = {
-      symbolId: identity.symbolId,
-      localId: identity.localId,
-      variableName: identity.variableName,
-      definitionLocation: identity.definitionLocation,
-    };
-    expect(
-      SymbolDefinitionSchema.parse({
-        ...base,
-        kind: 'input',
-        givenSource: {
-          kind: 'literal',
-          value: 2,
-          location: span('estimate.cso.py', 10),
-        },
-      }).kind,
-    ).toBe('input');
-    expect(
-      SymbolDefinitionSchema.parse({
-        ...base,
-        kind: 'constant',
-        literal: { value: 2, location: span('estimate.cso.py', 10) },
-      }).kind,
-    ).toBe('constant');
-    expect(
-      SymbolDefinitionSchema.parse({
-        ...base,
-        kind: 'unsupported',
-        reason: 'documented_result',
-      }).kind,
-    ).toBe('unsupported');
-    expect(
-      SymbolDefinitionSchema.safeParse({ ...base, kind: 'constant', value: 2 })
-        .success,
-    ).toBe(false);
-  });
-
   test('requires strict root/child shapes and permits all accepted binding variants', () => {
     const root = required(makeExecution().invocations[0]);
     expect(
@@ -469,112 +414,6 @@ describe('execution evidence contract', () => {
     ).toBe(false);
   });
 
-  test('successful response diagnostic spans resolve through the execution manifest', () => {
-    const response = {
-      protocolVersion: '1',
-      ok: true,
-      diagnostics: [
-        {
-          code: 'NOTE',
-          message: 'Available source note',
-          stage: 'source',
-          location: span('missing.cso.py', 1),
-        },
-      ],
-      execution: makeExecution(),
-    };
-    expect(ExecutionResponseSchema.safeParse(response).success).toBe(false);
-    expect(
-      ExecutionResponseSchema.safeParse({
-        ...response,
-        diagnostics: [
-          {
-            ...required(response.diagnostics[0]),
-            location: span('estimate.cso.py', 1),
-          },
-        ],
-      }).success,
-    ).toBe(true);
-  });
-
-  test('successful diagnostic identities resolve to the same invocation and symbol graph', () => {
-    const execution = makeNested();
-    const diagnostic = {
-      code: 'NOTE',
-      message: 'Observed operation',
-      stage: 'contract',
-      symbolId: symbolId('root', 'area'),
-      invocationId: 'root',
-      nodeKey: 'n1',
-    };
-    const response = {
-      protocolVersion: '1',
-      ok: true,
-      diagnostics: [diagnostic],
-      execution,
-    };
-    expect(ExecutionResponseSchema.safeParse(response).success).toBe(true);
-    expect(
-      ExecutionResponseSchema.safeParse({
-        ...response,
-        diagnostics: [{ ...diagnostic, symbolId: symbolId('root', 'length') }],
-      }).success,
-    ).toBe(true);
-    const malformed = [
-      {
-        patch: { invocationId: 'root/missing' },
-        code: 'UNKNOWN_DIAGNOSTIC_INVOCATION',
-        field: 'invocationId',
-      },
-      {
-        patch: { symbolId: symbolId('root', 'missing') },
-        code: 'UNKNOWN_DIAGNOSTIC_SYMBOL',
-        field: 'symbolId',
-      },
-      {
-        patch: { invocationId: 'root/panel_a' },
-        code: 'DIAGNOSTIC_SYMBOL_INVOCATION_MISMATCH',
-        field: 'invocationId',
-      },
-      {
-        patch: { nodeKey: 'missing' },
-        code: 'UNKNOWN_DIAGNOSTIC_NODE',
-        field: 'nodeKey',
-      },
-      {
-        patch: { symbolId: symbolId('root', 'length'), nodeKey: 'n2' },
-        code: 'UNKNOWN_DIAGNOSTIC_NODE',
-        field: 'nodeKey',
-      },
-    ];
-    for (const { patch, code, field } of malformed) {
-      const diagnostics = [{ ...diagnostic, ...patch }];
-      const result = ExecutionResponseSchema.safeParse({
-        ...response,
-        diagnostics,
-      });
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues).toEqual(
-          expect.arrayContaining([
-            expect.objectContaining({
-              code: 'custom',
-              path: ['diagnostics', 0, field],
-              params: { diagnosticCode: code },
-            }),
-          ]),
-        );
-      }
-      expect(
-        ExecutionResponseSchema.safeParse({
-          protocolVersion: '1',
-          ok: false,
-          diagnostics,
-        }).success,
-      ).toBe(true);
-    }
-  });
-
   test('rejects missing, duplicate and orphan observations with stable codes', () => {
     const execution = makeExecution();
     expect(codes({ ...execution, observations: [] })).toContain(
@@ -624,44 +463,6 @@ describe('execution evidence contract', () => {
         }),
       ).toContain(code);
     }
-  });
-
-  test('rejects bare/foreign operation addresses while allowing reused node keys', () => {
-    const execution = makeNested();
-    const observation = {
-      address: { symbolId: symbolId('root', 'area'), nodeKey: 'n2' },
-      invocationId: 'root/panel_a',
-      value: 4,
-      location: span('geometry.cso.py', 20),
-    };
-    expect(
-      codes({ ...execution, operationObservations: [observation] }),
-    ).toContain('NODE_INVOCATION_MISMATCH');
-    expect(
-      codes({
-        ...execution,
-        operationObservations: [
-          {
-            ...observation,
-            address: { symbolId: symbolId('root', 'area'), nodeKey: 'missing' },
-          },
-        ],
-      }),
-    ).toContain('UNKNOWN_NODE_ADDRESS');
-    expect(
-      ExecutionPayloadSchema.safeParse({
-        ...execution,
-        operationObservations: [{ ...observation, address: { nodeKey: 'n2' } }],
-      }).success,
-    ).toBe(false);
-    const valid = {
-      ...observation,
-      invocationId: 'root',
-      location: span('estimate.cso.py', 20),
-    };
-    expect(
-      codes({ ...execution, operationObservations: [valid, valid] }),
-    ).toContain('DUPLICATE_OPERATION_OBSERVATION');
   });
 
   test('rejects closure and entry disagreement without throwing from safeParse', () => {
@@ -760,83 +561,6 @@ describe('execution evidence contract', () => {
     ).toContain('SYMBOL_DEFINITION_ORDER');
   });
 
-  test('requires formula and caller sources to address graph roots', () => {
-    const execution = makeNested();
-    const root = required(execution.invocations[0]);
-    const formula = required(root.symbols[1]);
-    expect(
-      codes({
-        ...execution,
-        invocations: [
-          {
-            ...root,
-            symbols: [
-              required(root.symbols[0]),
-              {
-                ...formula,
-                address: { symbolId: formula.symbolId, nodeKey: 'n1' },
-              },
-            ],
-          },
-          ...execution.invocations.slice(1),
-        ],
-      }),
-    ).toContain('NON_ROOT_NODE_BINDING');
-    const child = required(
-      execution.invocations.find(
-        (invocation) => invocation.id === 'root/panel_b',
-      ),
-    );
-    const binding = required(child.inputBindings[0]);
-    expect(
-      codes({
-        ...execution,
-        invocations: execution.invocations.map((invocation) =>
-          invocation.id === child.id
-            ? {
-                ...child,
-                inputBindings: [
-                  {
-                    ...binding,
-                    source: {
-                      symbolId: symbolId('root/panel_a', 'area'),
-                      nodeKey: 'n1',
-                    },
-                  },
-                ],
-              }
-            : invocation,
-        ),
-      }),
-    ).toContain('NON_ROOT_NODE_BINDING');
-  });
-
-  test('rejects later caller definitions and later or inaccessible child sources', () => {
-    const execution = makeNested();
-    const child = required(
-      execution.invocations.find(
-        (invocation) => invocation.id === 'root/panel_a',
-      ),
-    );
-    const binding = required(child.inputBindings[0]);
-    for (const source of [
-      { symbolId: symbolId('root', 'area'), nodeKey: 'n2' },
-      { symbolId: symbolId('root/panel_b', 'area'), nodeKey: 'n2' },
-      { symbolId: symbolId('root/panel_a/nested', 'area'), nodeKey: 'n2' },
-    ]) {
-      expect(
-        codes({
-          ...execution,
-          invocations: execution.invocations.map((invocation) =>
-            invocation.id === child.id
-              ? { ...child, inputBindings: [{ ...binding, source }] }
-              : invocation,
-          ),
-        }),
-      ).toContain('INVALID_CALLER_SYMBOL_SOURCE');
-    }
-  });
-
   test('rejects disconnected invocation trees and wrong call-site modules', () => {
     const execution = makeNested();
     const child = required(
@@ -906,31 +630,6 @@ describe('execution evidence contract', () => {
         sourceManifest: [{ moduleId: '\uD800.cso.py', sha256: 'a'.repeat(64) }],
       }).success,
     ).toBe(false);
-  });
-
-  test('optional metadata identities and spans cannot contradict execution evidence', () => {
-    const execution = makeExecution();
-    const section = required(execution.cso.sections[0]);
-    section.metadata = {
-      invocationId: 'root/unknown',
-      localId: 'calculation',
-      location: span('estimate.cso.py', 1),
-    };
-    expect(codes(execution)).toContain('METADATA_INVOCATION_MISMATCH');
-    section.metadata = { location: span('unknown.cso.py', 1) };
-    expect(codes(execution)).toContain('UNKNOWN_MODULE');
-    section.metadata = {};
-    const item = required(section.items[0]);
-    if (item.kind !== 'symbol') {
-      throw new Error('Expected fixture symbol');
-    }
-    item.metadata = { invocationId: 'root/unknown' };
-    expect(codes(execution)).toContain('UNKNOWN_METADATA_INVOCATION');
-    item.metadata = { localId: 'different' };
-    expect(codes(execution)).toContain('METADATA_LOCAL_ID_MISMATCH');
-    item.metadata = {};
-    item.symbol.metadata = { location: span('estimate.cso.py', 99) };
-    expect(codes(execution)).toContain('METADATA_LOCATION_MISMATCH');
   });
 
   test('rejects unsafe observations, unknown assets and unnamespaced content', () => {

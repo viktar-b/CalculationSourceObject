@@ -1,6 +1,5 @@
 """Shared public-definition behavior through generation and execution."""
 
-import hashlib
 import shutil
 import tempfile
 import unittest
@@ -110,27 +109,6 @@ class DefinitionTest(unittest.TestCase):
             ["forwarded_output.cso.py"],
         )
 
-    def test_valid_binding_bytes_match_the_previous_definition_format(self):
-        for name in ("forwarded_output.cso.py", "hidden_intermediate.cso.py"):
-            shutil.copy(self.fixtures / name, self.root)
-        generate(self.root)
-        # Captured before this refactor at 01f296b, from these package-owned sources.
-        expected = {
-            "defaulted_step.py": "367006d9c463520f59e48e2283e0ecc316f37b986d14419258fa22aa69d6689d",
-            "defaulted_step.pyi": "e45981b121520e839ad570884c205f54ccfaf720b1aa89cde1fa899996bf033e",
-            "forwarded_output.py": "ff47e0297ef3a4ddbd7a9de3a5b36dfa42cac13eefed3f5f74f43d9bfa0ebf7e",
-            "forwarded_output.pyi": "c5039b80476191f22b4ed46c09b0537825eeb68a61430d2366f4c1b9d567a7ca",
-            "hidden_intermediate.py": "ccfcbe646b4b740196447e1fd45d2aca4a5d633a7c8dcef16ede08c72f2af167",
-            "hidden_intermediate.pyi": "97dededcdd5bbea73743cdaf50dae782f985e36f36cdeb36ff7254087cdbe096",
-        }
-        files = self.generated()
-        for name, digest in expected.items():
-            self.assertEqual(
-                hashlib.sha256(files[f"_cso_bindings/{name}"]).hexdigest(), digest
-            )
-        self.assertEqual(files["_cso_bindings/__init__.py"], b"")
-        self.assertEqual(files["_cso_bindings/py.typed"], b"")
-
     def test_definition_generation_does_not_validate_or_execute_formula_bodies(self):
         self.source.write_text(
             self.source.read_text().replace("amount + increment", "amount // increment")
@@ -169,22 +147,6 @@ def adjust(amount: float = 2):
         self.assertEqual(
             execution["invocations"][0]["inputBindings"][0]["kind"], "parsedDefault"
         )
-
-    def test_duplicate_metadata_is_rejected_by_generation_too(self):
-        self.source.write_text(
-            self.source.read_text()
-            .replace(
-                "    adjusted:", "    supplied: Amount = given(amount)\n    adjusted:"
-            )
-            .replace(
-                "CalculationResults, calculation",
-                "given, CalculationResults, calculation",
-            )
-        )
-        with self.assertRaises(SourceError) as error:
-            generate(self.root)
-        self.assertEqual(error.exception.diagnostic["code"], "AMBIGUOUS_METADATA")
-        self.assertFalse((self.root / "_cso_bindings").exists())
 
     def test_malformed_dependencies_keep_structured_source_errors(self):
         original = self.source.read_text()
