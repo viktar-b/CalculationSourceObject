@@ -19,7 +19,7 @@ CLI. The Python definition remains the source for input fields; the CLI retains
 request validation, execution verification, run state and report/PDF routes.
 The standalone `cso dev` page remains available to direct CLI users.
 
-The generated project records runnable reports in `reports.json`. Its sidebar
+The generated project records runnable reports in `reports.json`. Its page
 lists those entries and selects a report-specific API route. The launcher starts
 one CLI process per report. This extends ADR-0006's initial one-report project
 limit without changing the CLI's single-target runtime.

@@ -84,7 +84,7 @@ test('the installed archive creates a complete project without installing', () =
     'src/App.tsx',
     'src/index.css',
     'src/components/ui/button.tsx',
-    'src/components/ui/sidebar.tsx',
+    'src/components/ui/dropdown-menu.tsx',
     'reports.json',
   ])
     assert.ok(readFileSync(join(project, file)).length > 0, file);

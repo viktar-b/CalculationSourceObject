@@ -253,10 +253,7 @@ export function createDevRuntime(
         execution,
         assets: captureAssets(options.sourcePath, execution),
       });
-      const independent =
-        verified.report.checks.independentReferenceAgreement.status;
-      const notice = `Source-to-document consistency passed. Independent numerical reference: ${independent === 'passed' ? 'passed' : 'pending, no matching reference'}. Human visual inspection is pending. These checks do not establish engineering approval.`;
-      const html = Buffer.from(buildPreparedHtml(document, notice));
+      const html = Buffer.from(buildPreparedHtml(document));
       const bytes =
         html.length +
         jsonBytes(document).length +
