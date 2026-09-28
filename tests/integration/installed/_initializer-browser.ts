@@ -58,6 +58,11 @@ export async function exerciseBrowser(options: {
       await page.locator('#checks').innerText(),
       /Human visual inspection:\s*pending/i,
     );
+    if (options.reportId === 'rectangle-area')
+      assert.match(
+        await page.locator('#checks').innerText(),
+        /Independent reference agreement:\s*pending, no matching reference/i,
+      );
     await page.setViewportSize({ width: 950, height: 900 });
     assert.equal(
       await page.evaluate(
@@ -112,6 +117,71 @@ export async function exerciseBrowser(options: {
       evidence.artifacts.pdf?.sha256,
       hashBytes(readFileSync(options.downloadPath)),
     );
+    if (options.reportId === 'rectangle-area') {
+      await page.locator('[name=width]').fill('-0');
+      assert.match(await page.locator('#curl').innerText(), /"width":-0\.0/);
+      await page.locator('#calculate').click();
+      await page.locator('#outputs').filter({ hasText: '-0.0' }).waitFor();
+      const signedReportPath = await page
+        .locator('iframe#report')
+        .getAttribute('src');
+      const signedRun = /\/runs\/([\da-f-]{36})\/report\.html$/.exec(
+        signedReportPath ?? '',
+      );
+      assert(signedRun?.[1]);
+      const signedEvidence = EvidenceSchema.parse(
+        await (
+          await fetch(
+            new URL(
+              `/api/reports/rectangle-area/runs/${signedRun[1]}/evidence.json`,
+              options.origin,
+            ),
+          )
+        ).json(),
+      );
+      assert(
+        Object.is(
+          signedEvidence.execution.execution.entry.resolvedInputs.width,
+          -0,
+        ),
+      );
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
+export async function exerciseFailureFeedback(origin: string) {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({
+      viewport: { width: 1400, height: 900 },
+    });
+    await page.goto(origin, { waitUntil: 'networkidle' });
+    await page.locator('[name=height]').fill('0');
+    await page.locator('#calculate').click();
+    await page
+      .locator('#status')
+      .filter({ hasText: /ZeroDivisionError: division by zero/ })
+      .waitFor();
+    await page
+      .getByRole('button', { name: 'Two-panel estimate', exact: true })
+      .click();
+    await page.locator('a#pdf').waitFor({ state: 'visible' });
+    await page.locator('a#pdf').click();
+    await page
+      .locator('#status')
+      .filter({ hasText: /Executable doesn't exist/ })
+      .waitFor();
+    assert.match(
+      await page.locator('#checks').innerText(),
+      /PDF layout:\s*failed/i,
+    );
+    const evidencePath = await page.locator('a#evidence').getAttribute('href');
+    assert(evidencePath);
+    const evidenceResponse = await fetch(new URL(evidencePath, origin));
+    assert.equal(evidenceResponse.status, 200);
+    await evidenceResponse.arrayBuffer();
   } finally {
     await browser.close();
   }

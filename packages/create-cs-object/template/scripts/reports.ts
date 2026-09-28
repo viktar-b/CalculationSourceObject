@@ -1,12 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { PythonIdentifierSchema } from '@cs-object/core';
 import { z } from 'zod';
 
 const ReportSchema = z.strictObject({
   id: z.string().regex(/^[a-z][a-z0-9-]*$/),
   title: z.string().min(1),
   source: z.string().regex(/^calculations\/(?!.*\.\.\/)[^/].*\.cso\.py$/),
-  function: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/),
+  function: PythonIdentifierSchema,
   reference: z.string().optional(),
 });
 

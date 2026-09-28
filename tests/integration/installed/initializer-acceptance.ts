@@ -7,13 +7,17 @@ import {
   readdirSync,
   readFileSync,
   realpathSync,
+  writeFileSync,
 } from 'node:fs';
 import type { Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { z } from 'zod';
-import { exerciseBrowser } from './_initializer-browser.ts';
+import {
+  exerciseBrowser,
+  exerciseFailureFeedback,
+} from './_initializer-browser.ts';
 import {
   artifactSet,
   hashBytes,
@@ -325,6 +329,21 @@ try {
     function: 'estimate',
     reference: 'calculations/reference.json',
   });
+  const unicodeSource = readFileSync(
+    join(calculations, 'report.cso.py'),
+    'utf8',
+  );
+  assert(unicodeSource.includes('def calculate('));
+  writeFileSync(
+    join(calculations, 'unicode.cso.py'),
+    unicodeSource.replace('def calculate(', 'def calculer_é('),
+  );
+  reports.push({
+    id: 'unicode-entry',
+    title: 'Unicode entry function',
+    source: 'calculations/unicode.cso.py',
+    function: 'calculer_é',
+  });
   writeJson(reportsPath, reports);
 
   dev = await startDev({
@@ -338,8 +357,18 @@ try {
     .parse(await (await fetch(new URL('/api/reports', dev.origin))).json());
   assert.deepEqual(
     secondCatalog.map(({ id }) => id),
-    ['rectangle-area', 'two-panel'],
+    ['rectangle-area', 'two-panel', 'unicode-entry'],
   );
+  const unicodeDefinition = z
+    .object({ function: z.string() })
+    .parse(
+      await (
+        await fetch(
+          new URL('/api/reports/unicode-entry/definition', dev.origin),
+        )
+      ).json(),
+    );
+  assert.equal(unicodeDefinition.function, 'calculer_é');
   const twoPanelScreenshot = join(root, 'two-panel-browser.png');
   const twoPanelDownload = join(root, 'two-panel-browser-download.pdf');
   const twoPanelInputs = {
@@ -384,6 +413,23 @@ try {
     name: 'two-panel',
     reportId: 'two-panel',
   });
+  await dev.stop();
+  dev = undefined;
+
+  const source = join(calculations, 'report.cso.py');
+  const sourceText = readFileSync(source, 'utf8');
+  assert(sourceText.includes('width * height'));
+  writeFileSync(source, sourceText.replace('width * height', 'width / height'));
+  dev = await startDev({
+    project,
+    name: 'failure-feedback-dev',
+    environment: {
+      ...environment,
+      PLAYWRIGHT_BROWSERS_PATH: join(root, 'absent-browsers'),
+    },
+    logs: root,
+  });
+  await exerciseFailureFeedback(dev.origin);
   await dev.stop();
   dev = undefined;
 

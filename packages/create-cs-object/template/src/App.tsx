@@ -54,10 +54,18 @@ function apiPath(report: Report, route: string): string {
 async function readJson(response: Response): Promise<unknown> {
   const body: unknown = await response.json();
   if (!response.ok) {
-    const parsed = z.object({ error: z.string() }).safeParse(body);
+    const parsed = z
+      .object({
+        error: z.string(),
+        diagnostics: z.array(z.object({ message: z.string() })).optional(),
+      })
+      .safeParse(body);
     throw new Error(
       parsed.success
-        ? parsed.data.error
+        ? [
+            parsed.data.error,
+            ...(parsed.data.diagnostics ?? []).map(({ message }) => message),
+          ].join('\n')
         : `Request failed (${response.status})`,
     );
   }
@@ -66,6 +74,13 @@ async function readJson(response: Response): Promise<unknown> {
 
 function numericText(value: number): string {
   return Object.is(value, -0) ? '-0.0' : String(value);
+}
+
+function numericJson(value: number): string {
+  if (Object.is(value, -0)) return '-0.0';
+  if (Number.isInteger(value) && !Number.isSafeInteger(value))
+    return value.toExponential();
+  return String(value);
 }
 
 function requestBody(
@@ -79,9 +94,9 @@ function requestBody(
       throw new Error(`Enter a finite value for ${input.name}`);
     if (input.numericType === 'int' && !Number.isSafeInteger(number))
       throw new Error(`${input.name} requires a safe integer`);
-    return [input.name, number] as const;
+    return `${JSON.stringify(input.name)}:${numericJson(number)}`;
   });
-  return JSON.stringify({ inputs: Object.fromEntries(entries) });
+  return `{"inputs":{${entries.join(',')}}}`;
 }
 
 function ReportSidebar({
@@ -258,6 +273,17 @@ export default function App() {
     const current = run;
     const report = selected;
     const started = revision.current;
+    const refreshChecks = async () => {
+      const latest = await readJson(
+        await fetch(apiPath(report, `/api/runs/${current.id}`)),
+      );
+      const checks = RunSchema.omit({
+        html: true,
+        pdf: true,
+        evidence: true,
+      }).parse(latest).checks;
+      if (started === revision.current) setRun({ ...current, checks });
+    };
     setBusy(true);
     setStatus('Preparing PDF…');
     try {
@@ -273,20 +299,19 @@ export default function App() {
       link.download = 'calculation.pdf';
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      const latest = await readJson(
-        await fetch(apiPath(report, `/api/runs/${current.id}`)),
-      );
-      const checks = RunSchema.omit({
-        html: true,
-        pdf: true,
-        evidence: true,
-      }).parse(latest).checks;
+      await refreshChecks();
       if (started !== revision.current) return;
-      setRun({ ...current, checks });
       setStatus('PDF ready. Human review remains pending.');
     } catch (error) {
-      if (started === revision.current)
-        setStatus(error instanceof Error ? error.message : 'PDF failed');
+      if (started === revision.current) {
+        try {
+          await refreshChecks();
+        } catch {
+          // Keep the original PDF error if the run is unavailable.
+        }
+        if (started === revision.current)
+          setStatus(error instanceof Error ? error.message : 'PDF failed');
+      }
     } finally {
       if (started === revision.current) setBusy(false);
     }
@@ -360,7 +385,7 @@ export default function App() {
                       id="status"
                       role="status"
                       aria-live="polite"
-                      className="mt-4 text-sm text-muted-foreground"
+                      className="mt-4 whitespace-pre-line text-sm text-muted-foreground"
                     >
                       {status}
                     </p>
@@ -415,7 +440,9 @@ export default function App() {
                           <li key={key}>
                             {label}:{' '}
                             {run.checks[key].status === 'not_applicable'
-                              ? 'pending'
+                              ? key === 'independentReferenceAgreement'
+                                ? 'pending, no matching reference'
+                                : 'pending'
                               : run.checks[key].status}
                           </li>
                         ))}
