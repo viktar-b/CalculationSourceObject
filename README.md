@@ -1,33 +1,23 @@
 <h1 align="center">CalculationSourceObject</h1>
 
-<p align="center"><strong>An agent writes the calculation. You review the maths.</strong></p>
-
 <p align="center">
-Describe your problem, inputs and assumptions to a coding agent.
-CalculationSourceObject turns the Python calculation into a mathematical report
-showing formulas, substitutions, units and results, ready to print as a PDF.
+  Turn Python calculations into audit-ready engineering reports with formulas, unit tracking, and verified results.
 </p>
 
 <p align="center">
-The calculation and its report share one source. Automatic consistency checks
-run before HTML or PDF publication, with no separate formula template to maintain.
+  One single source for code and documentation—automatically validated before HTML or PDF export.
 </p>
 
-Try it now with your coding agent:
+## Quickstart
 
-```text
-Run `npx create-cs-object rectangle-inertia`. Build a report for a rectangle's centroidal second moments of area with editable width and height, formulas, units and assumptions.
-```
-
-[![Python source beside its generated mathematical document, showing one rectangle calculation reused for two panels.](assets/readme-demo.png)](assets/readme-demo.png)
-
-One reusable Python function supplies the formulas and results for both panels.
-Click the image to view it at full size.
+> Run `npx create-cs-object rectangle-inertia` to generate an interactive moment-of-inertia report with custom inputs and step-by-step math.
 
 **[Explore the worked example](https://www.cs-object.com/examples)** ·
 [See the agent workflow](https://www.cs-object.com/docs)
 
 ## How it works
+
+[![Python source beside its generated mathematical document, showing one rectangle calculation reused for two panels.](assets/readme-demo.png)](assets/readme-demo.png)
 
 Whether you currently use Excel, calculation software or Python, start with the
 problem you need to solve. You can work with a coding agent or write the source
