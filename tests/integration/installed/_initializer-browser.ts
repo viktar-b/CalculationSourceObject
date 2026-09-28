@@ -26,6 +26,23 @@ export async function exerciseBrowser(options: {
       viewport: { width: 950, height: 900 },
       permissions: ['clipboard-read', 'clipboard-write'],
     });
+    const startupFailurePage = await context.newPage();
+    await startupFailurePage.route('**/api/reports', (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Catalog unavailable' }),
+      }),
+    );
+    await startupFailurePage.goto(options.origin, { waitUntil: 'networkidle' });
+    const startupError = startupFailurePage.locator('#problem');
+    await startupError.waitFor({ state: 'visible' });
+    assert.equal(await startupError.innerText(), 'Catalog unavailable');
+    assert.equal(
+      await startupFailurePage.locator('[data-slot=sheet-content]').count(),
+      0,
+    );
+    await startupFailurePage.close();
     const page = await context.newPage();
     await page.goto(options.origin, { waitUntil: 'networkidle' });
     const reportMenu = page.getByRole('button', { name: 'Choose report' });

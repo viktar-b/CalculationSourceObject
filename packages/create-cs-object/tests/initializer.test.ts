@@ -72,7 +72,7 @@ test('the installed archive creates a complete project without installing', () =
     .parse(JSON.parse(readFileSync(join(project, 'package.json'), 'utf8')));
   assert.equal(manifest.name, 'area-report');
   assert.equal(manifest.scripts.dev, 'node scripts/dev.ts');
-  assert.equal(manifest.dependencies['@cs-object/cli'], '0.1.0');
+  assert.equal(manifest.dependencies['@cs-object/cli'], '0.1.1');
   assert.equal(manifest.dependencies['@cs-object/core'], '0.1.0');
   assert.equal(manifest.dependencies['@base-ui/react'], '^1.8.0');
   assert.equal(manifest.dependencies.vite, '^8');

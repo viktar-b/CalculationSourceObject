@@ -13,6 +13,12 @@ The calculation and its report share one source. Automatic consistency checks
 run before HTML or PDF publication, with no separate formula template to maintain.
 </p>
 
+Try it now with your coding agent:
+
+```text
+Run `npx create-cs-object rectangle-inertia`. Build a report for a rectangle's centroidal second moments of area with editable width and height, formulas, units and assumptions.
+```
+
 [![Python source beside its generated mathematical document, showing one rectangle calculation reused for two panels.](assets/readme-demo.png)](assets/readme-demo.png)
 
 One reusable Python function supplies the formulas and results for both panels.

@@ -505,6 +505,15 @@ export default function App() {
       <p id="status" role="status" aria-live="polite" className="sr-only">
         {status}
       </p>
+      {problem && (
+        <p
+          id="problem"
+          role="alert"
+          className="mx-auto mt-4 max-w-3xl whitespace-pre-line rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+        >
+          {problem}
+        </p>
+      )}
       <ReportPreview htmlUrl={run?.html} />
       <Sheet
         open={activeSheet !== null}
@@ -606,15 +615,6 @@ export default function App() {
                     );
                   })}
                 </dl>
-                {problem && (
-                  <p
-                    id="problem"
-                    role="alert"
-                    className="whitespace-pre-line rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive"
-                  >
-                    {problem}
-                  </p>
-                )}
                 <section
                   aria-labelledby="parameters-title"
                   className="space-y-4"
