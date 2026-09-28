@@ -126,8 +126,9 @@ export async function artifactSet(options: {
   }[];
   readonly referencePath?: string;
   readonly name: string;
+  readonly reportId: string;
 }) {
-  const expectedBase = `/api/runs/${options.run.id}`;
+  const expectedBase = `/api/reports/${options.reportId}/runs/${options.run.id}`;
   assert.equal(options.run.html, `${expectedBase}/report.html`);
   assert.equal(options.run.pdf, `${expectedBase}/report.pdf`);
   assert.equal(options.run.evidence, `${expectedBase}/evidence.json`);
@@ -214,9 +215,7 @@ export async function artifactSet(options: {
       `Missing report row ${expected.description} [${expected.unit}]`,
     );
 
-  const summaryResponse = await fetch(
-    new URL(`/api/runs/${options.run.id}`, options.origin),
-  );
+  const summaryResponse = await fetch(new URL(expectedBase, options.origin));
   assert.equal(summaryResponse.status, 200);
   const summary = RunSchema.parse(await summaryResponse.json());
   assert.deepEqual(summary.checks, evidence.checks);

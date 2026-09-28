@@ -14,7 +14,10 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { z } from 'zod';
-import { exerciseBrowser } from './_initializer-browser.ts';
+import {
+  exerciseBrowser,
+  exerciseFailureFeedback,
+} from './_initializer-browser.ts';
 import {
   artifactSet,
   hashBytes,
@@ -157,6 +160,11 @@ try {
   });
   await closeRegistry(registry);
   registry = undefined;
+  await run({
+    cwd: join(root, 'my-report'),
+    command: 'npm',
+    args: ['run', 'build'],
+  });
 
   const project = join(root, 'my-report');
   const lock = LockSchema.parse(
@@ -196,8 +204,14 @@ try {
     environment,
     logs: root,
   });
+  const firstCatalog = z
+    .array(z.object({ id: z.string(), title: z.string() }))
+    .parse(await (await fetch(new URL('/api/reports', dev.origin))).json());
+  assert.deepEqual(firstCatalog, [
+    { id: 'rectangle-area', title: 'Rectangle area' },
+  ]);
   const definitionResponse = await fetch(
-    new URL('/api/definition', dev.origin),
+    new URL('/api/reports/rectangle-area/definition', dev.origin),
   );
   assert.equal(definitionResponse.status, 200);
   const definition = z
@@ -223,6 +237,8 @@ try {
   const syntheticDownload = join(root, 'synthetic-browser-download.pdf');
   await exerciseBrowser({
     origin: dev.origin,
+    reportId: 'rectangle-area',
+    reportTitle: 'Rectangle area',
     width: '4',
     expectedText: ['area', '12'],
     screenshot: syntheticScreenshot,
@@ -245,15 +261,19 @@ try {
           'content-type: application/json',
           '--data',
           JSON.stringify({ inputs: { width: 4, height: 3 } }),
-          `${dev.origin}/api/calculate`,
+          `${dev.origin}/api/reports/rectangle-area/calculate`,
         ],
       }),
     ),
   );
   assert.deepEqual(curl, { area: 12 });
-  const syntheticRunResponse = await postJson(dev.origin, '/api/runs', {
-    inputs: { width: 4, height: 3 },
-  });
+  const syntheticRunResponse = await postJson(
+    dev.origin,
+    '/api/reports/rectangle-area/runs',
+    {
+      inputs: { width: 4, height: 3 },
+    },
+  );
   assert.equal(syntheticRunResponse.status, 201);
   const syntheticRun = RunSchema.parse(await syntheticRunResponse.json());
   const syntheticArtifacts = await artifactSet({
@@ -264,8 +284,9 @@ try {
     outputs: { area: 12 },
     rows: [{ description: 'Rectangle area', unit: 'm^2' }],
     name: 'synthetic',
+    reportId: 'rectangle-area',
   });
-  const expiredRunPath = `/api/runs/${syntheticRun.id}`;
+  const expiredRunPath = `/api/reports/rectangle-area/runs/${syntheticRun.id}`;
   await dev.stop();
   dev = await startDev({
     project,
@@ -297,16 +318,33 @@ try {
     command: installedPython,
     args: ['-I', '-m', 'cso_python', 'bindings', calculations],
   });
-  const devScriptPath = join(project, 'scripts/dev.ts');
-  const originalDevScript = readFileSync(devScriptPath, 'utf8');
-  const twoPanelDevScript = originalDevScript
-    .replace('calculations/report.cso.py', 'calculations/estimate.cso.py')
-    .replace(
-      "'calculate',",
-      "'estimate',\n      '--reference',\n      'calculations/reference.json',",
-    );
-  assert.notEqual(twoPanelDevScript, originalDevScript);
-  writeFileSync(devScriptPath, twoPanelDevScript);
+  const reportsPath = join(project, 'reports.json');
+  const reports = z
+    .array(z.record(z.string(), z.string()))
+    .parse(JSON.parse(readFileSync(reportsPath, 'utf8')));
+  reports.push({
+    id: 'two-panel',
+    title: 'Two-panel estimate',
+    source: 'calculations/estimate.cso.py',
+    function: 'estimate',
+    reference: 'calculations/reference.json',
+  });
+  const unicodeSource = readFileSync(
+    join(calculations, 'report.cso.py'),
+    'utf8',
+  );
+  assert(unicodeSource.includes('def calculate('));
+  writeFileSync(
+    join(calculations, 'unicode.cso.py'),
+    unicodeSource.replace('def calculate(', 'def calculer_é('),
+  );
+  reports.push({
+    id: 'unicode-entry',
+    title: 'Unicode entry function',
+    source: 'calculations/unicode.cso.py',
+    function: 'calculer_é',
+  });
+  writeJson(reportsPath, reports);
 
   dev = await startDev({
     project,
@@ -314,6 +352,23 @@ try {
     environment,
     logs: root,
   });
+  const secondCatalog = z
+    .array(z.object({ id: z.string(), title: z.string() }))
+    .parse(await (await fetch(new URL('/api/reports', dev.origin))).json());
+  assert.deepEqual(
+    secondCatalog.map(({ id }) => id),
+    ['rectangle-area', 'two-panel', 'unicode-entry'],
+  );
+  const unicodeDefinition = z
+    .object({ function: z.string() })
+    .parse(
+      await (
+        await fetch(
+          new URL('/api/reports/unicode-entry/definition', dev.origin),
+        )
+      ).json(),
+    );
+  assert.equal(unicodeDefinition.function, 'calculer_é');
   const twoPanelScreenshot = join(root, 'two-panel-browser.png');
   const twoPanelDownload = join(root, 'two-panel-browser-download.pdf');
   const twoPanelInputs = {
@@ -325,6 +380,8 @@ try {
   };
   await exerciseBrowser({
     origin: dev.origin,
+    reportId: 'two-panel',
+    reportTitle: 'Two-panel estimate',
     width: '1',
     expectedText: ['area', '7', 'volume', '0.7', 'mass', '350'],
     screenshot: twoPanelScreenshot,
@@ -332,9 +389,13 @@ try {
     inputs: twoPanelInputs,
     outputs: { area: 7, volume: 0.7, mass: 350 },
   });
-  const twoPanelRunResponse = await postJson(dev.origin, '/api/runs', {
-    inputs: { width: 1 },
-  });
+  const twoPanelRunResponse = await postJson(
+    dev.origin,
+    '/api/reports/two-panel/runs',
+    {
+      inputs: { width: 1 },
+    },
+  );
   assert.equal(twoPanelRunResponse.status, 201);
   const twoPanelRun = RunSchema.parse(await twoPanelRunResponse.json());
   const twoPanelArtifacts = await artifactSet({
@@ -350,7 +411,25 @@ try {
     ],
     referencePath: join(calculations, 'reference.json'),
     name: 'two-panel',
+    reportId: 'two-panel',
   });
+  await dev.stop();
+  dev = undefined;
+
+  const source = join(calculations, 'report.cso.py');
+  const sourceText = readFileSync(source, 'utf8');
+  assert(sourceText.includes('width * height'));
+  writeFileSync(source, sourceText.replace('width * height', 'width / height'));
+  dev = await startDev({
+    project,
+    name: 'failure-feedback-dev',
+    environment: {
+      ...environment,
+      PLAYWRIGHT_BROWSERS_PATH: join(root, 'absent-browsers'),
+    },
+    logs: root,
+  });
+  await exerciseFailureFeedback(dev.origin);
   await dev.stop();
   dev = undefined;
 

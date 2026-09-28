@@ -16,8 +16,12 @@ Existing destinations are never overwritten.
 
 Use `--skip-install` to create files without installing dependencies.
 The generated project contains a synthetic rectangle calculation, an editable
-brief, reference storage, and agent-neutral authoring guidance. The CLI serves
-the browser and report API. The initializer contains no server implementation.
+brief, reference storage, and agent-neutral authoring guidance. Its editable
+React and TypeScript page uses Vite, Tailwind and the selected shadcn preset.
+`npm run dev` starts that page and the CLI calculation and report API on localhost.
+The initializer contains no calculation server implementation.
+The page's sidebar reads `reports.json`; each configured report runs through its
+own local CLI process.
 
 Package tests execute a real npm archive in a temporary consumer. Full runtime
 acceptance belongs to the repository's installed integration checks.

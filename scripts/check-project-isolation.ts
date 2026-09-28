@@ -91,11 +91,14 @@ for (const [name, relative] of [
     .looseObject({
       name: z.string(),
       dependencies: z.record(z.string(), z.string()).optional(),
+      devDependencies: z.record(z.string(), z.string()).optional(),
     })
     .parse(JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')));
   for (const [dependency, archive] of dependencies) {
     if (manifest.dependencies?.[dependency])
       manifest.dependencies[dependency] = `file:${archive}`;
+    if (manifest.devDependencies?.[dependency])
+      manifest.devDependencies[dependency] = `file:${archive}`;
   }
   writeFileSync(
     join(directory, 'package.json'),

@@ -1,0 +1,8 @@
+[
+  {
+    "id": "rectangle-area",
+    "title": "Rectangle area",
+    "source": "calculations/report.cso.py",
+    "function": "calculate"
+  }
+]
