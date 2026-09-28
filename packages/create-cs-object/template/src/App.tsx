@@ -287,7 +287,7 @@ export default function App() {
     setBusy(true);
     setStatus('Preparing PDF…');
     try {
-      const response = await fetch(apiPath(report, current.pdf));
+      const response = await fetch(current.pdf);
       if (!response.ok) await readJson(response);
       const url = URL.createObjectURL(await response.blob());
       if (started !== revision.current) {
@@ -452,11 +452,7 @@ export default function App() {
                       <a
                         id="pdf"
                         hidden={!run || busy}
-                        href={
-                          run && selected
-                            ? apiPath(selected, run.pdf)
-                            : undefined
-                        }
+                        href={run && selected ? run.pdf : undefined}
                         className={`${buttonVariants({ variant: 'default' })} [hidden]:hidden`}
                         onClick={(event) => {
                           event.preventDefault();
@@ -472,11 +468,7 @@ export default function App() {
                           run.checks.rendering.status === 'not_applicable'
                         }
                         className="text-sm underline [hidden]:hidden"
-                        href={
-                          run && selected
-                            ? apiPath(selected, run.evidence)
-                            : undefined
-                        }
+                        href={run && selected ? run.evidence : undefined}
                         download
                       >
                         Download evidence
@@ -508,7 +500,7 @@ export default function App() {
                       id="report"
                       title="Calculation report"
                       sandbox=""
-                      src={apiPath(selected, run.html)}
+                      src={run.html}
                       className="h-[1000px] w-full border bg-white"
                     />
                   ) : (
