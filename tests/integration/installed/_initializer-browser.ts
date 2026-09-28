@@ -45,6 +45,15 @@ export async function exerciseBrowser(options: {
     await startupFailurePage.close();
     const page = await context.newPage();
     await page.goto(options.origin, { waitUntil: 'networkidle' });
+    await page.setViewportSize({ width: 320, height: 700 });
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > window.innerWidth,
+      ),
+      false,
+      'The navbar must not overflow a phone-width viewport',
+    );
+    await page.setViewportSize({ width: 950, height: 900 });
     const reportMenu = page.getByRole('button', { name: 'Choose report' });
     await reportMenu.click();
     const menu = page.locator('[data-slot=dropdown-menu-content]');
@@ -106,6 +115,8 @@ export async function exerciseBrowser(options: {
     assert.equal(await page.locator('[data-slot=sheet-overlay]').count(), 0);
     await page.locator('iframe#report').waitFor({ state: 'visible' });
     assert(await page.locator('iframe#report').getAttribute('src'));
+    assert.match(await page.locator('button#pdf').innerText(), /review pending/i);
+    assert.equal(await page.locator('#checks').isVisible(), true);
     const initialReportText = await page
       .frameLocator('iframe#report')
       .locator('body')

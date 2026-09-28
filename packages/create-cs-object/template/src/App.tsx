@@ -448,7 +448,7 @@ export default function App() {
 
   return (
     <main className="min-h-screen bg-background">
-      <header className="sticky top-0 z-60 flex min-h-16 min-w-0 items-center gap-3 border-b bg-background px-4 sm:px-6">
+      <header className="sticky top-0 z-60 flex min-h-16 min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-b bg-background px-4 py-2 sm:flex-nowrap sm:px-6 sm:py-0">
         <span className="shrink-0 font-heading text-lg font-semibold">CSO</span>
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -457,7 +457,7 @@ export default function App() {
                 variant="ghost"
                 aria-label="Choose report"
                 disabled={reports.length === 0}
-                className="min-w-0 max-w-[min(42vw,24rem)] justify-between gap-2"
+                className="min-w-0 max-w-[calc(100vw-6rem)] justify-between gap-2 sm:max-w-[min(42vw,24rem)]"
               />
             }
           >
@@ -486,7 +486,7 @@ export default function App() {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
+        <div className="ml-auto flex w-full items-center justify-end gap-2 sm:w-auto sm:shrink-0">
           <Button variant="ghost" onClick={() => setActiveSheet('api')}>
             API
           </Button>
@@ -498,7 +498,9 @@ export default function App() {
             disabled={!run || busy}
             onClick={() => void downloadPdf()}
           >
-            PDF
+            {run?.checks.visualInspection.status === 'pending'
+              ? 'PDF · review pending'
+              : 'PDF'}
           </Button>
         </div>
       </header>
@@ -514,6 +516,31 @@ export default function App() {
           {problem}
         </p>
       )}
+      <dl
+        id="checks"
+        aria-label="Verification status"
+        className="flex flex-wrap gap-x-5 gap-y-1 border-b px-4 py-2 text-xs sm:px-6"
+      >
+        {visibleChecks.map(([key, label]) => {
+          const value = run?.checks[key].status;
+          return (
+            <div key={key} className="flex items-baseline gap-1">
+              <dt className="text-muted-foreground">{label}</dt>
+              <dd
+                className={
+                  value === 'passed'
+                    ? 'font-medium text-primary'
+                    : value === 'failed'
+                      ? 'font-medium text-destructive'
+                      : 'text-muted-foreground'
+                }
+              >
+                {checkText(value)}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
       <ReportPreview htmlUrl={run?.html} />
       <Sheet
         open={activeSheet !== null}
@@ -526,7 +553,7 @@ export default function App() {
         <SheetContent
           side="right"
           showOverlay={false}
-          className="top-16! h-[calc(100dvh-4rem)]! w-[min(92vw,24rem)]"
+          className="top-24! h-[calc(100dvh-6rem)]! w-[min(92vw,24rem)] sm:top-16! sm:h-[calc(100dvh-4rem)]!"
         >
           <SheetHeader className="shrink-0 border-b pr-14">
             <SheetTitle>
@@ -591,30 +618,6 @@ export default function App() {
               </section>
             ) : (
               <>
-                <dl
-                  id="checks"
-                  className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-2 border-b pb-5 text-xs"
-                >
-                  {visibleChecks.map(([key, label]) => {
-                    const value = run?.checks[key].status;
-                    return (
-                      <div key={key} className="contents">
-                        <dt className="text-muted-foreground">{label}</dt>
-                        <dd
-                          className={
-                            value === 'passed'
-                              ? 'font-medium text-primary'
-                              : value === 'failed'
-                                ? 'font-medium text-destructive'
-                                : 'text-muted-foreground'
-                          }
-                        >
-                          {checkText(value)}
-                        </dd>
-                      </div>
-                    );
-                  })}
-                </dl>
                 <section
                   aria-labelledby="parameters-title"
                   className="space-y-4"
