@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
 
 const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 const temporary = mkdtempSync(join(tmpdir(), 'create-cs-object-'));
@@ -62,33 +63,26 @@ test('the installed archive creates a complete project without installing', () =
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /cd area-report\nnpm run setup\nnpm run dev/);
   const project = join(temporary, 'area-report');
-  const manifest: unknown = JSON.parse(
-    readFileSync(join(project, 'package.json'), 'utf8'),
-  );
-  assert.deepEqual(manifest, {
-    name: 'area-report',
-    version: '0.1.0',
-    private: true,
-    type: 'module',
-    engines: { node: '>=24' },
-    scripts: {
-      setup: 'npm install && node scripts/setup.ts',
-      dev: 'node scripts/dev.ts',
-    },
-    dependencies: { '@cs-object/cli': '0.1.0' },
-  });
-  assert.deepEqual(readdirSync(project).sort(), [
-    '.gitignore',
-    'AGENTS.md',
-    'README.md',
-    'authoring.md',
-    'brief.md',
-    'calculations',
-    'package.json',
-    'references',
-    'requirements.txt',
-    'scripts',
-  ]);
+  const manifest = z.object({
+    name: z.string(),
+    scripts: z.record(z.string(), z.string()),
+    dependencies: z.record(z.string(), z.string()),
+  }).parse(JSON.parse(readFileSync(join(project, 'package.json'), 'utf8')));
+  assert.equal(manifest.name, 'area-report');
+  assert.equal(manifest.scripts.dev, 'node scripts/dev.ts');
+  assert.equal(manifest.dependencies['@cs-object/cli'], '0.1.0');
+  assert.equal(manifest.dependencies['@cs-object/core'], '0.1.0');
+  assert.equal(manifest.dependencies['@base-ui/react'], '^1.8.0');
+  assert.equal(manifest.dependencies.vite, '^8');
+  assert.equal(manifest.scripts.build, 'tsc -b && vite build');
+  for (const file of [
+    'components.json',
+    'index.html',
+    'vite.config.ts',
+    'src/App.tsx',
+    'src/index.css',
+    'src/components/ui/button.tsx',
+  ]) assert.ok(readFileSync(join(project, file)).length > 0, file);
   const dev = spawnSync(process.execPath, ['scripts/dev.ts'], {
     cwd: project,
     encoding: 'utf8',

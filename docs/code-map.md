@@ -35,7 +35,12 @@ The [CLI entry point](../packages/cso-cli/src/cli.ts) separates verified command
 from `dev-export` and `dev-render`. The local `cso dev` command uses the
 [server](../packages/cso-cli/src/dev-server.ts) to validate requests and the
 [runtime](../packages/cso-cli/src/dev-runtime.ts) to retain verified runs.
-The [browser UI](../packages/cso-cli/src/dev-ui.ts) edits declared inputs.
+The standalone [CLI browser UI](../packages/cso-cli/src/dev-ui.ts) edits declared
+inputs. Generated projects instead use their owned
+[React page](../packages/create-cs-object/template/src/App.tsx), with
+[Vite](../packages/create-cs-object/template/vite.config.ts) proxying `/api` to
+`cso dev`; [their launcher](../packages/create-cs-object/template/scripts/dev.ts)
+starts both local processes.
 The [legacy exporter](../packages/cso-python/src/cso_python/exporter.py)
 still serves older single-file sources. Development output is not verification.
 
@@ -51,8 +56,9 @@ package and creates user projects outside this repository.
 - React owns preparation, MathML rendering and engineering presentation.
   It receives captured assets; it does not execute calculations or fetch files.
 - CLI owns process and filesystem access, reports, asset policy and HTML/PDF publication.
-- Initializer owns its synthetic project template and setup scripts; it delegates the
-  local app to the installed CLI. [Fresh-project acceptance](../tests/integration/installed/initializer-acceptance.ts)
+- Initializer owns its synthetic project template, editable browser UI and setup scripts;
+  it delegates calculation, verification and report routes to the installed CLI.
+  [Fresh-project acceptance](../tests/integration/installed/initializer-acceptance.ts)
   exercises published-style dependencies through actual archives.
 - Demo consumes packages and explicit data directories through its
   [workspace launcher](../scripts/demo.ts). Root [example preparation](../scripts/prepare-demo-examples.ts)

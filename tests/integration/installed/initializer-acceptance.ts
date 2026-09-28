@@ -157,6 +157,7 @@ try {
   });
   await closeRegistry(registry);
   registry = undefined;
+  await run({ cwd: join(root, 'my-report'), command: 'npm', args: ['run', 'build'] });
 
   const project = join(root, 'my-report');
   const lock = LockSchema.parse(
