@@ -1,30 +1,24 @@
 import {
-  CalculationDefinitionSchema,
   type CalculationDefinition,
+  CalculationDefinitionSchema,
 } from '@cs-object/core';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
-import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
-  useSidebar,
-} from '@/components/ui/sidebar';
-import { TooltipProvider } from '@/components/ui/tooltip';
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 
 const CatalogSchema = z.array(z.object({ id: z.string(), title: z.string() }));
 type Report = z.infer<typeof CatalogSchema>[number];
@@ -99,47 +93,158 @@ function requestBody(
   return `{"inputs":{${entries.join(',')}}}`;
 }
 
-function ReportSidebar({
-  reports,
-  selected,
-  onSelect,
-}: {
-  reports: Report[];
-  selected?: Report;
-  onSelect: (report: Report) => void;
-}) {
-  const { setOpenMobile } = useSidebar();
+type ShellFragment = {
+  text: string;
+  kind: 'command' | 'option' | 'url' | 'string' | 'plain';
+};
+
+const syntaxColor = {
+  command: 'font-semibold text-primary',
+  option: 'text-sky-700 dark:text-sky-300',
+  url: 'text-violet-700 dark:text-violet-300',
+  string: 'text-amber-700 dark:text-amber-300',
+  plain: 'text-foreground',
+} satisfies Record<ShellFragment['kind'], string>;
+
+function curlPreview(
+  report: Report | undefined,
+  definition: CalculationDefinition | undefined,
+  values: Record<string, string>,
+):
+  | { kind: 'ready'; command: string; fragments: ShellFragment[] }
+  | { kind: 'unavailable'; message: string } {
+  if (!report || !definition)
+    return {
+      kind: 'unavailable',
+      message: 'Load a report to show the command.',
+    };
+  try {
+    const body = requestBody(definition, values).replaceAll("'", "'\\''");
+    const fragments: ShellFragment[] = [
+      { kind: 'command', text: 'curl' },
+      { kind: 'plain', text: ' ' },
+      { kind: 'option', text: '-sS --fail-with-body' },
+      { kind: 'plain', text: ' \\\n  ' },
+      {
+        kind: 'url',
+        text: `${location.origin}${apiPath(report, '/api/calculate')}`,
+      },
+      { kind: 'plain', text: ' \\\n  ' },
+      { kind: 'option', text: '-H' },
+      { kind: 'plain', text: ' ' },
+      { kind: 'string', text: "'Content-Type: application/json'" },
+      { kind: 'plain', text: ' \\\n  ' },
+      { kind: 'option', text: '-d' },
+      { kind: 'plain', text: ' ' },
+      { kind: 'string', text: `'${body}'` },
+    ];
+    return {
+      kind: 'ready',
+      command: fragments.map(({ text }) => text).join(''),
+      fragments,
+    };
+  } catch {
+    return {
+      kind: 'unavailable',
+      message: 'Enter valid input values to show the command.',
+    };
+  }
+}
+
+const visibleChecks = [
+  ['sourceToDocumentConsistency', 'Source-to-document'],
+  ['independentReferenceAgreement', 'Independent reference'],
+  ['rendering', 'PDF layout'],
+  ['visualInspection', 'Human inspection'],
+] as const satisfies ReadonlyArray<readonly [keyof Run['checks'], string]>;
+
+function checkText(status: string | undefined): string {
+  if (status === undefined) return 'Not run';
+  if (status === 'passed') return 'Passed';
+  if (status === 'failed') return 'Failed';
+  if (status === 'pending' || status === 'not_applicable') return 'WIP';
+  return status;
+}
+
+const previewStyles = `
+  @media screen {
+    html, body { min-height: 100%; background: #fff; }
+    body.cso-standalone-report [data-formula-sheet-print-root] {
+      box-sizing: border-box;
+      width: 100%;
+      min-height: 141.4286vw;
+      margin: 0;
+      padding: 10mm;
+      background: #fff;
+    }
+    body.cso-standalone-report [data-formula-sheet] {
+      box-sizing: border-box;
+      width: 100%;
+      min-width: 0;
+      padding: 0;
+      margin: 0;
+    }
+  }
+`;
+
+function ReportPreview({ htmlUrl }: { htmlUrl?: string }) {
+  const [html, setHtml] = useState<string>();
+  const [error, setError] = useState<string>();
+
+  useEffect(() => {
+    if (!htmlUrl) {
+      setHtml(undefined);
+      setError(undefined);
+      return;
+    }
+    const controller = new AbortController();
+    setHtml(undefined);
+    setError(undefined);
+    void (async () => {
+      try {
+        const response = await fetch(htmlUrl, { signal: controller.signal });
+        if (!response.ok)
+          throw new Error(`Preview failed (${response.status})`);
+        const document = new DOMParser().parseFromString(
+          await response.text(),
+          'text/html',
+        );
+        const style = document.createElement('style');
+        style.textContent = previewStyles;
+        document.head.append(style);
+        if (!controller.signal.aborted)
+          setHtml(`<!doctype html>${document.documentElement.outerHTML}`);
+      } catch (cause) {
+        if (!controller.signal.aborted)
+          setError(cause instanceof Error ? cause.message : 'Preview failed');
+      }
+    })();
+    return () => controller.abort();
+  }, [htmlUrl]);
+
   return (
-    <Sidebar collapsible="offcanvas">
-      <SidebarHeader className="border-b p-4">
-        <p className="font-mono text-xs uppercase tracking-widest text-sidebar-foreground/65">
-          CalculationSourceObject
-        </p>
-        <p className="font-heading text-lg font-semibold">Reports</p>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Runnable calculations</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {reports.map((report) => (
-                <SidebarMenuItem key={report.id}>
-                  <SidebarMenuButton
-                    isActive={selected?.id === report.id}
-                    onClick={() => {
-                      onSelect(report);
-                      setOpenMobile(false);
-                    }}
-                  >
-                    <span className="truncate">{report.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-    </Sidebar>
+    <section
+      aria-label="Formula sheet preview"
+      className="flex min-h-[calc(100dvh-4rem)] min-w-0 justify-center overflow-x-auto bg-muted/40 p-4 sm:p-8"
+    >
+      {html ? (
+        <iframe
+          id="report"
+          title="Formula sheet"
+          sandbox=""
+          src={htmlUrl}
+          srcDoc={html}
+          className="block aspect-[210/297] h-auto w-full max-w-[794px] shrink-0 border-0 bg-white shadow-lg"
+        />
+      ) : (
+        <div className="flex min-h-[600px] items-center text-sm text-muted-foreground">
+          {error ??
+            (htmlUrl
+              ? 'Loading formula sheet…'
+              : 'Calculate to preview the report.')}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -150,17 +255,25 @@ export default function App() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [run, setRun] = useState<Run>();
   const [status, setStatus] = useState('Loading calculation…');
+  const [problem, setProblem] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [activeSheet, setActiveSheet] = useState<'inputs' | 'api' | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<{
+    kind: 'copied' | 'failed';
+    command: string;
+  }>();
   const revision = useRef(0);
-  const curl = (() => {
-    if (!definition || !selected) return '';
+  const curl = curlPreview(selected, definition, values);
+
+  async function copyCurl() {
+    if (curl.kind !== 'ready') return;
     try {
-      const body = requestBody(definition, values).replaceAll("'", "'\\''");
-      return `curl -sS --fail-with-body ${location.origin}${apiPath(selected, '/api/calculate')} -H 'Content-Type: application/json' -d '${body}'`;
+      await navigator.clipboard.writeText(curl.command);
+      setCopyFeedback({ kind: 'copied', command: curl.command });
     } catch {
-      return 'Enter input values to show the request.';
+      setCopyFeedback({ kind: 'failed', command: curl.command });
     }
-  })();
+  }
 
   async function calculate(
     report: Report,
@@ -171,6 +284,7 @@ export default function App() {
     setBusy(true);
     setRun(undefined);
     setStatus('Calculating…');
+    setProblem(undefined);
     try {
       const next = RunSchema.parse(
         await readJson(
@@ -185,10 +299,12 @@ export default function App() {
       setRun(next);
       setStatus('Report ready. Review its assumptions and results.');
     } catch (error) {
-      if (started === revision.current)
-        setStatus(
-          error instanceof Error ? error.message : 'Calculation failed',
-        );
+      if (started === revision.current) {
+        const message =
+          error instanceof Error ? error.message : 'Calculation failed';
+        setStatus(message);
+        setProblem(message);
+      }
     } finally {
       if (started === revision.current) setBusy(false);
     }
@@ -204,13 +320,17 @@ export default function App() {
         if (!active) return;
         setReports(catalog);
         setSelected(catalog[0]);
-        if (catalog.length === 0)
+        if (catalog.length === 0) {
           setStatus('No runnable reports are configured.');
+          setProblem('No runnable reports are configured.');
+        }
       } catch (error) {
-        if (active)
-          setStatus(
-            error instanceof Error ? error.message : 'Cannot load report list',
-          );
+        if (active) {
+          const message =
+            error instanceof Error ? error.message : 'Cannot load report list';
+          setStatus(message);
+          setProblem(message);
+        }
       }
     })();
     return () => {
@@ -227,6 +347,7 @@ export default function App() {
     setRun(undefined);
     setBusy(false);
     setStatus(`Loading ${selected.title}…`);
+    setProblem(undefined);
     void (async () => {
       try {
         const parsed = CalculationDefinitionSchema.parse(
@@ -245,10 +366,12 @@ export default function App() {
         if (parsed.inputs.every((input) => input.default !== undefined))
           void calculate(selected, parsed, defaults);
       } catch (error) {
-        if (active)
-          setStatus(
-            error instanceof Error ? error.message : 'Cannot load calculation',
-          );
+        if (active) {
+          const message =
+            error instanceof Error ? error.message : 'Cannot load calculation';
+          setStatus(message);
+          setProblem(message);
+        }
       }
     })();
     return () => {
@@ -267,6 +390,7 @@ export default function App() {
     setRun(undefined);
     setBusy(false);
     setStatus('Inputs changed. Calculate again to update the report.');
+    setProblem(undefined);
   }
   async function downloadPdf() {
     if (!run || !selected) return;
@@ -286,6 +410,7 @@ export default function App() {
     };
     setBusy(true);
     setStatus('Preparing PDF…');
+    setProblem(undefined);
     try {
       const response = await fetch(current.pdf);
       if (!response.ok) await readJson(response);
@@ -309,8 +434,12 @@ export default function App() {
         } catch {
           // Keep the original PDF error if the run is unavailable.
         }
-        if (started === revision.current)
-          setStatus(error instanceof Error ? error.message : 'PDF failed');
+        if (started === revision.current) {
+          const message = error instanceof Error ? error.message : 'PDF failed';
+          setStatus(message);
+          setProblem(message);
+          setActiveSheet('inputs');
+        }
       }
     } finally {
       if (started === revision.current) setBusy(false);
@@ -318,202 +447,235 @@ export default function App() {
   }
 
   return (
-    <TooltipProvider>
-      <SidebarProvider>
-        <ReportSidebar
-          reports={reports}
-          selected={selected}
-          onSelect={setSelected}
-        />
-        <SidebarInset>
-          <main className="mx-auto w-full max-w-[1600px] min-w-0 space-y-5 p-4 md:p-6 xl:p-8">
-            <header className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <SidebarTrigger />
-                <div className="min-w-0">
-                  <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                    CalculationSourceObject
-                  </p>
-                  <h1 className="truncate font-heading text-2xl font-semibold md:text-3xl">
-                    {selected?.title ?? 'Calculation report'}
-                  </h1>
-                </div>
-              </div>
-              <Badge variant="secondary">Local project</Badge>
-            </header>
-            <div className="grid min-w-0 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-              <div className="space-y-5">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Inputs</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <form id="inputs" onSubmit={onSubmit} className="space-y-4">
-                      <div id="fields" className="space-y-4">
-                        {definition?.inputs.map((input) => (
-                          <div key={input.name} className="space-y-2">
-                            <Label htmlFor={`input-${input.name}`}>
-                              {input.description}{' '}
-                              {input.unit && `(${input.unit})`}
-                            </Label>
-                            <p className="font-mono text-xs text-muted-foreground">
-                              {input.name}
-                            </p>
-                            <Input
-                              id={`input-${input.name}`}
-                              name={input.name}
-                              type="number"
-                              step={input.numericType === 'int' ? '1' : 'any'}
-                              required
-                              value={values[input.name] ?? ''}
-                              onChange={(event) =>
-                                edit(input.name, event.target.value)
-                              }
-                            />
-                          </div>
-                        ))}
-                      </div>
-                      <Button
-                        id="calculate"
-                        type="submit"
-                        disabled={!definition || busy}
-                      >
-                        Calculate
-                      </Button>
-                    </form>
-                    <p
-                      id="status"
-                      role="status"
-                      aria-live="polite"
-                      className="mt-4 whitespace-pre-line text-sm text-muted-foreground"
-                    >
-                      {status}
-                    </p>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Reload after changing the Python input definitions.
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Outputs</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <dl
-                      id="outputs"
-                      className="grid grid-cols-[1fr_auto] gap-2 text-sm"
-                    >
-                      {run &&
-                        Object.entries(run.outputs).map(([name, value]) => {
-                          const output = definition?.outputs.find(
-                            (item) => item.name === name,
-                          );
-                          return (
-                            <div key={name} className="contents">
-                              <dt>{name}</dt>
-                              <dd className="font-mono text-right">
-                                {numericText(value)} {output?.unit}
-                              </dd>
-                            </div>
-                          );
-                        })}
-                    </dl>
-                    {run && (
-                      <ul
-                        id="checks"
-                        className="space-y-1 text-xs text-muted-foreground"
-                      >
-                        {(
-                          [
-                            [
-                              'sourceToDocumentConsistency',
-                              'Source-to-document consistency',
-                            ],
-                            [
-                              'independentReferenceAgreement',
-                              'Independent reference agreement',
-                            ],
-                            ['rendering', 'PDF layout'],
-                            ['visualInspection', 'Human visual inspection'],
-                          ] as const
-                        ).map(([key, label]) => (
-                          <li key={key}>
-                            {label}:{' '}
-                            {run.checks[key].status === 'not_applicable'
-                              ? key === 'independentReferenceAgreement'
-                                ? 'pending, no matching reference'
-                                : 'pending'
-                              : run.checks[key].status}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <a
-                        id="pdf"
-                        hidden={!run || busy}
-                        href={run && selected ? run.pdf : undefined}
-                        className={`${buttonVariants({ variant: 'default' })} [hidden]:hidden`}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          void downloadPdf();
-                        }}
-                      >
-                        Download PDF
-                      </a>
-                      <a
-                        id="evidence"
-                        hidden={
-                          !run ||
-                          run.checks.rendering.status === 'not_applicable'
-                        }
-                        className="text-sm underline [hidden]:hidden"
-                        href={run && selected ? run.evidence : undefined}
-                        download
-                      >
-                        Download evidence
-                      </a>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Calculate with curl</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <pre
-                      id="curl"
-                      className="overflow-auto whitespace-pre-wrap break-all rounded bg-muted p-3 font-mono text-xs"
-                    >
-                      {curl}
-                    </pre>
-                  </CardContent>
-                </Card>
-              </div>
-              <Card className="min-w-0">
-                <CardHeader>
-                  <CardTitle>Report preview</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {run && selected ? (
-                    <iframe
-                      id="report"
-                      title="Calculation report"
-                      sandbox=""
-                      src={run.html}
-                      className="h-[1000px] w-full border bg-white"
-                    />
-                  ) : (
-                    <div className="flex min-h-[600px] items-center justify-center text-sm text-muted-foreground">
-                      Calculate to preview the report.
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+    <main className="min-h-screen bg-background">
+      <header className="sticky top-0 z-60 flex min-h-16 min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-b bg-background px-4 py-2 sm:flex-nowrap sm:px-6 sm:py-0">
+        <span className="shrink-0 font-heading text-lg font-semibold">CSO</span>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                aria-label="Choose report"
+                disabled={reports.length === 0}
+                className="min-w-0 max-w-[calc(100vw-6rem)] justify-between gap-2 sm:max-w-[min(42vw,24rem)]"
+              />
+            }
+          >
+            <span className="truncate">
+              {selected?.title ?? 'Select report'}
+            </span>
+            <span aria-hidden="true" className="text-muted-foreground">
+              ⌄
+            </span>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="start"
+            sideOffset={16}
+            className="w-max! min-w-64! max-w-[calc(100vw-2rem)] bg-popover!"
+          >
+            {reports.map((report) => (
+              <DropdownMenuItem
+                key={report.id}
+                onClick={() => {
+                  setSelected(report);
+                  setActiveSheet(null);
+                }}
+              >
+                {report.title}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <div className="ml-auto flex w-full items-center justify-end gap-2 sm:w-auto sm:shrink-0">
+          <Button variant="ghost" onClick={() => setActiveSheet('api')}>
+            API
+          </Button>
+          <Button variant="outline" onClick={() => setActiveSheet('inputs')}>
+            Inputs
+          </Button>
+          <Button
+            id="pdf"
+            disabled={!run || busy}
+            onClick={() => void downloadPdf()}
+          >
+            {run?.checks.visualInspection.status === 'pending'
+              ? 'PDF · review pending'
+              : 'PDF'}
+          </Button>
+        </div>
+      </header>
+      <p id="status" role="status" aria-live="polite" className="sr-only">
+        {status}
+      </p>
+      {problem && (
+        <p
+          id="problem"
+          role="alert"
+          className="mx-auto mt-4 max-w-3xl whitespace-pre-line rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+        >
+          {problem}
+        </p>
+      )}
+      <dl
+        id="checks"
+        aria-label="Verification status"
+        className="flex flex-wrap gap-x-5 gap-y-1 border-b px-4 py-2 text-xs sm:px-6"
+      >
+        {visibleChecks.map(([key, label]) => {
+          const value = run?.checks[key].status;
+          return (
+            <div key={key} className="flex items-baseline gap-1">
+              <dt className="text-muted-foreground">{label}</dt>
+              <dd
+                className={
+                  value === 'passed'
+                    ? 'font-medium text-primary'
+                    : value === 'failed'
+                      ? 'font-medium text-destructive'
+                      : 'text-muted-foreground'
+                }
+              >
+                {checkText(value)}
+              </dd>
             </div>
-          </main>
-        </SidebarInset>
-      </SidebarProvider>
-    </TooltipProvider>
+          );
+        })}
+      </dl>
+      <ReportPreview htmlUrl={run?.html} />
+      <Sheet
+        open={activeSheet !== null}
+        onOpenChange={(open) => {
+          if (!open) setActiveSheet(null);
+        }}
+        modal={false}
+        disablePointerDismissal
+      >
+        <SheetContent
+          side="right"
+          showOverlay={false}
+          className="top-24! h-[calc(100dvh-6rem)]! w-[min(92vw,24rem)] sm:top-16! sm:h-[calc(100dvh-4rem)]!"
+        >
+          <SheetHeader className="shrink-0 border-b pr-14">
+            <SheetTitle>
+              {activeSheet === 'api' ? 'API details' : 'Inputs'}
+            </SheetTitle>
+          </SheetHeader>
+          <div
+            id="calculation-sheet-scroll"
+            className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5"
+          >
+            {activeSheet === 'api' ? (
+              <section aria-label="Terminal command" className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Run this command in your terminal. The response contains only
+                  the calculation outputs.
+                </p>
+                <div className="overflow-hidden rounded-md border bg-muted/30">
+                  <div className="flex items-center justify-between border-b px-3 py-2">
+                    <span className="font-mono text-xs text-muted-foreground">
+                      bash
+                    </span>
+                    <Button
+                      id="copy-curl"
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={curl.kind !== 'ready'}
+                      onClick={() => void copyCurl()}
+                    >
+                      {curl.kind === 'ready' &&
+                      copyFeedback?.command === curl.command
+                        ? copyFeedback.kind === 'copied'
+                          ? 'Copied'
+                          : 'Retry copy'
+                        : 'Copy'}
+                    </Button>
+                  </div>
+                  <pre
+                    id="curl"
+                    className="whitespace-pre-wrap break-all px-3 py-4 font-mono text-xs leading-6"
+                  >
+                    {curl.kind === 'ready'
+                      ? curl.fragments.map((fragment, index) => (
+                          <span
+                            key={`${fragment.kind}-${index}`}
+                            data-syntax={fragment.kind}
+                            className={syntaxColor[fragment.kind]}
+                          >
+                            {fragment.text}
+                          </span>
+                        ))
+                      : curl.message}
+                  </pre>
+                </div>
+                {curl.kind === 'ready' &&
+                  copyFeedback?.command === curl.command &&
+                  copyFeedback.kind === 'failed' && (
+                    <p role="alert" className="text-xs text-destructive">
+                      Copy failed. Select the command to copy it manually.
+                    </p>
+                  )}
+              </section>
+            ) : (
+              <>
+                <section
+                  aria-labelledby="parameters-title"
+                  className="space-y-4"
+                >
+                  <h2
+                    id="parameters-title"
+                    className="font-heading text-sm font-medium"
+                  >
+                    Parameters
+                  </h2>
+                  <form id="inputs" onSubmit={onSubmit} className="space-y-4">
+                    <div id="fields" className="space-y-4">
+                      {definition?.inputs.map((input) => (
+                        <div key={input.name} className="space-y-2">
+                          <Label htmlFor={`input-${input.name}`}>
+                            {input.description}{' '}
+                            {input.unit && `(${input.unit})`}
+                          </Label>
+                          <Input
+                            id={`input-${input.name}`}
+                            name={input.name}
+                            type="number"
+                            step={input.numericType === 'int' ? '1' : 'any'}
+                            required
+                            value={values[input.name] ?? ''}
+                            onChange={(event) =>
+                              edit(input.name, event.target.value)
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      id="calculate"
+                      type="submit"
+                      className="w-full"
+                      disabled={!definition || busy}
+                    >
+                      {busy ? 'Calculating…' : 'Calculate'}
+                    </Button>
+                  </form>
+                </section>
+                <a
+                  id="evidence"
+                  hidden={
+                    !run || run.checks.rendering.status === 'not_applicable'
+                  }
+                  className="text-xs text-muted-foreground underline [hidden]:hidden"
+                  href={run && selected ? run.evidence : undefined}
+                  download
+                >
+                  Download evidence
+                </a>
+              </>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+    </main>
   );
 }

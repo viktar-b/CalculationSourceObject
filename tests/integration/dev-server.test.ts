@@ -123,8 +123,8 @@ test('retains original HTML and memoizes same-capture PDFs after a source change
   expect(response.status).toBe(201);
   const run = runSchema.parse(await response.json());
   const html = await (await fetch(server.origin + run.html)).text();
-  expect(html).toContain('Human visual inspection is pending');
-  expect(html).toContain('Independent numerical reference: pending');
+  expect(html).toContain('Rectangle area');
+  expect(html).not.toContain('data-cso-review-notice');
   writeFileSync(
     source,
     calculation.replace('width * height', 'width + height'),
