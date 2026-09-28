@@ -63,11 +63,13 @@ test('the installed archive creates a complete project without installing', () =
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /cd area-report\nnpm run setup\nnpm run dev/);
   const project = join(temporary, 'area-report');
-  const manifest = z.object({
-    name: z.string(),
-    scripts: z.record(z.string(), z.string()),
-    dependencies: z.record(z.string(), z.string()),
-  }).parse(JSON.parse(readFileSync(join(project, 'package.json'), 'utf8')));
+  const manifest = z
+    .object({
+      name: z.string(),
+      scripts: z.record(z.string(), z.string()),
+      dependencies: z.record(z.string(), z.string()),
+    })
+    .parse(JSON.parse(readFileSync(join(project, 'package.json'), 'utf8')));
   assert.equal(manifest.name, 'area-report');
   assert.equal(manifest.scripts.dev, 'node scripts/dev.ts');
   assert.equal(manifest.dependencies['@cs-object/cli'], '0.1.0');
@@ -82,7 +84,21 @@ test('the installed archive creates a complete project without installing', () =
     'src/App.tsx',
     'src/index.css',
     'src/components/ui/button.tsx',
-  ]) assert.ok(readFileSync(join(project, file)).length > 0, file);
+    'src/components/ui/sidebar.tsx',
+    'reports.json',
+  ])
+    assert.ok(readFileSync(join(project, file)).length > 0, file);
+  assert.deepEqual(
+    JSON.parse(readFileSync(join(project, 'reports.json'), 'utf8')),
+    [
+      {
+        id: 'rectangle-area',
+        title: 'Rectangle area',
+        source: 'calculations/report.cso.py',
+        function: 'calculate',
+      },
+    ],
+  );
   const dev = spawnSync(process.execPath, ['scripts/dev.ts'], {
     cwd: project,
     encoding: 'utf8',
@@ -157,7 +173,10 @@ test('automatic installation failure preserves the project and gives a recovery 
   assert.match(result.stderr, /Your project remains at/);
   assert.match(result.stderr, /Run npm run setup in that directory to retry/);
   assert.match(
-    readFileSync(join(temporary, 'retry-report/calculations/report.cso.py'), 'utf8'),
+    readFileSync(
+      join(temporary, 'retry-report/calculations/report.cso.py'),
+      'utf8',
+    ),
     /def calculate\(/,
   );
 });

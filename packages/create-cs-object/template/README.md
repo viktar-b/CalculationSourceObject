@@ -21,6 +21,14 @@ The input fields still come from the Python definition; page edits do not change
 the calculation or API validation. `npm run build` checks and builds the Vite
 frontend, but the local API and PDF routes still require `npm run dev`.
 
+The left sidebar lists runnable reports from [reports.json](reports.json).
+To add one, put its `.cso.py` source under `calculations/` and add an entry with
+a unique URL-safe `id`, a display `title`, the relative `source` path and its
+entry `function`. Add `reference` when the report has an independent numerical
+reference file. Restart `npm run dev` after editing the list. Each entry gets
+its own verified local API at `/api/reports/<id>/`; the sidebar switches between
+them without changing the input or report UI code.
+
 To choose a port, run `npm run dev -- --port 4173`. Use port `0` to select an
 available port. Stop the server with Ctrl+C and use the same command to restart.
 

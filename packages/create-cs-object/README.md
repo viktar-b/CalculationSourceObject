@@ -20,6 +20,8 @@ brief, reference storage, and agent-neutral authoring guidance. Its editable
 React and TypeScript page uses Vite, Tailwind and the selected shadcn preset.
 `npm run dev` starts that page and the CLI calculation and report API on localhost.
 The initializer contains no calculation server implementation.
+The page's sidebar reads `reports.json`; each configured report runs through its
+own local CLI process.
 
 Package tests execute a real npm archive in a temporary consumer. Full runtime
 acceptance belongs to the repository's installed integration checks.

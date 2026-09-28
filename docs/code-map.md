@@ -40,7 +40,8 @@ inputs. Generated projects instead use their owned
 [React page](../packages/create-cs-object/template/src/App.tsx), with
 [Vite](../packages/create-cs-object/template/vite.config.ts) proxying `/api` to
 `cso dev`; [their launcher](../packages/create-cs-object/template/scripts/dev.ts)
-starts both local processes.
+starts Vite and one CLI process for each entry in
+[the report registry](../packages/create-cs-object/template/reports.json).
 The [legacy exporter](../packages/cso-python/src/cso_python/exporter.py)
 still serves older single-file sources. Development output is not verification.
 

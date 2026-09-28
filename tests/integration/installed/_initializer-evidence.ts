@@ -126,14 +126,21 @@ export async function artifactSet(options: {
   }[];
   readonly referencePath?: string;
   readonly name: string;
+  readonly reportId?: string;
 }) {
   const expectedBase = `/api/runs/${options.run.id}`;
+  const route = (path: string) =>
+    options.reportId
+      ? path.replace('/api/', `/api/reports/${options.reportId}/`)
+      : path;
   assert.equal(options.run.html, `${expectedBase}/report.html`);
   assert.equal(options.run.pdf, `${expectedBase}/report.pdf`);
   assert.equal(options.run.evidence, `${expectedBase}/evidence.json`);
   assertOutputs(options.run.outputs, options.outputs);
 
-  const htmlResponse = await fetch(new URL(options.run.html, options.origin));
+  const htmlResponse = await fetch(
+    new URL(route(options.run.html), options.origin),
+  );
   assert.equal(htmlResponse.status, 200);
   assert.match(htmlResponse.headers.get('content-type') ?? '', /^text\/html/);
   const htmlBytes = new Uint8Array(await htmlResponse.arrayBuffer());
@@ -141,7 +148,9 @@ export async function artifactSet(options: {
   for (const name of Object.keys(options.outputs))
     assert.match(html, new RegExp(name, 'i'));
 
-  const pdfResponse = await fetch(new URL(options.run.pdf, options.origin));
+  const pdfResponse = await fetch(
+    new URL(route(options.run.pdf), options.origin),
+  );
   assert.equal(pdfResponse.status, 200);
   assert.match(
     pdfResponse.headers.get('content-type') ?? '',
@@ -155,7 +164,7 @@ export async function artifactSet(options: {
   );
 
   const evidenceResponse = await fetch(
-    new URL(options.run.evidence, options.origin),
+    new URL(route(options.run.evidence), options.origin),
   );
   assert.equal(evidenceResponse.status, 200);
   const evidence = EvidenceSchema.parse(await evidenceResponse.json());
@@ -215,7 +224,7 @@ export async function artifactSet(options: {
     );
 
   const summaryResponse = await fetch(
-    new URL(`/api/runs/${options.run.id}`, options.origin),
+    new URL(route(`/api/runs/${options.run.id}`), options.origin),
   );
   assert.equal(summaryResponse.status, 200);
   const summary = RunSchema.parse(await summaryResponse.json());

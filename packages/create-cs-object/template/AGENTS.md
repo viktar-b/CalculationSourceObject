@@ -10,6 +10,8 @@ Edit page layout in `src/App.tsx`, theme tokens in `src/index.css`, and shared U
 components in `src/components/ui/`. Keep numeric input names and validation
 derived from the Python definition. Add shadcn components with
 `npx shadcn@latest add <component>`.
+Add each runnable report to `reports.json` with a unique ID, title, source path
+and entry function. Restart the local server to update the sidebar.
 Read [authoring.md](authoring.md) before changing source or notation. Keep inputs,
 units, assumptions, intermediate steps, references, and outputs inspectable.
 
