@@ -30,7 +30,7 @@
     "tailwindcss": "^4.3.3",
     "postcss": "8.5.28",
     "@biomejs/biome": "2.5.14",
-    "vitest": "^5.0.1",
+    "vitest": "^5.0.2",
     "@tailwindcss/postcss": "^4.3.3"
   }
 }
