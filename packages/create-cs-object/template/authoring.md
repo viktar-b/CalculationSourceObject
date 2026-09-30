@@ -66,6 +66,12 @@ finite Python floats may use the binary64 range. Booleans are not numeric
 inputs or results. Execution preserves the actual numeric kind and does not
 coerce values to satisfy an annotation.
 
+Numeric input validation checks types and finite values. Documented physical
+ranges, such as positive lengths or a maximum temperature, are assumptions;
+declaring them in the brief does not enforce them in the API or browser.
+Test valid boundary cases and report any physical limits that remain unenforced.
+Record required range enforcement in the brief as an implementation requirement.
+
 ## Supported formulas and content
 
 Supported expressions include finite numeric literals, earlier documented
@@ -165,15 +171,37 @@ Review every input, unit, intermediate formula, explanation, figure and
 returned result in the report. Check that the displayed substitutions and
 outputs match the intended engineering method.
 
+From the project root, verify one execution and generate checked HTML with the
+project's Python interpreter. These examples use a POSIX shell; on Windows the
+interpreter is `.venv/Scripts/python.exe`.
+
+```sh
+PYTHON="$PWD/.venv/bin/python" npx --no-install cso verify calculations/report.cso.py \
+  --function calculate --format json
+mkdir -p output
+PYTHON="$PWD/.venv/bin/python" npx --no-install cso html calculations/report.cso.py \
+  --function calculate --out output/report.html --check-layout --format json
+```
+
+Repeat verification with `--input name=value` for representative and boundary
+cases. Check each command's exit status and report diagnostics. Open the HTML
+and inspect its content; automated layout checks leave visual inspection pending.
+Use `npm run dev` to test browser input edits and `npm run build` to check the
+frontend. A frontend build alone does not verify the calculation.
+
 Keep three judgments separate: source-to-document consistency, agreement
 with independently established numerical cases, and human engineering
 approval. A pending reference check is not a passing reference check.
+For a bound reference file and browser registration, follow the
+[worked reference recipe](references/README.md#bind-an-independent-case).
 Formula or text edits change captured source identity and can invalidate
 reference bindings; review and explicitly rebind them while preserving
 independently established expected values. Never obtain expected values by
 copying the execution being tested.
 
-Download and inspect every PDF page at normal size for missing steps,
-unreadable notation, clipped content and pagination. The browser and PDF
-need the same run and inputs. See [README.md](README.md) for local setup,
-report registration and UI customization.
+When delivering a PDF, download and inspect every page at normal size for
+missing steps, unreadable notation, clipped content and pagination. The browser
+and PDF need the same run and inputs. HTML-only work can finish with checked
+HTML and visual inspection. Report what passed, failed or was not checked;
+successful generation does not establish human engineering approval.
+See [README.md](README.md) for local setup, report registration and UI customization.

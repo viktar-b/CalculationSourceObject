@@ -8,8 +8,8 @@ npm run dev
 ```
 
 Open the localhost address printed in the terminal. Edit numeric inputs in the
-browser, calculate, review the report, and download its PDF. Change formulas in
-`calculations/report.cso.py`, then calculate again. If you change the declared
+browser, calculate, and review the report. Download its PDF when needed. Change
+formulas in `calculations/report.cso.py`, then calculate again. If you change the declared
 inputs, reload the browser page to rebuild its form. Existing report downloads
 remain tied to their captured run until that run expires or the server stops.
 
@@ -28,6 +28,20 @@ entry `function`. Add `reference` when the report has an independent numerical
 reference file. Restart `npm run dev` after editing the list. Each entry gets
 its own verified local API at `/api/reports/<id>/`; the menu switches between
 them without changing the input or report UI code.
+
+For the starter, send inputs to the frontend's `/api/reports/rectangle-area/calculate`
+route. Replace the origin with the address printed by `npm run dev`:
+
+```sh
+curl --fail-with-body http://127.0.0.1:5173/api/reports/rectangle-area/calculate \
+  -H 'Content-Type: application/json' \
+  -d '{"inputs":{"width":2,"height":3}}'
+```
+
+The result is `{"area":6}`. Use the report ID from `reports.json` in place of
+`rectangle-area` after replacing the starter. `POST /api/reports/<id>/runs`
+accepts the same body and returns a captured run with report and download links.
+Wait for the initial report to load before testing input edits in the browser.
 
 To choose a port, run `npm run dev -- --port 4173`. Use port `0` to select an
 available port. Stop the server with Ctrl+C and use the same command to restart.
