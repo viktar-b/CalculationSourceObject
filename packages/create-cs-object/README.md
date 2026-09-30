@@ -12,7 +12,7 @@ npm run dev
 In PowerShell 5.1 or 7, select Python 3.11+ and run the setup steps explicitly:
 
 ```powershell
-$env:PYTHON = (Get-Command python -CommandType Application).Source
+$env:PYTHON = Get-Command python -CommandType Application | Select-Object -First 1 -ExpandProperty Source
 & $env:PYTHON --version
 ```
 

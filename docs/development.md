@@ -30,7 +30,7 @@ The JSON capture preserves Unicode executable paths under legacy console encodin
 
 <!-- docs:repository-setup:start -->
 ```powershell
-$env:PYTHON = (Get-Command python -CommandType Application).Source
+$env:PYTHON = Get-Command python -CommandType Application | Select-Object -First 1 -ExpandProperty Source
 npm.cmd ci
 if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
 & $env:PYTHON -m venv .venv
@@ -97,7 +97,8 @@ access. PDF checks also need Chromium and Poppler.
 ## Continuous integration
 
 [CI](../.github/workflows/ci.yml) runs on every pull request and pushes to `main`
-with Node 24 and Python 3.11 on Ubuntu. It keeps these required check names,
+with Node 24 and Python 3.11 on Ubuntu and Windows Server 2025. It keeps these
+required Ubuntu job names,
 with PR execution selected by the changed files:
 
 - `quality`: dependency audit, lint, typechecking, workspace tests and demo build.
@@ -105,6 +106,14 @@ with PR execution selected by the changed files:
 - `installed-packages`: npm archives, Python wheel, CLI/PDF acceptance and library
   type/export/browser consumers. Both archive commands are required when this
   job runs. Full installed consumers run on main, manual runs and before release.
+
+The `windows-installed` matrix runs the maintained
+[installed-user workflow](../tests/integration/installed/windows-user-workflow.ps1)
+in PowerShell 5.1 and 7. It checks actual npm archives and the Python wheel in
+external paths with spaces and Unicode, including browser/API behavior, checked
+HTML/PDF, and owned process teardown and restart. Its two check names,
+`windows-installed (powershell-5.1)` and `windows-installed (pwsh-7)`, are not
+currently required protection contexts.
 
 [Dependency review](../.github/workflows/dependency-review.yml) adds the required
 `dependency-review` check for newly introduced high or critical vulnerabilities,
@@ -123,12 +132,18 @@ Like other `pull_request` workflows, changes to the workflow itself require revi
 
 CI's `changes` job selects PR checks:
 
-| Changed files | `quality` | `isolation` | `installed-packages` |
-| --- | --- | --- | --- |
-| Only `.md` files | Skip | Skip | Skip |
-| Only examples or integration tests, optionally with Markdown | Run | Skip | Skip |
-| Package/app files or recognized dependency/build configuration | Run | Run | Skip |
-| CI tooling, workflows or unrecognized paths | Run | Run | Run |
+| Changed files | `quality` | `isolation` | `installed-packages` | `windows-installed` |
+| --- | --- | --- | --- | --- |
+| Only Windows workflow guides listed below | Skip | Skip | Skip | Run |
+| Only other `.md` files | Skip | Skip | Skip | Skip |
+| Only examples or integration tests, optionally with Markdown | Run | Skip | Skip | Run |
+| Package/app files or recognized dependency/build configuration | Run | Run | Skip | Run |
+| CI tooling, workflows or unrecognized paths | Run | Run | Run | Run |
+
+Windows guide selection covers `docs/development.md`, `docs/authoring.md`,
+`docs/rendering.md`, package README files and initializer template Markdown.
+The `run_windows` output selects both native shells, including for these
+Markdown-only changes.
 
 The workflow defines the recognized paths. Mixed PRs run every job required by
 any changed path. Rename detection is disabled so both old and new paths count,
@@ -146,6 +161,9 @@ Release publishing still depends on the full reusable CI workflow.
 
 `npm run test:ci` exercises the classifier in temporary Git repositories and
 checks the actual job conditions, fallback behavior and release dependencies.
+It also [compares the ten published PowerShell blocks](../scripts/check-windows-powershell-docs.test.ts)
+with the executed Windows workflow, allowing only line-ending and common
+indentation differences.
 PR title validation, dependency review and GitHub-managed CodeQL keep their own
 triggers.
 
@@ -180,10 +198,16 @@ to this pin through all required checks, including ESM/CJS builds, declarations,
 CLI/PDF acceptance and browser consumers. Remove the overrides when upstream
 ranges permit a patched version and fresh workspace/isolated installs confirm it.
 
-Isolation and installed-package jobs retain logs and evidence for 14 days,
+Isolation, installed-package and Windows jobs retain logs and evidence for 14 days,
 including generated PDFs and their hashes. Passing automated PDF checks leaves
 visual inspection pending. Use the [rendering guide](rendering.md#choose-verification-by-change)
 to select HTML or PDF checks and apply its delivery requirements.
+
+Each Windows artifact set retains host versions, command statuses, archive and
+binding hashes, reference agreement, HTML/PDF and browser-download evidence,
+and port/restart receipts. Evidence is uploaded after success or failure unless
+the job is cancelled. Automated termination uses `taskkill /T /F`; Windows 11
+foreground Ctrl+C and human PDF inspection remain separate qualifications.
 
 ## Test data
 

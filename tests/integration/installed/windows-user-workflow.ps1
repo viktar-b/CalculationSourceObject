@@ -192,6 +192,11 @@ try {
     }
     Write-JsonNoBom (Join-Path $evidenceRoot 'versions.json') $versions
 
+    $activeBlock = 'documentation-blocks'
+    & node.exe --test (Join-Path $repository 'scripts\check-windows-powershell-docs.test.ts')
+    if ($LASTEXITCODE -ne 0) { throw 'Published PowerShell commands differ from the native workflow.' }
+    $commands.Add([ordered]@{ name = $activeBlock; status = 0 })
+
     Set-Location $repository
     $activeBlock = 'repository-setup'
     # docs:repository-setup:start
