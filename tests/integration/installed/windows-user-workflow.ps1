@@ -277,6 +277,8 @@ try {
     }
 
     $activeBlock = 'pack-initializer'
+    npm.cmd run build --workspace create-cs-object
+    if ($LASTEXITCODE -ne 0) { throw 'Initializer build failed.' }
     $initializerText = npm.cmd pack --workspace create-cs-object --ignore-scripts --pack-destination $artifacts --json
     if ($LASTEXITCODE -ne 0) { throw 'Initializer archive creation failed.' }
     $initializerPack = @(($initializerText -join "`n") | ConvertFrom-Json)
@@ -284,6 +286,9 @@ try {
     $initializerArchive = Join-Path $artifacts $initializerPack[0].filename
     $initializerFiles = @(tar.exe -tzf $initializerArchive)
     if ($LASTEXITCODE -ne 0) { throw 'Initializer archive inspection failed.' }
+    if ($initializerFiles -notcontains 'package/dist/cli.js') {
+        throw 'Initializer archive omitted dist/cli.js.'
+    }
     if ($initializerFiles -notcontains 'package/template/.gitattributes') {
         throw 'Initializer archive omitted template/.gitattributes.'
     }
