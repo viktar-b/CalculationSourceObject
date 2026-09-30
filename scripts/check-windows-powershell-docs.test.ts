@@ -26,8 +26,8 @@ function normalize(lines: string[]): string {
 function readBlocks(path: string, format: 'markdown' | 'powershell'): Map<string, string> {
   const source = readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
   const marker = format === 'markdown'
-    ? /^<!-- docs:([a-z-]+):(start|end) -->$/
-    : /^# docs:([a-z-]+):(start|end)$/;
+    ? /^<!-- docs:(.+):(start|end) -->$/
+    : /^# docs:(.+):(start|end)$/;
   const blocks = new Map<string, string>();
   let open: { id: string; lines: string[] } | undefined;
   for (const line of source.replace(/\r\n/g, '\n').split('\n')) {
