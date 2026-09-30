@@ -136,6 +136,33 @@ test('invalid names and options fail before creating a destination', () => {
   assert.equal(invoke(['--help']).status, 0);
 });
 
+test('the installed template preserves Python bytes with automatic CRLF checkout', () => {
+  const result = invoke(['lf-report', '--skip-install']);
+  assert.equal(result.status, 0, result.stderr);
+  const project = join(temporary, 'lf-report');
+  const metadata = join(project, 'calculations/metadata.py');
+  const stub = join(project, 'calculations/metadata.pyi');
+  writeFileSync(metadata, 'title = "Café"\n', 'utf8');
+  writeFileSync(stub, 'title: str\n', 'utf8');
+  const files = [join(project, 'calculations/report.cso.py'), metadata, stub];
+  const expected = files.map((path) => readFileSync(path));
+  for (const args of [['init', '--quiet'], ['add', '.']]) {
+    const git = spawnSync('git', ['-c', 'core.autocrlf=true', ...args], {
+      cwd: project,
+      encoding: 'utf8',
+    });
+    assert.equal(git.status, 0, git.stderr);
+  }
+  for (const path of files) rmSync(path);
+  const checkout = spawnSync(
+    'git',
+    ['-c', 'core.autocrlf=true', 'checkout-index', '--all'],
+    { cwd: project, encoding: 'utf8' },
+  );
+  assert.equal(checkout.status, 0, checkout.stderr);
+  assert.deepEqual(files.map((path) => readFileSync(path)), expected);
+});
+
 test('existing files and directories survive unchanged', () => {
   const project = join(temporary, 'existing');
   mkdirSync(project);
