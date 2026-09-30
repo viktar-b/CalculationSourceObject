@@ -1,0 +1,82 @@
+name: Windows repair proof
+
+on:
+  push:
+    branches: [codex/windows-proof]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-repair-proof
+  cancel-in-progress: true
+
+jobs:
+  native-repair:
+    name: ${{ matrix.name }}
+    runs-on: windows-2025
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: bindings-bytes
+            head: ef6cfc547bf9c33913f2ca91aa919f048b179f91
+            command: "& $env:PYTHON -I packages/cso-python/tests/test_bindings.py -v"
+          - name: bindings-canonical
+            head: ef6cfc547bf9c33913f2ca91aa919f048b179f91
+            command: "node node_modules/vitest/vitest.mjs run tests/integration/demo-examples.test.ts"
+          - name: npm-launch
+            head: faff12d2cf50e995fa67ff72dd800feb5669ab7e
+            command: "node node_modules/vitest/vitest.mjs run tests/integration/demo-launch.test.ts"
+    steps:
+      - name: Use normal Windows Git conversion
+        run: git config --global core.autocrlf true
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ matrix.head }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.11'
+      - name: Install the exact-head wheel
+        run: |
+          python -m venv .venv
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\.venv\Scripts\python.exe -m pip wheel --no-deps ./packages/cso-python --wheel-dir artifacts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\.venv\Scripts\python.exe -m pip install --no-index --find-links artifacts cs-object
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $pythonPath = (Resolve-Path .venv\Scripts\python.exe).Path
+          [IO.File]::AppendAllText($env:GITHUB_ENV, "PYTHON=$pythonPath`n", [Text.UTF8Encoding]::new($false))
+      - name: Install and build the exact-head Node packages
+        run: |
+          npm.cmd ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm.cmd run build:cli
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Record native environment
+        run: |
+          node -p "JSON.stringify({platform:process.platform,node:process.version,commit:process.env.PROOF_HEAD})"
+          & $env:PYTHON -I -X utf8 -c "import sys; print(sys.version); print(sys.executable)"
+          $PSVersionTable
+        env:
+          PROOF_HEAD: ${{ matrix.head }}
+      - name: Run the focused repair behavior
+        run: |
+          ${{ matrix.command }}
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Exercise the real npm child launch
+        if: matrix.name == 'npm-launch'
+        env:
+          CSO_EXAMPLES_DIRECTORY: tests/integration/fixtures/demo-preservation
+        run: |
+          npm.cmd run build:demo -- --help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
