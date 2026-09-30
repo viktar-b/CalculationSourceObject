@@ -82,7 +82,7 @@ function run(name, args, expected = 0, executions = 1, extraEnv = {}) {
   assert.equal(calls.length, executions);
   if (!executions) assert(!readdirSync('.').includes('invocations.jsonl'));
   for (const call of calls)
-    assert.deepEqual(call.slice(0, 4), ['-I', '-m', 'cso_python', 'execute']);
+    assert.deepEqual(call.slice(0, 6), ['-I', '-X', 'utf8', '-m', 'cso_python', 'execute']);
   if (executions && !extraEnv.PYTHON)
     assert.match(result.stderr, /observer operational stderr/);
   assert.equal(report.checks.documentContent.status, 'not_applicable');
