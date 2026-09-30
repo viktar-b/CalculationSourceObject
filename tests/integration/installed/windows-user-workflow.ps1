@@ -45,7 +45,17 @@ function Wait-ForOrigin([string]$Log, [System.Diagnostics.Process]$Process, [int
     $deadline = [DateTime]::UtcNow.AddSeconds($Seconds)
     while ([DateTime]::UtcNow -lt $deadline) {
         if (Test-Path -LiteralPath $Log) {
-            $match = [regex]::Match([System.IO.File]::ReadAllText($Log), 'CSO dev (http://127\.0\.0\.1:\d+)')
+            $logStream = [System.IO.File]::Open($Log, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+            try {
+                $logReader = [System.IO.StreamReader]::new($logStream, [System.Text.Encoding]::UTF8)
+                try {
+                    $match = [regex]::Match($logReader.ReadToEnd(), 'CSO dev (http://127\.0\.0\.1:\d+)')
+                } finally {
+                    $logReader.Dispose()
+                }
+            } finally {
+                $logStream.Dispose()
+            }
             if ($match.Success) { return $match.Groups[1].Value }
         }
         if ($Process.HasExited) {
