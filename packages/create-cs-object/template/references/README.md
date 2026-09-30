@@ -18,7 +18,7 @@ area independently first: a 2 m by 3 m rectangle has area 6 m². The verificatio
 report supplies only source hashes, function and input metadata for binding;
 the expected value below is the hand-derived 6, not a captured result.
 
-From the project root:
+From the project root in a POSIX shell:
 
 ```sh
 PYTHON="$PWD/.venv/bin/python" npx --no-install cso verify calculations/report.cso.py \
@@ -33,7 +33,7 @@ Create `references/rectangle-reference.json` with the full case shape:
 import json
 from pathlib import Path
 
-report = json.loads(Path("references/rectangle-check.json").read_text())
+report = json.loads(Path("references/rectangle-check.json").read_text(encoding="utf-8"))
 if not report["ok"]:
     raise SystemExit("Resolve verification diagnostics before binding a case")
 fields = (
@@ -59,13 +59,65 @@ reference = {
     }],
 }
 Path("references/rectangle-reference.json").write_text(
-    json.dumps(reference, indent=2) + "\n"
+    json.dumps(reference, indent=2) + "\n", encoding="utf-8", newline="\n"
 )
 PY
 PYTHON="$PWD/.venv/bin/python" npx --no-install cso verify calculations/report.cso.py \
   --function calculate --input width=2 --input height=3 \
   --reference references/rectangle-reference.json --format json
 ```
+
+In PowerShell 5.1 or 7, run the following block instead. It captures only the
+verification metadata needed to bind the independently derived value `6`.
+The JSON stays inside PowerShell until the file write, so native argument
+quoting cannot alter it. `Join-Path $PWD` gives the .NET writer an absolute path.
+
+<!-- docs:reference-authoring:start -->
+```powershell
+$env:PYTHON = Join-Path $PWD '.venv\Scripts\python.exe'
+$cso = Join-Path $PWD 'node_modules\.bin\cso.cmd'
+$source = Join-Path $PWD 'calculations\report.cso.py'
+$utf8 = [System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = $utf8
+$reportText = & $cso verify $source --function calculate --input width=2 --input height=3 --format json
+if ($LASTEXITCODE -ne 0) { throw 'Calculation verification failed.' }
+$report = ($reportText -join "`n") | ConvertFrom-Json
+if (-not $report.ok) { throw 'Resolve verification diagnostics before binding a case.' }
+$binding = [ordered]@{}
+foreach ($name in @('entryModuleId', 'entrySourceHash', 'sourceClosureHash', 'function', 'resolvedInputs', 'resolvedInputKinds')) {
+    $binding[$name] = $report.provenance.$name
+}
+$reference = [ordered]@{
+    referenceVersion = '1'
+    cases = @([ordered]@{
+        id = 'rectangle-2-by-3'
+        revision = '1'
+        basis = [ordered]@{
+            method = 'Hand-derived rectangle area'
+            derivation = 'Perpendicular sides: 2 m times 3 m equals 6 m^2.'
+            sourceDescription = 'Elementary geometry for the stated rectangle.'
+        }
+        binding = $binding
+        expected = @([ordered]@{
+            symbolId = '["symbol","root","area"]'
+            value = 6
+            unit = 'm^2'
+        })
+    })
+}
+$referencePath = Join-Path $PWD 'references\rectangle-reference.json'
+$json = ($reference | ConvertTo-Json -Depth 20).Replace("`r`n", "`n") + "`n"
+[System.IO.File]::WriteAllText($referencePath, $json, $utf8)
+& $cso verify $source --function calculate --input width=2 --input height=3 --reference $referencePath --format json
+if ($LASTEXITCODE -ne 0) { throw 'Independent reference verification failed.' }
+```
+<!-- docs:reference-authoring:end -->
+
+This writer produces UTF-8 without a BOM and uses LF. Do not use `>` or
+`Out-File` to save source or JSON in Windows PowerShell 5.1; their default
+encoding differs from this file format. The console encoding assignment makes
+UTF-8 CLI output safe to capture before `ConvertFrom-Json`, including Unicode
+paths and diagnostics.
 
 Check that `checks.independentReferenceAgreement.status` is `passed` with one checked
 symbol. To use the case in the browser, add

@@ -7,7 +7,7 @@ The [code map](code-map.md) explains responsibility and execution order.
 
 ## Setup
 
-From the repository root:
+From the repository root in a POSIX shell:
 
 ```sh
 npm ci
@@ -20,6 +20,40 @@ npm run build:cli
 "$PYTHON" -m cso_python bindings examples/section-properties
 npx playwright install chromium
 ```
+
+For Windows 11 x64, use Node 24 and Python 3.11+ with PowerShell 5.1 or 7.
+The following commands select an installed Python executable, then use a
+repository virtualenv. If `python` is not on PATH, replace the first assignment
+with your interpreter's absolute executable path. For a launcher-only install,
+use `$env:PYTHON = py -3.11 -c 'import sys; print(sys.executable)'`.
+
+<!-- docs:repository-setup:start -->
+```powershell
+$env:PYTHON = (Get-Command python -CommandType Application).Source
+npm.cmd ci
+if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
+& $env:PYTHON -m venv .venv
+if ($LASTEXITCODE -ne 0) { throw 'Python environment creation failed.' }
+$env:PYTHON = Join-Path $PWD '.venv\Scripts\python.exe'
+& $env:PYTHON -m pip wheel --no-deps ./packages/cso-python --wheel-dir artifacts
+if ($LASTEXITCODE -ne 0) { throw 'Python wheel build failed.' }
+& $env:PYTHON -m pip install --no-index --find-links artifacts --force-reinstall cs-object
+if ($LASTEXITCODE -ne 0) { throw 'Python wheel installation failed.' }
+npm.cmd run build:cli
+if ($LASTEXITCODE -ne 0) { throw 'CLI build failed.' }
+& $env:PYTHON -I -X utf8 -m cso_python bindings examples/two-panel
+if ($LASTEXITCODE -ne 0) { throw 'Two-panel binding generation failed.' }
+& $env:PYTHON -I -X utf8 -m cso_python bindings examples/section-properties
+if ($LASTEXITCODE -ne 0) { throw 'Section binding generation failed.' }
+npx.cmd playwright install chromium
+if ($LASTEXITCODE -ne 0) { throw 'Chromium installation failed.' }
+```
+<!-- docs:repository-setup:end -->
+
+`PYTHON` contains one executable path, not `py -3.11` or other command arguments.
+The call operator `&` handles paths with spaces. No environment activation or
+global execution-policy change is needed. Use `npm.cmd` and `npx.cmd` in these
+PowerShell recipes so PowerShell selects the command wrappers explicitly.
 
 Rebuild and reinstall the wheel after Python source changes. Exporting `PYTHON`
 selects the installed interpreter for the CLI and test runners. A source/editable
@@ -38,6 +72,14 @@ The [demo guide](../apps/demo/README.md) owns data-directory configuration,
 empty states and standalone builds.
 Deployment settings live in [vercel.json](../vercel.json); its build context is
 the repository root. A local build does not establish a hosted deployment result.
+
+In PowerShell, start the demo with `npm.cmd run dev` or build it with
+`npm.cmd run build:demo`. For calculation verification and checked HTML/PDF, use the
+[PowerShell CLI examples](../packages/cso-cli/README.md#powershell-51-and-7).
+
+Native automated checks use Windows Server 2025. They provide evidence for the
+commands under test. Windows 11 foreground Ctrl+C/restart and human inspection
+of delivered reports remain separate qualification steps.
 
 ## Checks
 
@@ -168,6 +210,47 @@ After building, pack the required npm workspaces into `artifacts/` with
 archive paths together in the consumer. Install the Python wheel into its chosen
 interpreter. Use the package manifests for versions and peer dependencies.
 These commands do not publish to npm or PyPI.
+
+In PowerShell 5.1 or 7, after repository setup, pack the libraries and CLI and
+install their archives into a new temporary consumer:
+
+<!-- docs:archive-consumer:start -->
+```powershell
+$artifacts = Join-Path $PWD 'artifacts'
+$utf8 = [System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = $utf8
+$packedText = npm.cmd pack --workspace '@cs-object/core' --workspace '@cs-object/react' --workspace '@cs-object/cli' --pack-destination $artifacts --ignore-scripts --json
+if ($LASTEXITCODE -ne 0) { throw 'Archive creation failed.' }
+$packed = ($packedText -join "`n") | ConvertFrom-Json
+$archives = @($packed | ForEach-Object { Join-Path $artifacts $_.filename })
+$consumer = Join-Path ([System.IO.Path]::GetTempPath()) ('cso-consumer-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory $consumer | Out-Null
+Push-Location $consumer
+try {
+    npm.cmd init -y
+    if ($LASTEXITCODE -ne 0) { throw 'Consumer initialization failed.' }
+    npm.cmd install -- $archives
+    if ($LASTEXITCODE -ne 0) { throw 'Archive installation failed.' }
+    & $env:PYTHON -m venv .venv
+    if ($LASTEXITCODE -ne 0) { throw 'Consumer Python environment creation failed.' }
+    $env:PYTHON = Join-Path $PWD '.venv\Scripts\python.exe'
+    & $env:PYTHON -m pip install --no-index --find-links $artifacts cs-object
+    if ($LASTEXITCODE -ne 0) { throw 'Consumer wheel installation failed.' }
+    & (Join-Path $PWD 'node_modules\.bin\cso.cmd') --help
+    if ($LASTEXITCODE -ne 0) { throw 'Installed CLI launch failed.' }
+} finally {
+    Pop-Location
+}
+```
+<!-- docs:archive-consumer:end -->
+
+The archives use the builds produced during repository setup. Skipping the pack
+lifecycle scripts keeps the captured output valid JSON. The consumer remains at
+`$consumer`; select that directory to use its local CLI. Select the repository
+interpreter again when returning to repository work.
+This route needs no registry release for the CSO packages. It still downloads
+third-party npm dependencies. The [initializer guide](../packages/create-cs-object/README.md)
+owns project creation, which uses its declared dependency versions.
 
 ## Registry releases
 

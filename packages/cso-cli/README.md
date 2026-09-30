@@ -33,6 +33,38 @@ and 2 means invalid usage. Reports retain known source hashes, function, inputs,
 versions and diagnostics; successful HTML/PDF reports include output path and hash.
 Unknown provenance is not fabricated. See [report schemas](../../packages/cso-core/src/contracts/reports.ts).
 
+### PowerShell 5.1 and 7
+
+Complete [repository setup](../../docs/development.md#setup), then run these
+commands from its root. They use the local CLI wrapper and the installed wheel
+in `.venv`. A generated project's corresponding commands are in its `authoring.md`.
+
+<!-- docs:canonical-report:start -->
+```powershell
+$env:PYTHON = Join-Path $PWD '.venv\Scripts\python.exe'
+$cso = Join-Path $PWD 'node_modules\.bin\cso.cmd'
+$source = Join-Path $PWD 'examples\two-panel\estimate.cso.py'
+$reference = Join-Path $PWD 'examples\two-panel\reference.json'
+& $cso bindings (Join-Path $PWD 'examples\two-panel')
+if ($LASTEXITCODE -ne 0) { throw 'Binding generation failed.' }
+& $cso verify $source --function estimate --input width=2 --reference $reference --format json
+if ($LASTEXITCODE -ne 0) { throw 'Calculation verification failed.' }
+New-Item -ItemType Directory -Force (Join-Path $PWD 'output') | Out-Null
+& $cso html $source --function estimate --input width=2 --reference $reference --out (Join-Path $PWD 'output\panels.html') --check-layout --format json
+if ($LASTEXITCODE -ne 0) { throw 'Checked HTML generation failed.' }
+& $cso pdf $source --function estimate --input width=2 --reference $reference --out (Join-Path $PWD 'output\panels.pdf') --format json
+if ($LASTEXITCODE -ne 0) { throw 'PDF generation failed.' }
+```
+<!-- docs:canonical-report:end -->
+
+Keep `PYTHON` as one executable path and invoke path variables with `&`.
+For a standalone install, point it at the environment containing `cs-object`.
+Use `--input name=value` to avoid shell-dependent JSON quoting.
+If you save stdout, select UTF-8 explicitly; the generated project's
+[reference recipe](../create-cs-object/template/references/README.md#bind-an-independent-case)
+shows a PowerShell 5.1/7 capture and BOM-free UTF-8/LF write. Do not use
+PowerShell 5.1 redirection to write source or JSON files.
+
 ## Numerical checks
 
 [verifyExecution](../../packages/cso-core/src/verification/verify.ts) checks inputs,

@@ -127,6 +127,18 @@ function:
 ./.venv/bin/python -m cso_python bindings calculations --check
 ```
 
+In PowerShell 5.1 or 7, use the project's interpreter directly:
+
+<!-- docs:project-bindings:start -->
+```powershell
+$env:PYTHON = Join-Path $PWD '.venv\Scripts\python.exe'
+& $env:PYTHON -I -X utf8 -m cso_python bindings calculations
+if ($LASTEXITCODE -ne 0) { throw 'Binding generation failed.' }
+& $env:PYTHON -I -X utf8 -m cso_python bindings calculations --check
+if ($LASTEXITCODE -ne 0) { throw 'Bindings are stale.' }
+```
+<!-- docs:project-bindings:end -->
+
 For a file `calculations/geometry.cso.py` with a public function
 `rectangle`, a parent in that directory can import and call it:
 
@@ -155,6 +167,11 @@ metadata or public output selections. Formula-only edits may leave the
 interface current. Generation validates definitions but does not execute
 formulas. A missing or stale handle will not regenerate itself.
 
+Save authored Python as UTF-8 with LF line endings. The project's `.gitattributes`
+keeps Python and stub files at LF on Git checkout. Generated bindings already
+use UTF-8/LF. Source hashes cover exact bytes, so an editor's encoding or newline
+change can invalidate a reference even when the formula is unchanged.
+
 Each distinct quantity needs distinct displayed notation. Repeated child
 calls qualify child glyphs using their call names. When a reference
 deliberately reuses a glyph in separate contexts, set a meaningful
@@ -172,8 +189,7 @@ returned result in the report. Check that the displayed substitutions and
 outputs match the intended engineering method.
 
 From the project root, verify one execution and generate checked HTML with the
-project's Python interpreter. These examples use a POSIX shell; on Windows the
-interpreter is `.venv/Scripts/python.exe`.
+project's Python interpreter. In a POSIX shell:
 
 ```sh
 PYTHON="$PWD/.venv/bin/python" npx --no-install cso verify calculations/report.cso.py \
@@ -182,6 +198,30 @@ mkdir -p output
 PYTHON="$PWD/.venv/bin/python" npx --no-install cso html calculations/report.cso.py \
   --function calculate --out output/report.html --check-layout --format json
 ```
+
+For the unchanged rectangle starter, these PowerShell 5.1 and 7 commands verify
+width 2 and height 3, then write checked HTML and a PDF:
+
+<!-- docs:project-report:start -->
+```powershell
+$env:PYTHON = Join-Path $PWD '.venv\Scripts\python.exe'
+$cso = Join-Path $PWD 'node_modules\.bin\cso.cmd'
+$source = Join-Path $PWD 'calculations\report.cso.py'
+& $cso verify $source --function calculate --input width=2 --input height=3 --format json
+if ($LASTEXITCODE -ne 0) { throw 'Calculation verification failed.' }
+New-Item -ItemType Directory -Force (Join-Path $PWD 'output') | Out-Null
+& $cso html $source --function calculate --input width=2 --input height=3 --out (Join-Path $PWD 'output\report.html') --check-layout --format json
+if ($LASTEXITCODE -ne 0) { throw 'Checked HTML generation failed.' }
+& $cso pdf $source --function calculate --input width=2 --input height=3 --out (Join-Path $PWD 'output\report.pdf') --format json
+if ($LASTEXITCODE -ne 0) { throw 'PDF generation failed.' }
+```
+<!-- docs:project-report:end -->
+
+Use `&` when invoking an executable stored in a variable. These commands use the
+project's installed CLI and managed interpreter, including when the project
+path contains spaces. Setup installs the matching Chromium used by both report
+commands. The [reference recipe](references/README.md#bind-an-independent-case)
+shows how to save structured JSON as UTF-8 without a BOM in either PowerShell.
 
 Repeat verification with `--input name=value` for representative and boundary
 cases. Check each command's exit status and report diagnostics. Open the HTML
