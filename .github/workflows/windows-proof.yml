@@ -24,13 +24,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: assets-baseline
-            head: f4de4e767747cb4d8cb3bb329b9448cc3f3b2a11
-            command: "npm.cmd run test --workspace @cs-object/cli -- assets.test.ts"
-            expect_failure: true
-          - name: assets-fixed
-            head: 3f81de69f1746029cf6ac5c59b8546ee3b0f93b0
-            command: "npm.cmd run test --workspace @cs-object/cli -- assets.test.ts"
+          - name: cli-utf8-fixed
+            head: 1f40cd0770268f00a4462afe62fa7b023b1484ed
+            command: "node node_modules/vitest/vitest.mjs run tests/integration/cli-python-utf8.test.ts"
             expect_failure: false
     steps:
       - name: Use normal Windows Git conversion
@@ -74,6 +70,7 @@ jobs:
           if ('${{ matrix.expect_failure }}' -eq 'true') {
             if ($LASTEXITCODE -eq 0) { throw 'The baseline unexpectedly passed' }
             Write-Host 'The baseline failed as expected. Inspect its assertion receipt.'
+            exit 0
           } elseif ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Exercise the real npm child launch
         if: matrix.name == 'npm-launch'
