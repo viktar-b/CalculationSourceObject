@@ -27,7 +27,6 @@ const workflow = z.object({
         matrix: z.object({
           include: z.array(z.object({
             id: z.string(),
-            shell: z.string(),
             edition: z.string(),
             major: z.string(),
           })),
@@ -35,6 +34,7 @@ const workflow = z.object({
       }),
       steps: z.array(z.object({
         name: z.string().optional(),
+        if: z.string().optional(),
         shell: z.string().optional(),
         run: z.string().optional(),
         uses: z.string().optional(),
@@ -221,15 +221,24 @@ test('required jobs remain reported without workflow path filters', () => {
 test('Windows installed-user cases use explicit native PowerShell hosts', () => {
   assert.equal(workflow.jobs['windows-installed'].name, `windows-installed (${githubExpression('matrix.id')})`);
   assert.deepEqual(workflow.jobs['windows-installed'].strategy.matrix.include, [
-    { id: 'powershell-5.1', shell: 'powershell', edition: 'Desktop', major: '5' },
-    { id: 'pwsh-7', shell: 'pwsh', edition: 'Core', major: '7' },
+    { id: 'powershell-5.1', edition: 'Desktop', major: '5' },
+    { id: 'pwsh-7', edition: 'Core', major: '7' },
   ]);
-  const workflowStep = workflow.jobs['windows-installed'].steps.find((step) => step.name === 'Run the installed-user workflow');
-  assert.deepEqual(workflowStep, {
-    name: 'Run the installed-user workflow',
-    shell: githubExpression('matrix.shell'),
-    run: '& .\\tests\\integration\\installed\\windows-user-workflow.ps1',
-  });
+  const workflowSteps = workflow.jobs['windows-installed'].steps.filter((step) => step.run);
+  assert.deepEqual(workflowSteps, [
+    {
+      name: 'Run the installed-user workflow in PowerShell 5.1',
+      if: githubExpression("matrix.id == 'powershell-5.1'"),
+      shell: 'powershell',
+      run: '& .\\tests\\integration\\installed\\windows-user-workflow.ps1',
+    },
+    {
+      name: 'Run the installed-user workflow in PowerShell 7',
+      if: githubExpression("matrix.id == 'pwsh-7'"),
+      shell: 'pwsh',
+      run: '& .\\tests\\integration\\installed\\windows-user-workflow.ps1',
+    },
+  ]);
   const node = workflow.jobs['windows-installed'].steps.find((step) => step.uses?.startsWith('actions/setup-node@'));
   const python = workflow.jobs['windows-installed'].steps.find((step) => step.uses?.startsWith('actions/setup-python@'));
   assert.equal(node?.with?.['node-version'], '24');
