@@ -157,7 +157,10 @@ try {
     }
     $npmVersion = (npm.cmd --version).Trim()
     if ($LASTEXITCODE -ne 0) { throw 'npm version detection failed.' }
-    $rootPython = (Get-Command python -CommandType Application).Source
+    $rootPython = Get-Command python -CommandType Application | Select-Object -First 1 -ExpandProperty Source
+    if (-not $rootPython -or -not (Test-Path -LiteralPath $rootPython -PathType Leaf)) {
+        throw 'Python did not resolve to an executable file.'
+    }
     $pythonVersion = (& $rootPython --version 2>&1).ToString().Trim()
     if ($LASTEXITCODE -ne 0 -or $pythonVersion -notmatch '^Python 3\.11\.') {
         throw "Expected Python 3.11, received $pythonVersion."
@@ -182,7 +185,7 @@ try {
     Set-Location $repository
     $activeBlock = 'repository-setup'
     # docs:repository-setup:start
-    $env:PYTHON = (Get-Command python -CommandType Application).Source
+    $env:PYTHON = Get-Command python -CommandType Application | Select-Object -First 1 -ExpandProperty Source
     npm.cmd ci
     if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
     & $env:PYTHON -m venv .venv
@@ -304,7 +307,10 @@ try {
         evidenceRoot = $evidenceRoot
     })
     $env:CSO_WINDOWS_CONFIG = $registryConfig
-    $node = (Get-Command node -CommandType Application).Source
+    $node = Get-Command node -CommandType Application | Select-Object -First 1 -ExpandProperty Source
+    if (-not $node -or -not (Test-Path -LiteralPath $node -PathType Leaf)) {
+        throw 'Node did not resolve to an executable file.'
+    }
     $tsx = Join-Path $repository 'node_modules\tsx\dist\cli.mjs'
     $registryScript = Join-Path $repository 'tests\integration\installed\windows-registry.ts'
     $registryProcess = Start-Process -FilePath $node -ArgumentList @($tsx, $registryScript) -WorkingDirectory $repository -PassThru -NoNewWindow `
