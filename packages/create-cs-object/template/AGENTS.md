@@ -15,9 +15,12 @@ and entry function. Restart the local server to update the report menu.
 Read [authoring.md](authoring.md) before changing source or notation. Keep inputs,
 units, assumptions, intermediate steps, references, and outputs inspectable.
 
-Run the calculation with representative inputs and review its rendered report.
+For verification commands and completion criteria, follow
+[Check the result](authoring.md#check-the-result). Run the calculation with
+representative inputs and review its rendered report.
 Report source-to-document consistency, independent numerical agreement, and
 human engineering approval separately. Establish expected reference values
-independently of the execution under test. Inspect every PDF page before delivery.
+independently of the execution under test. When delivering a PDF, inspect every
+page before delivery.
 
 This project runs on localhost. Deployment is outside its calculation workflow.

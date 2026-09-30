@@ -10,7 +10,11 @@
 
 ## Quickstart
 
-> Run `npx create-cs-object rectangle-inertia` to generate an interactive moment-of-inertia report with custom inputs and step-by-step math.
+Give your coding agent this prompt:
+
+> Run `npx create-cs-object@latest my-calculation`, then show me something
+> extraordinary about an ordinary object. Use at most ten formulas and let me
+> experiment with the inputs.
 
 **[Explore the worked example](https://www.cs-object.com/examples)** ·
 [See the agent workflow](https://www.cs-object.com/docs)
