@@ -54,12 +54,14 @@ access. PDF checks also need Chromium and Poppler.
 ## Continuous integration
 
 [CI](../.github/workflows/ci.yml) runs on every pull request and pushes to `main`
-with Node 24 and Python 3.11 on Ubuntu. Its required checks are:
+with Node 24 and Python 3.11 on Ubuntu. It keeps these required check names,
+with PR execution selected by the changed files:
 
 - `quality`: dependency audit, lint, typechecking, workspace tests and demo build.
 - `isolation`: independent builds and tests for all projects.
 - `installed-packages`: npm archives, Python wheel, CLI/PDF acceptance and library
-  type/export/browser consumers. Both archive commands are required.
+  type/export/browser consumers. Both archive commands are required when this
+  job runs. Full installed consumers run on main, manual runs and before release.
 
 [Dependency review](../.github/workflows/dependency-review.yml) adds the required
 `dependency-review` check for newly introduced high or critical vulnerabilities,
@@ -76,13 +78,33 @@ on PR creation, title edits and updates, without installing dependencies. Run
 uses the runner's Node runtime without checking out or executing repository code.
 Like other `pull_request` workflows, changes to the workflow itself require review.
 
-For pull requests that change only `.md` files, CI's `changes` job skips the
-three build/test jobs. Their check names remain present as skipped checks, which
-GitHub accepts for required jobs. Mixed changes and all other file types run the
-full suite. Pushes to `main`, manual runs, empty diffs and file-detection failures
-also run the full suite. `npm run test:ci` tests the workflow's detector against
-temporary Git repositories. PR title validation, dependency review and
-GitHub-managed CodeQL keep their own triggers.
+CI's `changes` job selects PR checks:
+
+| Changed files | `quality` | `isolation` | `installed-packages` |
+| --- | --- | --- | --- |
+| Only `.md` files | Skip | Skip | Skip |
+| Only examples or integration tests, optionally with Markdown | Run | Skip | Skip |
+| Package/app files or recognized dependency/build configuration | Run | Run | Skip |
+| CI tooling, workflows or unrecognized paths | Run | Run | Run |
+
+The workflow defines the recognized paths. Mixed PRs run every job required by
+any changed path. Rename detection is disabled so both old and new paths count,
+including deletions. Pushes to `main`, manual runs, reusable release calls, empty
+diffs and file-detection failures run the full suite. A detector job failure
+runs all checks; a missing output runs its affected job. Cancellation prevents
+these fallback jobs.
+
+Skipped job names remain present, which GitHub accepts for required jobs. This
+keeps branch protection unchanged. Routine PRs retain behavior, numerical,
+verification and document tests in `quality`; isolation still checks package/app
+independence. Packaging defects can reach main and require repair before release.
+For earlier installed-consumer feedback, manually run CI on the PR branch.
+Release publishing still depends on the full reusable CI workflow.
+
+`npm run test:ci` exercises the classifier in temporary Git repositories and
+checks the actual job conditions, fallback behavior and release dependencies.
+PR title validation, dependency review and GitHub-managed CodeQL keep their own
+triggers.
 
 Keep all five check names stable and required in the `Protect main` ruleset.
 Do not add workflow-level path filters or allow failures on required checks. PR code runs with
