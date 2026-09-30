@@ -259,17 +259,17 @@ try {
     $activeBlock = 'canonical-report'
     # docs:canonical-report:start
     $env:PYTHON = Join-Path $PWD '.venv\Scripts\python.exe'
-    $cso = Join-Path $PWD 'node_modules\.bin\cso.cmd'
+    $cso = Join-Path $PWD 'packages\cso-cli\dist\cli.js'
     $source = Join-Path $PWD 'examples\two-panel\estimate.cso.py'
     $reference = Join-Path $PWD 'examples\two-panel\reference.json'
-    & $cso bindings (Join-Path $PWD 'examples\two-panel')
+    & node.exe $cso bindings (Join-Path $PWD 'examples\two-panel')
     if ($LASTEXITCODE -ne 0) { throw 'Binding generation failed.' }
-    & $cso verify $source --function estimate --input width=2 --reference $reference --format json
+    & node.exe $cso verify $source --function estimate --input width=2 --reference $reference --format json
     if ($LASTEXITCODE -ne 0) { throw 'Calculation verification failed.' }
     New-Item -ItemType Directory -Force (Join-Path $PWD 'output') | Out-Null
-    & $cso html $source --function estimate --input width=2 --reference $reference --out (Join-Path $PWD 'output\panels.html') --check-layout --format json
+    & node.exe $cso html $source --function estimate --input width=2 --reference $reference --out (Join-Path $PWD 'output\panels.html') --check-layout --format json
     if ($LASTEXITCODE -ne 0) { throw 'Checked HTML generation failed.' }
-    & $cso pdf $source --function estimate --input width=2 --reference $reference --out (Join-Path $PWD 'output\panels.pdf') --format json
+    & node.exe $cso pdf $source --function estimate --input width=2 --reference $reference --out (Join-Path $PWD 'output\panels.pdf') --format json
     if ($LASTEXITCODE -ne 0) { throw 'PDF generation failed.' }
     # docs:canonical-report:end
     $commands.Add([ordered]@{ name = $activeBlock; status = 0 })
