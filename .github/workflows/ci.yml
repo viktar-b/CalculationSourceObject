@@ -29,6 +29,7 @@ jobs:
       run_quality: ${{ steps.classify.outputs.run_quality }}
       run_isolation: ${{ steps.classify.outputs.run_isolation }}
       run_packages: ${{ steps.classify.outputs.run_packages }}
+      run_windows: ${{ steps.classify.outputs.run_windows }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -43,6 +44,7 @@ jobs:
           run_quality=true
           run_isolation=true
           run_packages=true
+          run_windows=true
           if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
             # Disable rename detection so both the old and new paths are checked.
             if git diff --name-only --no-renames -z "$BASE_SHA...$HEAD_SHA" -- > "$RUNNER_TEMP/changed-files"; then
@@ -50,21 +52,28 @@ jobs:
                 run_quality=false
                 run_isolation=false
                 run_packages=false
+                run_windows=false
                 while IFS= read -r -d '' path; do
                   case "$path" in
+                    docs/development.md|docs/authoring.md|docs/rendering.md|packages/*/README.md|packages/create-cs-object/template/*.md)
+                      run_windows=true
+                      ;;
                     *.md) ;;
                     examples/*|tests/integration/*)
                       run_quality=true
+                      run_windows=true
                       ;;
                     packages/*|apps/*|package.json|package-lock.json|.nvmrc|.npmrc|tsconfig*.json|biome.json|vitest.config.ts|vercel.json)
                       run_quality=true
                       run_isolation=true
+                      run_windows=true
                       ;;
                     *)
                       # Unknown paths and CI tooling changes retain the full suite.
                       run_quality=true
                       run_isolation=true
                       run_packages=true
+                      run_windows=true
                       ;;
                   esac
                 done < "$RUNNER_TEMP/changed-files"
@@ -74,6 +83,7 @@ jobs:
           echo "run_quality=$run_quality" >> "$GITHUB_OUTPUT"
           echo "run_isolation=$run_isolation" >> "$GITHUB_OUTPUT"
           echo "run_packages=$run_packages" >> "$GITHUB_OUTPUT"
+          echo "run_windows=$run_windows" >> "$GITHUB_OUTPUT"
 
   quality:
     needs: changes
@@ -183,3 +193,71 @@ jobs:
             ${{ runner.temp }}/cso installed packages */full cli/*-results.json
             ${{ runner.temp }}/cso installed packages */full cli/output/*
             ${{ runner.temp }}/cso installed packages */full cli/pdf-output/**
+
+  windows-installed:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.run_windows != 'false') }}
+    name: windows-installed (${{ matrix.id }})
+    runs-on: windows-2025
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: powershell-5.1
+            edition: Desktop
+            major: '5'
+          - id: pwsh-7
+            edition: Core
+            major: '7'
+    env:
+      CSO_WINDOWS_SHELL_ID: ${{ matrix.id }}
+      CSO_WINDOWS_EXPECTED_EDITION: ${{ matrix.edition }}
+      CSO_WINDOWS_EXPECTED_MAJOR: ${{ matrix.major }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        env:
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: core.autocrlf
+          GIT_CONFIG_VALUE_0: 'true'
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+      - name: Run the installed-user workflow in PowerShell 5.1
+        if: ${{ matrix.id == 'powershell-5.1' }}
+        shell: powershell
+        run: '& .\tests\integration\installed\windows-user-workflow.ps1'
+      - name: Run the installed-user workflow in PowerShell 7
+        if: ${{ matrix.id == 'pwsh-7' }}
+        shell: pwsh
+        run: '& .\tests\integration\installed\windows-user-workflow.ps1'
+      - name: Retain Windows workflow evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-installed-${{ matrix.id }}
+          retention-days: 14
+          include-hidden-files: true
+          path: |
+            ${{ runner.temp }}/cso installed packages ${{ matrix.id }} é/*.json
+            ${{ runner.temp }}/cso installed packages ${{ matrix.id }} é/*.log
+            ${{ runner.temp }}/cso installed packages ${{ matrix.id }} é/*.png
+            ${{ runner.temp }}/cso installed packages ${{ matrix.id }} é/*.html
+            ${{ runner.temp }}/cso installed packages ${{ matrix.id }} é/*.pdf
+            ${{ runner.temp }}/cso installed packages ${{ matrix.id }} é/my-report/.gitattributes
+            ${{ runner.temp }}/cso installed packages ${{ matrix.id }} é/my-report/reports.json
+            ${{ runner.temp }}/cso installed packages ${{ matrix.id }} é/my-report/references/*.json
+            ${{ runner.temp }}/cso installed packages ${{ matrix.id }} é/my-report/calculations/reference.json
+            ${{ runner.temp }}/cso installed packages ${{ matrix.id }} é/my-report/calculations/_cso_bindings/**/*.py
+            ${{ runner.temp }}/cso installed packages ${{ matrix.id }} é/my-report/calculations/_cso_bindings/**/*.pyi
+            ${{ runner.temp }}/cso installed packages ${{ matrix.id }} é/my-report/output/*.html
+            ${{ runner.temp }}/cso installed packages ${{ matrix.id }} é/my-report/output/*.pdf
+            ${{ github.workspace }}/output/panels.html
+            ${{ github.workspace }}/output/panels.pdf
