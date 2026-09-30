@@ -7,6 +7,10 @@ Node dependencies, creates a private `.venv`, and installs Chromium for PDF outp
 npm run dev
 ```
 
+In PowerShell 5.1 or 7, use `npm.cmd run dev`. Commands that invoke the installed
+CLI directly use `.\node_modules\.bin\cso.cmd`; see
+[Check the result](authoring.md#check-the-result).
+
 Open the localhost address printed in the terminal. Edit numeric inputs in the
 browser, calculate, and review the report. Download its PDF when needed. Change
 formulas in `calculations/report.cso.py`, then calculate again. If you change the declared
@@ -43,12 +47,36 @@ The result is `{"area":6}`. Use the report ID from `reports.json` in place of
 accepts the same body and returns a captured run with report and download links.
 Wait for the initial report to load before testing input edits in the browser.
 
+In PowerShell 5.1 or 7, the equivalent request avoids native-shell JSON quoting:
+
+```powershell
+$request = @{ inputs = @{ width = 2; height = 3 } } | ConvertTo-Json
+Invoke-RestMethod -Uri 'http://127.0.0.1:5173/api/reports/rectangle-area/calculate' -Method Post -ContentType 'application/json; charset=utf-8' -Body $request
+```
+
+Use the port printed by your development server, such as `4173` when you select
+that port explicitly. The response's `area` property is `6`.
+
 To choose a port, run `npm run dev -- --port 4173`. Use port `0` to select an
 available port. Stop the server with Ctrl+C and use the same command to restart.
 
 If setup failed or you used `--skip-install`, run `npm run setup`.
 Set `PYTHON` to a Python executable if automatic detection cannot find Python
 3.11 or newer. Setup can be run again without replacing calculation files.
+
+In PowerShell, retry with `npm.cmd run setup`. `PYTHON` accepts one absolute
+executable path, including a path with spaces. Use
+`& $env:PYTHON --version` to inspect it. Setup creates `.venv\Scripts\python.exe`.
+You do not need to activate the environment or change an execution policy.
+
+Build the frontend from PowerShell with:
+
+<!-- docs:project-build:start -->
+```powershell
+npm.cmd run build
+if ($LASTEXITCODE -ne 0) { throw 'The frontend build failed.' }
+```
+<!-- docs:project-build:end -->
 
 Before replacing the starter, update [the brief](brief.md), collect
 [references](references/README.md), and read [the authoring notes](authoring.md).
