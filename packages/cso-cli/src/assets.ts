@@ -1,5 +1,5 @@
 import { readFileSync, realpathSync, statSync } from 'node:fs';
-import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { createHash } from 'node:crypto';
 import {
   ResolvedAssetSchema,
@@ -23,7 +23,11 @@ export function captureAssets(
         resolve(root, dirname(asset.moduleId), asset.path),
       );
       const within = relative(root, path);
-      if (within === '..' || within.startsWith('../') || isAbsolute(within))
+      if (
+        within === '..' ||
+        within.startsWith(`..${sep}`) ||
+        isAbsolute(within)
+      )
         throw new Error('Asset resolves outside the entry source directory');
       if (!statSync(path).isFile())
         throw new Error('Asset is not a regular file');
