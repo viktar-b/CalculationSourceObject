@@ -40,7 +40,8 @@ if ($LASTEXITCODE -ne 0) { throw 'The development server failed.' }
 
 Use an absolute Python executable path for `PYTHON` if the interpreter is not
 on PATH. A launcher-only installation can supply that path with
-`$env:PYTHON = py -3.11 -c 'import sys; print(sys.executable)'`.
+`$env:PYTHON = py -3.11 -c 'import json, sys; print(json.dumps(sys.executable))' | ConvertFrom-Json`.
+The JSON capture preserves Unicode executable paths under legacy console encodings.
 `PYTHON` is an executable path, not a command such as `py -3.11`.
 The project uses its own `.venv`; activation and execution-policy changes are
 unnecessary. See the generated project's `README.md` for browser and API usage.

@@ -25,7 +25,8 @@ For Windows 11 x64, use Node 24 and Python 3.11+ with PowerShell 5.1 or 7.
 The following commands select an installed Python executable, then use a
 repository virtualenv. If `python` is not on PATH, replace the first assignment
 with your interpreter's absolute executable path. For a launcher-only install,
-use `$env:PYTHON = py -3.11 -c 'import sys; print(sys.executable)'`.
+use `$env:PYTHON = py -3.11 -c 'import json, sys; print(json.dumps(sys.executable))' | ConvertFrom-Json`.
+The JSON capture preserves Unicode executable paths under legacy console encodings.
 
 <!-- docs:repository-setup:start -->
 ```powershell
