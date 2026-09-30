@@ -177,6 +177,7 @@ try {
         npm = $npmVersion
         python = $pythonVersion
     }
+    Write-JsonNoBom (Join-Path $evidenceRoot 'versions.json') $versions
 
     Set-Location $repository
     $activeBlock = 'repository-setup'
