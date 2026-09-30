@@ -19,6 +19,28 @@ const workflow = z.object({
     quality: job,
     isolation: job,
     'installed-packages': job,
+    'windows-installed': job.extend({
+      name: z.string(),
+      'runs-on': z.literal('windows-2025'),
+      strategy: z.object({
+        'fail-fast': z.literal(false),
+        matrix: z.object({
+          include: z.array(z.object({
+            id: z.string(),
+            shell: z.string(),
+            edition: z.string(),
+            major: z.string(),
+          })),
+        }),
+      }),
+      steps: z.array(z.object({
+        name: z.string().optional(),
+        shell: z.string().optional(),
+        run: z.string().optional(),
+        uses: z.string().optional(),
+        with: z.record(z.string(), z.unknown()).optional(),
+      })),
+    }),
   }),
 }).parse(parse(readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8')));
 const script = z.string().min(1).parse(workflow.jobs.changes.steps.find((step) => step.id === 'classify')?.run);
@@ -29,17 +51,20 @@ type Change =
   | { kind: 'delete'; path: string }
   | { kind: 'empty' };
 
-type Policy = { quality: boolean; isolation: boolean; 'installed-packages': boolean };
-const full: Policy = { quality: true, isolation: true, 'installed-packages': true };
-const projects: Policy = { quality: true, isolation: true, 'installed-packages': false };
-const quality: Policy = { quality: true, isolation: false, 'installed-packages': false };
-const skip: Policy = { quality: false, isolation: false, 'installed-packages': false };
-const jobNames = ['quality', 'isolation', 'installed-packages'] satisfies (keyof Policy)[];
+type Policy = { quality: boolean; isolation: boolean; 'installed-packages': boolean; 'windows-installed': boolean };
+const full: Policy = { quality: true, isolation: true, 'installed-packages': true, 'windows-installed': true };
+const projects: Policy = { quality: true, isolation: true, 'installed-packages': false, 'windows-installed': true };
+const quality: Policy = { quality: true, isolation: false, 'installed-packages': false, 'windows-installed': true };
+const windowsDocumentation: Policy = { quality: false, isolation: false, 'installed-packages': false, 'windows-installed': true };
+const skip: Policy = { quality: false, isolation: false, 'installed-packages': false, 'windows-installed': false };
+const jobNames = ['quality', 'isolation', 'installed-packages', 'windows-installed'] satisfies (keyof Policy)[];
 
 function expression(source: string, context: object): unknown {
   assert.ok(source.startsWith('${{') && source.endsWith('}}'));
   return runInNewContext(source.slice(3, -2), context, { timeout: 1000 });
 }
+
+const githubExpression = (value: string) => `${String.fromCodePoint(36)}{{ ${value} }}`;
 
 function policy({ outputs, result = 'success', cancelled = false }: {
   outputs: Record<string, string>;
@@ -51,6 +76,7 @@ function policy({ outputs, result = 'success', cancelled = false }: {
     quality: z.boolean().parse(expression(workflow.jobs.quality.if, context)),
     isolation: z.boolean().parse(expression(workflow.jobs.isolation.if, context)),
     'installed-packages': z.boolean().parse(expression(workflow.jobs['installed-packages'].if, context)),
+    'windows-installed': z.boolean().parse(expression(workflow.jobs['windows-installed'].if, context)),
   };
 }
 
@@ -125,6 +151,10 @@ function classify({ change, event = 'pull_request', missingBase = false, missing
 
 for (const [name, change, expected] of [
   ['Markdown only', { kind: 'write', paths: ['README.md', 'guide with spaces.md', 'line\nbreak.md'] }, skip],
+  ['Windows development guide', { kind: 'write', paths: ['docs/development.md'] }, windowsDocumentation],
+  ['CLI guide', { kind: 'write', paths: ['packages/cso-cli/README.md'] }, windowsDocumentation],
+  ['initializer guide', { kind: 'write', paths: ['packages/create-cs-object/README.md'] }, windowsDocumentation],
+  ['generated-project guide', { kind: 'write', paths: ['packages/create-cs-object/template/authoring.md'] }, windowsDocumentation],
   ['package source', { kind: 'write', paths: ['packages/cso-core/src/index.ts'] }, projects],
   ['demo source', { kind: 'write', paths: ['apps/demo/app/page.tsx'] }, projects],
   ['Python package', { kind: 'write', paths: ['packages/cso-python/src/cso_python/cli.py'] }, projects],
@@ -174,7 +204,7 @@ test('failed detector and missing outputs run all checks', () => {
 });
 
 test('missing job output runs the affected check', () => {
-  assert.deepEqual(policy({ outputs: { run_quality: 'false', run_packages: 'false' } }), {
+  assert.deepEqual(policy({ outputs: { run_quality: 'false', run_packages: 'false', run_windows: 'false' } }), {
     ...skip, isolation: true,
   });
 });
@@ -186,6 +216,30 @@ test('cancellation prevents fallback jobs', () => {
 test('required jobs remain reported without workflow path filters', () => {
   assert.equal(workflow.on.pull_request, null);
   for (const name of jobNames) assert.equal(workflow.jobs[name].needs, 'changes');
+});
+
+test('Windows installed-user cases use explicit native PowerShell hosts', () => {
+  assert.equal(workflow.jobs['windows-installed'].name, `windows-installed (${githubExpression('matrix.id')})`);
+  assert.deepEqual(workflow.jobs['windows-installed'].strategy.matrix.include, [
+    { id: 'powershell-5.1', shell: 'powershell', edition: 'Desktop', major: '5' },
+    { id: 'pwsh-7', shell: 'pwsh', edition: 'Core', major: '7' },
+  ]);
+  const workflowStep = workflow.jobs['windows-installed'].steps.find((step) => step.name === 'Run the installed-user workflow');
+  assert.deepEqual(workflowStep, {
+    name: 'Run the installed-user workflow',
+    shell: githubExpression('matrix.shell'),
+    run: '& .\\tests\\integration\\installed\\windows-user-workflow.ps1',
+  });
+  const node = workflow.jobs['windows-installed'].steps.find((step) => step.uses?.startsWith('actions/setup-node@'));
+  const python = workflow.jobs['windows-installed'].steps.find((step) => step.uses?.startsWith('actions/setup-python@'));
+  assert.equal(node?.with?.['node-version'], '24');
+  assert.equal(python?.with?.['python-version'], '3.11');
+});
+
+test('Windows PowerShell reads the Unicode workflow as UTF-8', () => {
+  const bytes = readFileSync(new URL('../tests/integration/installed/windows-user-workflow.ps1', import.meta.url));
+  assert.deepEqual([...bytes.subarray(0, 3)], [0xef, 0xbb, 0xbf]);
+  assert(bytes.includes(Buffer.from('é', 'utf8')));
 });
 
 test('release runs full reusable CI before both registries publish', () => {
