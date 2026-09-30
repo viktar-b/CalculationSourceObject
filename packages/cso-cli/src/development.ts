@@ -1,5 +1,4 @@
 import { stringifyJson } from './json.ts';
-import { spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -22,6 +21,8 @@ import {
   type SheetDocument,
 } from '@cs-object/core';
 import { UsageError, type DevelopmentOptions } from './arguments.ts';
+import { runPythonProcess } from './python-process.ts';
+export { isolatedEnvironment } from './python-process.ts';
 export { parseCliArgs } from './arguments.ts';
 export type AnnotatedPythonPdfOptions = DevelopmentOptions;
 export interface PythonExporterOptions {
@@ -42,13 +43,6 @@ const escapeHtml = (value: string): string =>
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
-export function isolatedEnvironment(): NodeJS.ProcessEnv {
-  const environment = { ...process.env };
-  Reflect.deleteProperty(environment, 'NODE_PATH');
-  Reflect.deleteProperty(environment, 'PYTHONPATH');
-  Reflect.deleteProperty(environment, 'PYTHONHOME');
-  return environment;
-}
 export function writeAtomically(
   outPath: string,
   bytes: string | Uint8Array,
@@ -70,32 +64,25 @@ export const runPythonExporter = ({
   inputs,
   sourcePath,
 }: PythonExporterOptions): CalculationSourceObject => {
-  const result = spawnSync(
-    process.env.PYTHON ?? 'python3',
-    [
-      '-I',
-      '-m',
-      'cso_python',
-      'export',
+  const result = runPythonProcess({
+    command: 'export',
+    args: [
       sourcePath,
       '--function',
       functionName,
       '--inputs-json',
       stringifyJson(inputs),
     ],
-    {
-      encoding: 'utf8',
-      env: isolatedEnvironment(),
-      maxBuffer: 32 * 1024 * 1024,
-    },
-  );
+    maxBuffer: 32 * 1024 * 1024,
+  });
 
   if (result.error) {
     throw result.error;
   }
 
   if (result.status !== 0) {
-    const message = result.stderr.trim() || 'Python exporter failed';
+    const message =
+      result.stderr.toString('utf8').trim() || 'Python exporter failed';
     if (result.status === 2) throw new UsageError(message);
     throw new Error(message);
   }
@@ -104,7 +91,9 @@ export const runPythonExporter = ({
     process.stderr.write(result.stderr);
   }
 
-  return CalculationSourceObjectSchema.parse(JSON.parse(result.stdout));
+  return CalculationSourceObjectSchema.parse(
+    JSON.parse(result.stdout.toString('utf8')),
+  );
 };
 
 export const renderFormulaSheetHtml = (

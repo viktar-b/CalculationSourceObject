@@ -40,7 +40,7 @@ function run(name, args, expected = 0, extraEnv = {}, outPath = resolve(`pdf-out
   assert.equal(result.stdout.toString().trim().split('\n').length, 1);
   const calls = readFileSync('pdf-invocations.jsonl', 'utf8').trim().split('\n').map(JSON.parse);
   assert.equal(calls.length, 1, name);
-  assert.deepEqual(calls[0].slice(0, 4), ['-I', '-m', 'cso_python', 'execute']);
+  assert.deepEqual(calls[0].slice(0, 6), ['-I', '-X', 'utf8', '-m', 'cso_python', 'execute']);
   assert.equal(report.command, 'pdf');
   assert.equal(report.ok, expected === 0);
   let manifest;
