@@ -1,5 +1,4 @@
 import { stringifyJson } from './json.ts';
-import { spawnSync } from 'node:child_process';
 import {
   ExecutionResponseSchema,
   contractIssuesToDiagnostics,
@@ -7,6 +6,7 @@ import {
   type Diagnostic,
 } from '@cs-object/core';
 import { parseStrictJson } from './strict-json.ts';
+import { runPythonProcess } from './python-process.ts';
 import type { VerifiedOptions } from './verified-arguments.ts';
 
 type ExecutionAttempt =
@@ -24,30 +24,19 @@ export function runPythonExecution(
   options: VerifiedOptions,
   timeoutMs?: number,
 ): ExecutionAttempt {
-  const environment = { ...process.env };
-  for (const key of ['PYTHONPATH', 'PYTHONHOME', 'NODE_PATH']) {
-    Reflect.deleteProperty(environment, key);
-  }
-  const result = spawnSync(
-    process.env.PYTHON ?? 'python3',
-    [
-      '-I',
-      '-m',
-      'cso_python',
-      'execute',
+  const result = runPythonProcess({
+    command: 'execute',
+    args: [
       options.sourcePath,
       '--function',
       options.functionName,
       '--inputs-json',
       stringifyJson(options.inputs),
     ],
-    {
-      env: environment,
-      maxBuffer: 64 * 1024 * 1024,
-      timeout: timeoutMs,
-      killSignal: 'SIGKILL',
-    },
-  );
+    maxBuffer: 64 * 1024 * 1024,
+    timeout: timeoutMs,
+    killSignal: 'SIGKILL',
+  });
   if (result.stderr) {
     process.stderr.write(result.stderr);
   }
