@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import {
   CalculationDefinitionResponseSchema,
@@ -16,6 +15,7 @@ import { jsonBytes, type PresentationMapping } from './evidence.ts';
 import { renderPreparedPdf, LayoutInspectionError } from './pdf-rendering.ts';
 import { buildPreparedHtml } from './prepared-html.ts';
 import { parseStrictJson } from './strict-json.ts';
+import { runPythonProcess } from './python-process.ts';
 import { executeAndVerify, type VerifiedCapture } from './verification.ts';
 import type { VerifiedOptions } from './verified-arguments.ts';
 
@@ -54,27 +54,13 @@ const defaults: DevLimits = {
   maximumAgeMs: 30 * 60_000,
 };
 function describe(options: DevTarget): CalculationDefinition {
-  const env = { ...process.env };
-  for (const key of ['PYTHONPATH', 'PYTHONHOME', 'NODE_PATH'])
-    Reflect.deleteProperty(env, key);
-  const result = spawnSync(
-    process.env.PYTHON ?? 'python3',
-    [
-      '-I',
-      '-m',
-      'cso_python',
-      'describe',
-      options.sourcePath,
-      '--function',
-      options.functionName,
-    ],
-    {
-      env,
-      timeout: 30_000,
-      killSignal: 'SIGKILL',
-      maxBuffer: 4 * 1024 * 1024,
-    },
-  );
+  const result = runPythonProcess({
+    command: 'describe',
+    args: [options.sourcePath, '--function', options.functionName],
+    timeout: 30_000,
+    killSignal: 'SIGKILL',
+    maxBuffer: 4 * 1024 * 1024,
+  });
   if (result.error || result.signal)
     throw new HttpError(
       422,

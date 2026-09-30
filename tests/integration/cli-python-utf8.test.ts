@@ -9,7 +9,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { createDevRuntime } from '../../packages/cso-cli/src/dev-runtime.ts';
 import { runPythonExporter } from '../../packages/cso-cli/src/development.ts';
 import { executeAndVerify } from '../../packages/cso-cli/src/verification.ts';
@@ -19,7 +19,22 @@ const cli = fileURLToPath(
   new URL('../../packages/cso-cli/dist/cli.js', import.meta.url),
 );
 
+beforeEach(() => {
+  const directory = mkdtempSync(join(tmpdir(), 'cso-python-environment-'));
+  directories.push(directory);
+  writeFileSync(
+    join(directory, 'cso_python.py'),
+    'raise RuntimeError("Untrusted Python path")\n',
+  );
+  vi.stubEnv('PYTHONPATH', directory);
+  vi.stubEnv('PYTHONHOME', join(directory, 'missing-python-home'));
+  vi.stubEnv('NODE_PATH', directory);
+  vi.stubEnv('PYTHONIOENCODING', 'ascii');
+  vi.stubEnv('PYTHONUTF8', '0');
+});
+
 afterEach(() => {
+  vi.unstubAllEnvs();
   for (const directory of directories.splice(0))
     rmSync(directory, { recursive: true, force: true });
 });

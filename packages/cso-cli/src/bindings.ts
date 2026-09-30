@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { runPythonProcess } from './python-process.ts';
 
 export const bindingsHelp = `Usage: cso bindings <directory> [--check]
 
@@ -10,15 +10,11 @@ Exit codes: 0 current/generated, 1 stale/source/write failure, 2 invalid usage.
 `;
 
 export function bindingsCommand(args: string[]): number {
-  const environment = { ...process.env };
-  for (const key of ['PYTHONPATH', 'PYTHONHOME', 'NODE_PATH']) {
-    Reflect.deleteProperty(environment, key);
-  }
-  const result = spawnSync(
-    process.env.PYTHON ?? 'python3',
-    ['-I', '-m', 'cso_python', 'bindings', ...args],
-    { env: environment, maxBuffer: 64 * 1024 * 1024 },
-  );
+  const result = runPythonProcess({
+    command: 'bindings',
+    args,
+    maxBuffer: 64 * 1024 * 1024,
+  });
   if (result.stderr) process.stderr.write(result.stderr);
   if (result.error || result.signal) {
     process.stdout.write(
