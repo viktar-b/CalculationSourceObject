@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { z } from 'zod';
 import { createDevRuntime } from '../../packages/cso-cli/src/dev-runtime.ts';
 import { runPythonExporter } from '../../packages/cso-cli/src/development.ts';
 import { executeAndVerify } from '../../packages/cso-cli/src/verification.ts';
@@ -108,7 +109,13 @@ test('bindings forward UTF-8 JSON and generate handles in a Unicode directory', 
     const stdout = new TextDecoder('utf-8', { fatal: true }).decode(
       result.stdout,
     );
-    expect(JSON.parse(stdout)).toMatchObject({ ok: true, directory });
+    const response = z
+      .object({ ok: z.boolean(), directory: z.string() })
+      .parse(JSON.parse(stdout));
+    expect(response.ok).toBe(true);
+    expect(realpathSync.native(response.directory)).toBe(
+      realpathSync.native(directory),
+    );
     expect(stdout).toContain('café 梁');
   }
   expect(
