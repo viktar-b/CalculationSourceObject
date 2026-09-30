@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { exerciseBrowser } from './_initializer-browser.ts';
 import {
   artifactSet,
+  assertOutputs,
   hashBytes,
   LockSchema,
   OutputsSchema,
@@ -116,7 +117,7 @@ if (config.kind === 'restart') {
       })
     ).json(),
   );
-  assert.deepEqual(calculation, outputs);
+  assertOutputs(calculation, outputs);
   const runResponse = await postJson(
     config.origin,
     '/api/reports/two-panel/runs',
