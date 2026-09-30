@@ -124,11 +124,11 @@ function Start-DevProcess([string]$Name, [string]$Project, [string]$EvidenceRoot
 }
 
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
-$shellId = $env:CSO_WINDOWS_SHELL_ID
-if ($shellId -notin @('powershell-5.1', 'pwsh-7')) {
-    throw "Unknown Windows shell case: $shellId"
+$windowsShellId = $env:CSO_WINDOWS_SHELL_ID
+if ($windowsShellId -notin @('powershell-5.1', 'pwsh-7')) {
+    throw "Unknown Windows shell case: $windowsShellId"
 }
-$evidenceRoot = Join-Path $env:RUNNER_TEMP "cso installed packages $shellId é"
+$evidenceRoot = Join-Path $env:RUNNER_TEMP "cso installed packages $windowsShellId é"
 New-Item -ItemType Directory -Path $evidenceRoot | Out-Null
 $transcriptPath = Join-Path $evidenceRoot 'workflow.log'
 Start-Transcript -LiteralPath $transcriptPath | Out-Null
@@ -546,7 +546,7 @@ try {
     )
     $qualification = [ordered]@{
         ok = $true
-        shell = $shellId
+        shell = $windowsShellId
         root = $evidenceRoot
         project = $project
         versions = $versions
@@ -592,7 +592,7 @@ try {
 } catch {
     $failure = [ordered]@{
         ok = $false
-        shell = $shellId
+        shell = $windowsShellId
         activeBlock = $activeBlock
         lastExitCode = $LASTEXITCODE
         commands = $commands
