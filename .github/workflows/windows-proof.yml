@@ -9,8 +9,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: windows-repair-proof
-  cancel-in-progress: true
+  group: windows-repair-proof-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   native-repair:
@@ -24,15 +24,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: bindings-bytes
-            head: ef6cfc547bf9c33913f2ca91aa919f048b179f91
-            command: "& $env:PYTHON -I packages/cso-python/tests/test_bindings.py -v"
-          - name: bindings-canonical
-            head: ef6cfc547bf9c33913f2ca91aa919f048b179f91
-            command: "node node_modules/vitest/vitest.mjs run tests/integration/demo-examples.test.ts"
-          - name: npm-launch
-            head: faff12d2cf50e995fa67ff72dd800feb5669ab7e
-            command: "node node_modules/vitest/vitest.mjs run tests/integration/demo-launch.test.ts"
+          - name: cli-utf8
+            head: 8cff3e1d85e8dffc2e58f35e3d925a7ecd8a7005
+            command: "node node_modules/vitest/vitest.mjs run tests/integration/cli-python-utf8.test.ts"
     steps:
       - name: Use normal Windows Git conversion
         run: git config --global core.autocrlf true
