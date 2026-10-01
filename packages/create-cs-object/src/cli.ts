@@ -48,7 +48,7 @@ try {
             typecheck: 'tsc -b --pretty false',
           },
           dependencies: {
-            '@cs-object/cli': '0.1.1',
+            '@cs-object/cli': '0.1.2',
             '@cs-object/core': '0.1.0',
             '@base-ui/react': '^1.8.0',
             '@fontsource-variable/geist-mono': '^5.3.0',
