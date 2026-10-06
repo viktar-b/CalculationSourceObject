@@ -188,6 +188,8 @@ export {
   SymbolObservationSchema,
   type ExecutionPayload,
   type ExecutionResponse,
+  type MethodContentItem,
+  type MethodHelperRecord,
   type GivenSource,
   type InputBinding,
   type Invocation,
@@ -239,6 +241,8 @@ export {
   type LegacyAssetManifest,
   type PreparedDocument,
   type PreparedDocumentItem,
+  type PreparedMethodContent,
+  type PreparedMethodHelper,
   type PreparedDocumentSection,
   type ResolvedAsset,
 } from './contracts/document.ts';

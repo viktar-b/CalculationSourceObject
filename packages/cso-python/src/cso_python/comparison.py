@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import ast
 import hashlib
+from pathlib import Path
 
 from .annotations import symbol_annotation
-from .source import Json, authoring_name, identity, span
+from .source import Json, SourceError, authoring_name, identity, kwargs, span
+from .source_plan import _describe_call, lower_expression
 
 _OPERATORS = {
     "fg.add": "+",
@@ -15,7 +17,6 @@ _OPERATORS = {
     "fg.divide": "/",
     "fg.pow": "^",
 }
-_DEFERRED_CALLS = {"method", "table", "text", "figure", "document_section"}
 
 
 def place_comparison(planner, inv, statement: ast.Expr, section: Json, ids: set[str]) -> None:
@@ -104,6 +105,19 @@ def _place_method(planner, inv, call: ast.Call, section: Json, ids: set[str]) ->
             "Run cso bindings to refresh the changed public interface",
         )
     plan = planner.ensure_plan(inv, target, function_name)
+    quantities = _quantities(planner, inv, target, definition, plan, call)
+    content, helpers = _method_content(
+        planner,
+        inv,
+        target,
+        definition,
+        plan,
+        quantities,
+        method_id,
+        call,
+        {(target.id, function_name)},
+        {},
+    )
     record = {
         "id": method_id,
         "localId": local_id,
@@ -116,7 +130,9 @@ def _place_method(planner, inv, call: ast.Call, section: Json, ids: set[str]) ->
         "revision": plan.revision,
         "parameterNames": list(definition.parameters),
         "outputNames": list(definition.outputs),
-        "quantities": _quantities(planner, inv, target, definition, plan, call),
+        "quantities": quantities,
+        "content": content,
+        "helpers": helpers,
         "location": span(inv.module.id, call),
     }
     ids.add(method_id)
@@ -134,34 +150,30 @@ def _place_method(planner, inv, call: ast.Call, section: Json, ids: set[str]) ->
 def _reject_deferred_content(planner, inv, module, function_name: str, at: ast.AST) -> None:
     function = module.functions[function_name]
     for node in ast.walk(ast.Module(body=function.body, type_ignores=[])):
-        if isinstance(node, (ast.IfExp, ast.With)):
+        if isinstance(node, ast.IfExp):
             planner.error(
                 inv,
                 at,
                 "UNSUPPORTED_METHOD_CONTENT",
-                "Conditional, grouped, or nested method content is not available in this slice",
+                "Conditional method content is not available in this slice",
             )
-        if isinstance(node, ast.Call) and authoring_name(node.func) in _DEFERRED_CALLS:
+        if isinstance(node, ast.With) and not _is_document_section(node):
             planner.error(
                 inv,
                 at,
                 "UNSUPPORTED_METHOD_CONTENT",
-                "Conditional, grouped, or nested method content is not available in this slice",
+                "Only document sections can group method content",
             )
-        if (
-            isinstance(node, ast.Assign)
-            and isinstance(node.value, ast.Call)
-            and (
-                authoring_name(node.value.func) in module.handles
-                or authoring_name(node.value.func) == "calculation_call"
-            )
-        ):
-            planner.error(
-                inv,
-                at,
-                "UNSUPPORTED_METHOD_CONTENT",
-                "Nested calculation calls stay outside this straight-line method slice",
-            )
+
+
+def _is_document_section(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.With)
+        and len(node.items) == 1
+        and node.items[0].optional_vars is None
+        and isinstance(node.items[0].context_expr, ast.Call)
+        and authoring_name(node.items[0].context_expr.func) == "document_section"
+    )
 
 
 def _quantities(planner, inv, module, definition, plan, at: ast.AST) -> list[Json]:
@@ -252,7 +264,10 @@ def _formula_text(nodes: list[Json], glyphs: dict[str, str]) -> str:
         if mode == "LITERAL":
             return str(node.get("draft", node["literal"]["value"]))
         if mode == "SYMBOL":
-            name = node["ref"].get("name") or node["ref"].get("output")
+            ref = node["ref"]
+            if ref.get("kind") == "output":
+                return f"{ref['call']}.{ref['output']}"
+            name = ref.get("name") or ref.get("output")
             return glyphs.get(name, name)
         if mode == "GIVEN_PARAMETER":
             return glyphs.get(node["parameter"], node["parameter"])
@@ -267,6 +282,278 @@ def _formula_text(nodes: list[Json], glyphs: dict[str, str]) -> str:
         return ""
 
     return walk(nodes[0]["key"])
+
+
+def _method_content(
+    planner,
+    inv,
+    module,
+    definition,
+    plan,
+    quantities: list[Json],
+    owner_id: str,
+    at: ast.AST,
+    stack: set[tuple[str, str]],
+    cache: dict[tuple[str, str], Json],
+) -> tuple[list[Json], list[Json]]:
+    glyphs = {
+        item["selectionName"] if item["role"] == "input" else item["variableName"]: item["glyph"]
+        for item in quantities
+    }
+    for item in quantities:
+        glyphs.setdefault(item["variableName"], item["glyph"])
+    content: list[Json] = [
+        {"kind": "quantity", "variableName": name}
+        for name in definition.parameters
+        if name not in definition.given_parameters
+    ]
+    helpers: list[Json] = []
+    _walk_steps(
+        planner,
+        inv,
+        module,
+        definition,
+        glyphs,
+        content,
+        helpers,
+        owner_id,
+        plan.steps,
+        stack,
+        cache,
+        at,
+    )
+    seen = _content_variables(content)
+    if any(item["variableName"] not in seen for item in quantities):
+        planner.error(
+            inv,
+            at,
+            "UNSUPPORTED_METHOD_CONTENT",
+            "Method content must include every explained quantity",
+        )
+    return content, helpers
+
+
+def _walk_steps(
+    planner,
+    inv,
+    module,
+    definition,
+    glyphs: dict[str, str],
+    content: list[Json],
+    helpers: list[Json],
+    owner_id: str,
+    steps,
+    stack: set[tuple[str, str]],
+    cache: dict[tuple[str, str], Json],
+    at: ast.AST,
+) -> None:
+    for step in steps:
+        node = step.node
+        if isinstance(node, ast.Return):
+            continue
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            content.append({"kind": "quantity", "variableName": node.target.id})
+            continue
+        if isinstance(node, ast.With):
+            if not _is_document_section(node) or "document_section" not in module.imported:
+                planner.error(inv, node, "UNSUPPORTED_METHOD_CONTENT", "Only document sections can group method content")
+            config = kwargs(
+                node.items[0].context_expr,
+                module.id,
+                {"id", "title", "metadata"},
+                {"id", "title"},
+            )
+            nested: list[Json] = []
+            _walk_steps(
+                planner,
+                inv,
+                module,
+                definition,
+                glyphs,
+                nested,
+                helpers,
+                owner_id,
+                step.child_steps or [],
+                stack,
+                cache,
+                at,
+            )
+            content.append(
+                {
+                    "kind": "section",
+                    "localId": config["id"],
+                    "title": config["title"],
+                    "content": nested,
+                }
+            )
+            continue
+        described = _describe_call(node)
+        if described is not None:
+            helper = _helper(planner, inv, module, described, owner_id, stack, cache, node)
+            if not any(item["id"] == helper["id"] for item in helpers):
+                helpers.append(helper)
+            content.append(
+                {
+                    "kind": "call",
+                    "binding": described["binding"],
+                    "helperId": helper["id"],
+                    "inputs": _call_formulas(module, definition, node, glyphs),
+                    "outputs": list(helper["outputNames"]),
+                }
+            )
+            continue
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
+            name = authoring_name(node.value.func)
+            if name in {"method", "table"}:
+                continue
+            if name == "text":
+                data = kwargs(node.value, module.id, {"id", "content"}, {"id", "content"})
+                content.append({"kind": "text", "localId": data["id"], "content": data["content"]})
+                continue
+            if name == "figure":
+                data = kwargs(
+                    node.value,
+                    module.id,
+                    {"id", "path", "media_type", "caption", "alt"},
+                    {"id", "path", "media_type", "caption", "alt"},
+                )
+                content.append(
+                    {
+                        "kind": "figure",
+                        "localId": data["id"],
+                        "assetId": _remember_figure(planner, module, data, owner_id, node),
+                        "caption": data["caption"],
+                        "alt": data["alt"],
+                    }
+                )
+                continue
+        planner.error(
+            inv,
+            node,
+            "UNSUPPORTED_METHOD_CONTENT",
+            f"Unsupported method statement {type(node).__name__}",
+        )
+
+
+def _call_formulas(module, definition, node: ast.Assign, glyphs: dict[str, str]) -> list[Json]:
+    keywords = {keyword.arg: keyword.value for keyword in node.value.keywords}
+    mapping = keywords.get("inputs")
+    if not isinstance(mapping, ast.Dict):
+        return []
+    formulas = []
+    for key, value in zip(mapping.keys, mapping.values):
+        if not isinstance(key, ast.Constant) or not isinstance(key.value, str):
+            continue
+        nodes = lower_expression(
+            module,
+            definition.function,
+            set(definition.parameters),
+            value,
+            given=False,
+        )
+        formulas.append(
+            {
+                "name": key.value,
+                "formulaText": _formula_text(
+                    [{item_key: item_value for item_key, item_value in item.items() if item_key != "_ast"} for item in nodes],
+                    glyphs,
+                ),
+            }
+        )
+    return formulas
+
+
+def _helper(planner, inv, module, described: Json, owner_id: str, stack, cache, at: ast.AST) -> Json:
+    loaded = planner.capture.load(module.path.parent / described["path"], span(module.id, at))
+    function_name = described["function"]
+    key = (loaded.id, function_name)
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+    if key in stack:
+        planner.error(inv, at, "UNSUPPORTED_METHOD_CONTENT", "Method dependencies must not cycle")
+    if function_name not in loaded.functions:
+        planner.error(inv, at, "MISSING_FUNCTION", f"Missing calculation {function_name}")
+    _reject_deferred_content(planner, inv, loaded, function_name, at)
+    definition = planner.definitions.get(loaded.path, function_name)
+    plan = planner.ensure_plan(inv, loaded, function_name)
+    helper_id = identity("method", owner_id, f"{loaded.id}::{function_name}")
+    stack.add(key)
+    quantities = _quantities(planner, inv, loaded, definition, plan, at)
+    content, nested = _method_content(
+        planner,
+        inv,
+        loaded,
+        definition,
+        plan,
+        quantities,
+        helper_id,
+        at,
+        stack,
+        cache,
+    )
+    record = {
+        "id": helper_id,
+        "moduleId": loaded.id,
+        "function": function_name,
+        "sourceHash": plan.source_hash,
+        "revision": plan.revision,
+        "parameterNames": list(definition.parameters),
+        "outputNames": list(definition.outputs),
+        "quantities": quantities,
+        "content": content,
+        "helpers": nested,
+    }
+    cache[key] = record
+    stack.remove(key)
+    return record
+
+
+def _content_variables(content: list[Json]) -> set[str]:
+    found: set[str] = set()
+    for item in content:
+        if item["kind"] == "quantity":
+            found.add(item["variableName"])
+        elif item["kind"] == "section":
+            found.update(_content_variables(item["content"]))
+    return found
+
+
+def _remember_figure(planner, module, data: Json, owner_id: str, node: ast.AST) -> str:
+    path = data["path"]
+    if Path(path).is_absolute() or "\\" in path or ":" in path or "\0" in path:
+        raise SourceError(
+            "INVALID_ASSET_PATH",
+            "Figure needs a module-relative local path",
+            location=span(module.id, node),
+        )
+    try:
+        requested = module.path.parent / path
+        asset_path = requested.resolve(strict=True)
+        asset_path.relative_to(planner.capture.root)
+        asset_bytes = asset_path.read_bytes()
+    except (OSError, ValueError, RuntimeError) as error:
+        raise SourceError(
+            "INVALID_ASSET_PATH",
+            f"Missing or escaping asset: {path}: {error}",
+            location=span(module.id, node),
+        ) from error
+    if data["media_type"] not in {"image/png", "image/jpeg", "image/svg+xml"}:
+        raise SourceError(
+            "UNSUPPORTED_ASSET",
+            "Unsupported figure media type",
+            location=span(module.id, node),
+        )
+    asset_id = identity("figure", owner_id, data["id"])
+    planner.asset_files[requested.absolute()] = (asset_path, asset_bytes)
+    planner.assets[asset_id] = {
+        "id": asset_id,
+        "moduleId": module.id,
+        "path": path,
+        "mediaType": data["media_type"],
+        "sha256": hashlib.sha256(asset_bytes).hexdigest(),
+    }
+    return asset_id
 
 
 def _place_table(planner, inv, call: ast.Call, section: Json, ids: set[str]) -> None:

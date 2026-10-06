@@ -211,6 +211,79 @@ const PreparedMethodQuantitySchema = z.strictObject({
   unit: z.string(),
   formulaText: z.string(),
 });
+export type PreparedMethodContent =
+  | ({ kind: 'quantity' } & z.infer<typeof PreparedMethodQuantitySchema>)
+  | { kind: 'text'; localId: string; content: string }
+  | {
+      kind: 'figure';
+      localId: string;
+      assetId: string;
+      caption: string;
+      alt: string;
+    }
+  | {
+      kind: 'call';
+      binding: string;
+      helperId: string;
+      inputs: { name: string; formulaText: string }[];
+      outputs: string[];
+    }
+  | {
+      kind: 'section';
+      localId: string;
+      title: string;
+      content: PreparedMethodContent[];
+    };
+export type PreparedMethodHelper = {
+  id: string;
+  function: string;
+  content: PreparedMethodContent[];
+  helpers: PreparedMethodHelper[];
+};
+const PreparedMethodContentSchema: z.ZodType<PreparedMethodContent> = z.lazy(
+  () =>
+    z.discriminatedUnion('kind', [
+      PreparedMethodQuantitySchema.extend({ kind: z.literal('quantity') }),
+      z.strictObject({
+        kind: z.literal('text'),
+        localId: NonemptyStringSchema,
+        content: z.string(),
+      }),
+      z.strictObject({
+        kind: z.literal('figure'),
+        localId: NonemptyStringSchema,
+        assetId: NonemptyStringSchema,
+        caption: NonemptyStringSchema,
+        alt: NonemptyStringSchema,
+      }),
+      z.strictObject({
+        kind: z.literal('call'),
+        binding: NonemptyStringSchema,
+        helperId: NonemptyStringSchema,
+        inputs: z.array(
+          z.strictObject({
+            name: NonemptyStringSchema,
+            formulaText: z.string(),
+          }),
+        ),
+        outputs: z.array(NonemptyStringSchema).min(1),
+      }),
+      z.strictObject({
+        kind: z.literal('section'),
+        localId: NonemptyStringSchema,
+        title: NonemptyStringSchema,
+        content: z.array(PreparedMethodContentSchema),
+      }),
+    ]),
+);
+const PreparedMethodHelperSchema: z.ZodType<PreparedMethodHelper> = z.lazy(() =>
+  z.strictObject({
+    id: NonemptyStringSchema,
+    function: NonemptyStringSchema,
+    content: z.array(PreparedMethodContentSchema).min(1),
+    helpers: z.array(PreparedMethodHelperSchema),
+  }),
+);
 const PreparedTableCellSchema = z.strictObject({
   heading: NonemptyStringSchema,
   invocationId: NonemptyStringSchema,
@@ -272,6 +345,8 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
     id: NonemptyStringSchema,
     title: NonemptyStringSchema,
     quantities: z.array(PreparedMethodQuantitySchema).min(1),
+    content: z.array(PreparedMethodContentSchema).min(1),
+    helpers: z.array(PreparedMethodHelperSchema),
     contextSource: HistoricalJsonObjectSchema.optional(),
     ...placementFields,
   }),
@@ -524,6 +599,33 @@ const validateAssets = (document: PreparedDocument, ctx: z.RefinementCtx) => {
     }
     assetIds.add(resolved.asset.id);
   }
+  const walkContent = (
+    content: PreparedMethodContent[],
+    path: (string | number)[],
+  ): void => {
+    for (const [index, item] of content.entries()) {
+      if (item.kind === 'figure' && !assetIds.has(item.assetId)) {
+        addIssue(
+          ctx,
+          'UNRESOLVED_DOCUMENT_ASSET',
+          'Figure asset must resolve to captured bytes',
+          [...path, index, 'assetId'],
+        );
+      }
+      if (item.kind === 'section') {
+        walkContent(item.content, [...path, index, 'content']);
+      }
+    }
+  };
+  const walkHelpers = (
+    helpers: PreparedMethodHelper[],
+    path: (string | number)[],
+  ): void => {
+    for (const [index, helper] of helpers.entries()) {
+      walkContent(helper.content, [...path, index, 'content']);
+      walkHelpers(helper.helpers, [...path, index, 'helpers']);
+    }
+  };
   for (const [sectionIndex, section] of document.sections.entries()) {
     for (const [itemIndex, item] of section.items.entries()) {
       if (item.kind === 'figure' && !assetIds.has(item.figure.assetId)) {
@@ -533,6 +635,22 @@ const validateAssets = (document: PreparedDocument, ctx: z.RefinementCtx) => {
           'Figure asset must resolve to captured bytes',
           ['sections', sectionIndex, 'items', itemIndex, 'figure', 'assetId'],
         );
+      }
+      if (item.kind === 'method') {
+        walkContent(item.content, [
+          'sections',
+          sectionIndex,
+          'items',
+          itemIndex,
+          'content',
+        ]);
+        walkHelpers(item.helpers, [
+          'sections',
+          sectionIndex,
+          'items',
+          itemIndex,
+          'helpers',
+        ]);
       }
     }
   }

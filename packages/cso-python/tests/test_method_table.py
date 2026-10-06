@@ -1,5 +1,6 @@
-"""Straight-line method and column comparison capture."""
+"""Method and column comparison capture, including nested helpers."""
 
+import base64
 from pathlib import Path
 import tempfile
 import unittest
@@ -23,6 +24,60 @@ def rectangle(width: Width, height: Height, allowance: Allowance = 0.0) -> Calcu
     perimeter: Annotated[float, symbol(glyph="P", description="Perimeter", unit="m")] = 2 * (width + height)
     return {"area": area, "perimeter": perimeter}
 '''
+
+
+PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+)
+
+MARGIN = '''from typing import Annotated, TypeAlias
+from cso_python import CalculationResults, calculation, section, symbol, text
+
+Length: TypeAlias = Annotated[float, symbol(glyph="L", description="Length", unit="m")]
+
+@calculation(id="margin", title="Add a margin")
+@section(id="margin-section", title="Margin")
+def margin(length: Length) -> CalculationResults:
+    """Add one metre of margin."""
+    text(id="assumption", content="The margin is one metre.")
+    grown: Annotated[float, symbol(glyph="G", description="Grown length", unit="m")] = length + 1.0
+    return {"grown": grown}
+'''
+
+PANEL = '''from typing import Annotated, TypeAlias
+from cso_python import CalculationResults, calculation, document_section, figure, section, symbol, text
+from _cso_bindings.margin import margin
+
+Width: TypeAlias = Annotated[float, symbol(glyph="w", description="Width", unit="m")]
+Height: TypeAlias = Annotated[float, symbol(glyph="h", description="Height", unit="m")]
+
+@calculation(id="panel", title="Panel area")
+@section(id="panel-section", title="Panel")
+def panel(width: Width, height: Height) -> CalculationResults:
+    """Grow each side, then multiply."""
+    with document_section(id="assumptions", title="Assumptions"):
+        text(id="note", content="Panel sides are grown independently.")
+    figure(id="sketch", path="sketch.png", media_type="image/png", caption="Panel sketch", alt="A rectangle")
+    wider = margin(length=width)
+    taller = margin(length=height)
+    product: Annotated[float, symbol(glyph="Q", description="Grown product", unit="m^2")] = wider["grown"] * taller["grown"]
+    area: Annotated[float, symbol(glyph="A", description="Area", unit="m^2")] = product
+    return {"area": area}
+'''
+
+
+def content_shape(content: list) -> list:
+    shaped = []
+    for item in content:
+        if item["kind"] == "section":
+            shaped.append(("section", item["title"], content_shape(item["content"])))
+        elif item["kind"] == "quantity":
+            shaped.append(("quantity", item["variableName"]))
+        elif item["kind"] == "call":
+            shaped.append(("call", item["binding"], item["inputs"], item["outputs"]))
+        else:
+            shaped.append((item["kind"], item["localId"]))
+    return shaped
 
 
 def compare_source(body: str) -> str:
@@ -218,13 +273,7 @@ def compare() -> CalculationResults:
     def test_method_content_awaiting_later_slices_is_diagnosed(self):
         source = (self.root / "rectangle.cso.py").read_text()
         (self.root / "rectangle.cso.py").write_text(
-            source.replace(
-                "from cso_python import CalculationResults, calculation, section, symbol",
-                "from cso_python import CalculationResults, calculation, section, symbol, text",
-            ).replace(
-                "    area:",
-                '    text(id="note", content="Keep this note")\n    area:',
-            )
+            source.replace(" = width * height", " = width if width > height else height")
         )
         (self.root / "compare.cso.py").write_text(
             '''from typing import Annotated
@@ -256,3 +305,214 @@ def compare() -> CalculationResults:
             response = execute(self.root / "compare.cso.py", "compare", {})
             self.assertEqual(response["diagnostics"][0]["code"], "OVERLAPPING_TABLE")
             run.assert_not_called()
+
+    def write_composed(self, body: str) -> None:
+        (self.root / "sketch.png").write_bytes(PNG)
+        (self.root / "margin.cso.py").write_text(MARGIN)
+        (self.root / "panel.cso.py").write_text(PANEL)
+        (self.root / "compare.cso.py").write_text(
+            f'''from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table, text
+from _cso_bindings.panel import panel
+
+@calculation(id="compare", title="Panel comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+{body}
+    compared: Annotated[float, symbol(glyph="R", description="Compared area", unit="m^2")] = first_panel["area"]
+    return {{"compared": compared}}
+'''
+        )
+        generate(self.root)
+
+    def test_nested_helpers_keep_distinct_call_mappings(self):
+        self.write_composed(
+            '''    method(id="panel-method", calculation=panel, title="How panel area is calculated")
+    text(id="case-a", content="Case A is the narrow panel")
+    first_panel = panel(width=2.0, height=3.0)
+    text(id="case-b", content="Case B is the wide panel")
+    second_panel = panel(width=1.0, height=6.0)
+    table(id="panel-results", method="panel-method", title="Panel comparison", cases={"Case A": first_panel, "Case B": second_panel}, inputs=(), outputs=("area",))
+    extra_panel = panel(width=4.0, height=5.0)
+'''
+        )
+        execution = self.execution()["execution"]
+        method = execution["methods"][0]
+        self.assertEqual(
+            content_shape(method["content"]),
+            [
+                ("quantity", "width"),
+                ("quantity", "height"),
+                ("section", "Assumptions", [("text", "note")]),
+                ("figure", "sketch"),
+                ("call", "wider", [{"name": "length", "formulaText": "w"}], ["grown"]),
+                ("call", "taller", [{"name": "length", "formulaText": "h"}], ["grown"]),
+                ("quantity", "product"),
+                ("quantity", "area"),
+            ],
+        )
+        self.assertEqual(len(method["helpers"]), 1)
+        helper = method["helpers"][0]
+        self.assertEqual(helper["function"], "margin")
+        self.assertEqual(
+            [item["helperId"] for item in method["content"] if item["kind"] == "call"],
+            [helper["id"], helper["id"]],
+        )
+        self.assertEqual(
+            content_shape(helper["content"]),
+            [
+                ("quantity", "length"),
+                ("text", "assumption"),
+                ("quantity", "grown"),
+            ],
+        )
+        self.assertEqual(helper["content"][1]["content"], "The margin is one metre.")
+        product = next(item for item in method["quantities"] if item["variableName"] == "product")
+        self.assertEqual(product["formulaText"], "(wider.grown * taller.grown)")
+        self.assertEqual(product["role"], "intermediate")
+        rendered = str(method["content"])
+        self.assertIn("Panel sides are grown independently.", rendered)
+        self.assertNotIn("Case A is the narrow panel", rendered)
+        self.assertNotIn("The margin is one metre.", rendered)
+        table = execution["tables"][0]
+        self.assertEqual(table["inputs"], [])
+        self.assertEqual(table["outputs"], ["area"])
+        parent_text = [
+            item["text"]["content"]
+            for item in execution["cso"]["sections"][0]["items"]
+            if item["kind"] == "text"
+        ]
+        self.assertEqual(
+            parent_text,
+            ["Case A is the narrow panel", "Case B is the wide panel"],
+        )
+        self.assertIn(
+            "root/first_panel",
+            [section["metadata"].get("invocationId") for section in execution["cso"]["sections"]],
+        )
+        self.assertIn("root/extra_panel", [item["id"] for item in execution["invocations"]])
+        self.assertTrue(any(asset["path"] == "sketch.png" for asset in execution["assets"]))
+        self.assertNotIn(
+            2,
+            [
+                node.get("literal", {}).get("value")
+                for quantity in method["quantities"]
+                for node in quantity["nodes"]
+            ],
+        )
+
+    def test_empty_method_keeps_helper_explanation_without_executing_it(self):
+        (self.root / "sketch.png").write_bytes(PNG)
+        (self.root / "margin.cso.py").write_text(MARGIN)
+        (self.root / "panel.cso.py").write_text(PANEL)
+        (self.root / "compare.cso.py").write_text(
+            '''from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.panel import panel
+
+@calculation(id="compare", title="Panel comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="panel-method", calculation=panel, title="How panel area is calculated")
+    table(id="panel-results", method="panel-method", title="Panel comparison", cases={}, outputs=("area",))
+    ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
+    return {"ready": ready}
+'''
+        )
+        generate(self.root)
+        execution = self.execution()["execution"]
+        self.assertEqual([item["function"] for item in execution["invocations"]], ["compare"])
+        method = execution["methods"][0]
+        self.assertEqual(method["helpers"][0]["function"], "margin")
+        self.assertEqual(
+            [item["binding"] for item in method["content"] if item["kind"] == "call"],
+            ["wider", "taller"],
+        )
+        self.assertTrue(any(asset["path"] == "sketch.png" for asset in execution["assets"]))
+
+    def test_disjoint_tables_share_one_method(self):
+        self.write_compare(
+            '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+    first_panel = rectangle(width=2.0, height=3.0)
+    second_panel = rectangle(width=1.0, height=6.0)
+    table(id="left-results", method="rectangle-method", title="Left", cases={"A": first_panel})
+    table(id="right-results", method="rectangle-method", title="Right", cases={"B": second_panel})
+'''
+        )
+        execution = self.execution()["execution"]
+        self.assertEqual(len(execution["methods"]), 1)
+        self.assertEqual(
+            [table["methodId"] for table in execution["tables"]],
+            [execution["methods"][0]["id"], execution["methods"][0]["id"]],
+        )
+
+    def test_inner_table_overlap_is_rejected(self):
+        (self.root / "leaf.cso.py").write_text(
+            '''from typing import Annotated, TypeAlias
+from cso_python import CalculationResults, calculation, section, symbol
+
+Width: TypeAlias = Annotated[float, symbol(glyph="w", description="Width", unit="m")]
+
+@calculation(id="leaf", title="Leaf")
+@section(id="leaf-section", title="Leaf")
+def leaf(width: Width) -> CalculationResults:
+    value: Annotated[float, symbol(glyph="V", description="Value", unit="m")] = width
+    return {"value": value}
+'''
+        )
+        (self.root / "wrapper.cso.py").write_text(
+            '''from typing import Annotated, TypeAlias
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.leaf import leaf
+
+Width: TypeAlias = Annotated[float, symbol(glyph="w", description="Width", unit="m")]
+
+@calculation(id="wrapper", title="Wrapper")
+@section(id="wrapper-section", title="Wrapper")
+def wrapper(width: Width) -> CalculationResults:
+    method(id="leaf-method", calculation=leaf, title="Leaf")
+    only = leaf(width=width)
+    table(id="inner", method="leaf-method", title="Inner", cases={"Only": only})
+    value: Annotated[float, symbol(glyph="V", description="Value", unit="m")] = only["value"]
+    return {"value": value}
+'''
+        )
+        (self.root / "compare.cso.py").write_text(
+            '''from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.wrapper import wrapper
+
+@calculation(id="compare", title="Outer comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="wrap", calculation=wrapper, title="Wrapper")
+    first = wrapper(width=1.0)
+    table(id="outer", method="wrap", title="Outer", cases={"A": first})
+    ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
+    return {"ready": ready}
+'''
+        )
+        generate(self.root)
+        with patch.object(Execution, "run") as run:
+            response = execute(self.root / "compare.cso.py", "compare", {})
+            self.assertFalse(response["ok"], response)
+            self.assertEqual(response["diagnostics"][0]["code"], "OVERLAPPING_TABLE")
+            self.assertTrue(
+                response["diagnostics"][0]["location"]["moduleId"].endswith("compare.cso.py"),
+                response["diagnostics"][0],
+            )
+            run.assert_not_called()
+
+    def test_helper_source_edit_changes_the_dependency_hash(self):
+        self.write_composed(
+            '''    method(id="panel-method", calculation=panel, title="How panel area is calculated")
+    first_panel = panel(width=2.0, height=3.0)
+    second_panel = panel(width=1.0, height=6.0)
+    table(id="panel-results", method="panel-method", title="Panel comparison", cases={"Case A": first_panel, "Case B": second_panel}, outputs=("area",))
+'''
+        )
+        before = self.execution()["execution"]["methods"][0]["helpers"][0]["sourceHash"]
+        margin = self.root / "margin.cso.py"
+        margin.write_text(margin.read_text().replace("length + 1.0", "length + 2.0"))
+        after = self.execution()["execution"]["methods"][0]["helpers"][0]["sourceHash"]
+        self.assertNotEqual(before, after)

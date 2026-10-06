@@ -18,6 +18,8 @@ import {
   PreparedDocumentItemSchema,
   PreparedDocumentSchema,
   PreparedDocumentSectionSchema,
+  type PreparedMethodContent,
+  type PreparedMethodHelper,
   type ResolvedAsset,
   ResolvedAssetSchema,
 } from '@cs-object/core';
@@ -519,6 +521,51 @@ const presentedCell = (
   };
 };
 
+type MethodRecord = NonNullable<ExecutionPayload['methods']>[number];
+
+const presentMethodContent = (
+  quantities: MethodRecord['quantities'],
+  content: MethodRecord['content'],
+): PreparedMethodContent[] =>
+  content.map((item) => {
+    if (item.kind === 'quantity') {
+      const quantity = quantities.find(
+        (candidate) => candidate.variableName === item.variableName,
+      );
+      if (!quantity) {
+        fail('UNKNOWN_QUANTITY', `Quantity '${item.variableName}' is missing`);
+      }
+      return {
+        kind: 'quantity',
+        selectionName: quantity.selectionName,
+        role: quantity.role,
+        glyph: quantity.glyph,
+        description: quantity.description,
+        unit: quantity.unit,
+        formulaText: quantity.formulaText,
+      };
+    }
+    if (item.kind === 'section') {
+      return {
+        kind: 'section',
+        localId: item.localId,
+        title: item.title,
+        content: presentMethodContent(quantities, item.content),
+      };
+    }
+    return item;
+  });
+
+const presentMethodHelpers = (
+  helpers: MethodRecord['helpers'],
+): PreparedMethodHelper[] =>
+  helpers.map((helper) => ({
+    id: helper.id,
+    function: helper.function,
+    content: presentMethodContent(helper.quantities, helper.content),
+    helpers: presentMethodHelpers(helper.helpers),
+  }));
+
 const comparisonPlacement = (
   execution: ExecutionPayload,
   item: CalculationSourceSectionItem,
@@ -545,18 +592,21 @@ const comparisonPlacement = (
   if (item.kind === 'method') {
     const method = execution.methods?.find((record) => record.id === item.id);
     if (!method) fail('UNKNOWN_METHOD', `Method '${item.id}' is missing`);
+    const quantities = method.quantities.map((quantity) => ({
+      selectionName: quantity.selectionName,
+      role: quantity.role,
+      glyph: quantity.glyph,
+      description: quantity.description,
+      unit: quantity.unit,
+      formulaText: quantity.formulaText,
+    }));
     return {
       kind: 'method',
       id: item.id,
       title: method.title,
-      quantities: method.quantities.map((quantity) => ({
-        selectionName: quantity.selectionName,
-        role: quantity.role,
-        glyph: quantity.glyph,
-        description: quantity.description,
-        unit: quantity.unit,
-        formulaText: quantity.formulaText,
-      })),
+      quantities,
+      content: presentMethodContent(method.quantities, method.content),
+      helpers: presentMethodHelpers(method.helpers),
       ...placement,
     };
   }

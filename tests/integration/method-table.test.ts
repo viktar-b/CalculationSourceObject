@@ -70,6 +70,63 @@ const rows = compare.replace(
   'cases={"Case A": first_panel}, cases_axis="rows"',
 );
 
+const png = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+const margin = `from typing import Annotated, TypeAlias
+from cso_python import CalculationResults, calculation, section, symbol, text
+
+Length: TypeAlias = Annotated[float, symbol(glyph="L", description="Length", unit="m")]
+
+@calculation(id="margin", title="Add a margin")
+@section(id="margin-section", title="Margin")
+def margin(length: Length) -> CalculationResults:
+    """Add one metre of margin."""
+    text(id="assumption", content="The margin is one metre.")
+    grown: Annotated[float, symbol(glyph="G", description="Grown length", unit="m")] = length + 1.0
+    return {"grown": grown}
+`;
+
+const panel = `from typing import Annotated, TypeAlias
+from cso_python import CalculationResults, calculation, document_section, figure, section, symbol, text
+from _cso_bindings.margin import margin
+
+Width: TypeAlias = Annotated[float, symbol(glyph="w", description="Width", unit="m")]
+Height: TypeAlias = Annotated[float, symbol(glyph="h", description="Height", unit="m")]
+
+@calculation(id="panel", title="Panel area")
+@section(id="panel-section", title="Panel")
+def panel(width: Width, height: Height) -> CalculationResults:
+    """Grow each side, then multiply."""
+    with document_section(id="assumptions", title="Assumptions"):
+        text(id="note", content="Panel sides are grown independently.")
+    figure(id="sketch", path="sketch.png", media_type="image/png", caption="Panel sketch", alt="A rectangle")
+    wider = margin(length=width)
+    taller = margin(length=height)
+    product: Annotated[float, symbol(glyph="Q", description="Grown product", unit="m^2")] = wider["grown"] * taller["grown"]
+    area: Annotated[float, symbol(glyph="A", description="Area", unit="m^2")] = product
+    return {"area": area}
+`;
+
+const panelCompare = `from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table, text
+from _cso_bindings.panel import panel
+
+@calculation(id="compare", title="Panel comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="panel-method", calculation=panel, title="How panel area is calculated")
+    text(id="case-a", content="Case A is the narrow panel")
+    first_panel = panel(width=2.0, height=3.0)
+    text(id="case-b", content="Case B is the wide panel")
+    second_panel = panel(width=1.0, height=6.0)
+    table(id="panel-results", method="panel-method", title="Panel comparison", cases={"Case A": first_panel, "Case B": second_panel}, inputs=(), outputs=("area",))
+    compared: Annotated[float, symbol(glyph="R", description="Compared area", unit="m^2")] = first_panel["area"]
+    return {"compared": compared}
+`;
+
 beforeAll(() => {
   const created = spawnSync(
     '/opt/homebrew/bin/python3',
@@ -96,6 +153,11 @@ beforeAll(() => {
   writeFileSync(join(directory, 'publish.cso.py'), publication);
   writeFileSync(join(directory, 'empty.cso.py'), empty);
   writeFileSync(join(directory, 'rows.cso.py'), rows);
+  writeFileSync(join(directory, 'sketch.png'), png);
+  writeFileSync(join(directory, 'margin.cso.py'), margin);
+  writeFileSync(join(directory, 'panel.cso.py'), panel);
+  writeFileSync(join(directory, 'panel_compare.cso.py'), panelCompare);
+  writeFileSync(join(directory, 'panel_publish.cso.py'), panelCompare);
   const bindings = spawnSync(
     python,
     ['-I', '-m', 'cso_python', 'bindings', directory],
@@ -270,4 +332,100 @@ test('publishes one straight-line method and bound case columns', async () => {
   expect(readdirSync(directory).some((name) => name.endsWith('.tmp'))).toBe(
     false,
   );
+}, 180_000);
+
+test('publishes nested helper explanations without pruning authored context', async () => {
+  const execution = capture('panel_compare.cso.py', 'compare');
+  expect(verifyExecution({ execution }).ok).toBe(true);
+  const assets = execution.assets.map((asset) => ({
+    asset,
+    dataUrl: `data:${asset.mediaType};base64,${png.toString('base64')}`,
+  }));
+  const first = prepareExecutionDocument({ execution, assets });
+  const second = prepareExecutionDocument({ execution, assets });
+  expect(second).toEqual(first);
+  const method = first.sections[0]?.items.find(
+    (item) => item.kind === 'method',
+  );
+  if (method?.kind !== 'method') throw new Error('Missing method');
+  expect(method.helpers).toHaveLength(1);
+  expect(method.helpers[0]?.function).toBe('margin');
+  expect(
+    method.content.flatMap((item) =>
+      item.kind === 'call' ? [item.binding] : [],
+    ),
+  ).toEqual(['wider', 'taller']);
+  expect(
+    method.content.some(
+      (item) => item.kind === 'quantity' && item.selectionName === 'product',
+    ),
+  ).toBe(true);
+  const table = first.sections[0]?.items.find((item) => item.kind === 'table');
+  if (table?.kind !== 'table') throw new Error('Missing table');
+  expect(
+    table.groups.flatMap((group) => group.rows).map((row) => row.quantity),
+  ).toEqual(['area']);
+  expect(
+    first.sections[0]?.items
+      .filter((item) => item.kind === 'text')
+      .map((item) => (item.kind === 'text' ? item.text.content : '')),
+  ).toEqual(['Case A is the narrow panel', 'Case B is the wide panel']);
+  expect(
+    first.sections.some(
+      (section) => section.invocationId === 'root/first_panel',
+    ),
+  ).toBe(false);
+  expect(
+    execution.cso.sections.some(
+      (section) => section.metadata?.invocationId === 'root/first_panel',
+    ),
+  ).toBe(true);
+
+  const tampered = structuredClone(execution);
+  const call = tampered.methods?.[0]?.content.find(
+    (item) => item.kind === 'call',
+  );
+  if (call?.kind !== 'call') throw new Error('Missing call');
+  const input = call.inputs[0];
+  if (!input) throw new Error('Missing call input');
+  input.name = 'width';
+  expect(
+    verifyExecution({ execution: tampered }).diagnostics.some(
+      (item) => item.code === 'CALL_MAPPING_MISMATCH',
+    ),
+  ).toBe(true);
+  const edited = structuredClone(execution);
+  const helper = edited.methods?.[0]?.helpers[0];
+  if (!helper) throw new Error('Missing helper');
+  helper.sourceHash = 'b'.repeat(64);
+  expect(
+    verifyExecution({ execution: edited }).diagnostics.some(
+      (item) => item.code === 'DEPENDENCY_SOURCE_MISMATCH',
+    ),
+  ).toBe(true);
+
+  const htmlPath = join(directory, 'panel.html');
+  const html = publish('html', 'panel_publish.cso.py', 'compare', htmlPath, [
+    '--check-layout',
+  ]);
+  expect(html.status, html.stdout || html.stderr).toBe(0);
+  const htmlText = readFileSync(htmlPath, 'utf8');
+  expect(htmlText.match(/data-helper="margin"/g)).toHaveLength(1);
+  expect(htmlText).toContain('data-call="wider"');
+  expect(htmlText).toContain('data-call="taller"');
+  expect(htmlText).toContain('length = w');
+  expect(htmlText).toContain('length = h');
+  expect(htmlText).toContain('The margin is one metre.');
+  expect(htmlText).toContain('Panel sides are grown independently.');
+  expect(htmlText).toContain('alt="A rectangle"');
+  expect(htmlText).toContain('(wider.grown * taller.grown)');
+  expect(htmlText).toContain('Case A is the narrow panel');
+  expect(htmlText.match(/The margin is one metre\./g)).toHaveLength(1);
+
+  const pdfPath = join(directory, 'panel.pdf');
+  const pdf = publish('pdf', 'panel_publish.cso.py', 'compare', pdfPath);
+  expect(pdf.status, pdf.stdout || pdf.stderr).toBe(0);
+  const info = spawnSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
+  expect(info.status, info.stderr).toBe(0);
+  expect(info.stdout).toContain('Pages:           2');
 }, 180_000);

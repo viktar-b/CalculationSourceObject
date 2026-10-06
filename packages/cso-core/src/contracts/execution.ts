@@ -199,6 +199,94 @@ const MethodQuantitySchema = z.strictObject({
   formulaText: z.string(),
   nodes: z.array(SymbolicFormulaNodeSchema),
 });
+type MethodQuantity = z.infer<typeof MethodQuantitySchema>;
+export type MethodContentItem =
+  | { kind: 'quantity'; variableName: string }
+  | { kind: 'text'; localId: string; content: string }
+  | {
+      kind: 'figure';
+      localId: string;
+      assetId: string;
+      caption: string;
+      alt: string;
+    }
+  | {
+      kind: 'call';
+      binding: string;
+      helperId: string;
+      inputs: { name: string; formulaText: string }[];
+      outputs: string[];
+    }
+  | {
+      kind: 'section';
+      localId: string;
+      title: string;
+      content: MethodContentItem[];
+    };
+export type MethodHelperRecord = {
+  id: string;
+  moduleId: string;
+  function: string;
+  sourceHash: string;
+  revision: string;
+  parameterNames: string[];
+  outputNames: string[];
+  quantities: MethodQuantity[];
+  content: MethodContentItem[];
+  helpers: MethodHelperRecord[];
+};
+const MethodContentSchema: z.ZodType<MethodContentItem> = z.lazy(() =>
+  z.discriminatedUnion('kind', [
+    z.strictObject({
+      kind: z.literal('quantity'),
+      variableName: PythonIdentifierSchema,
+    }),
+    z.strictObject({
+      kind: z.literal('text'),
+      localId: NonemptyStringSchema,
+      content: z.string(),
+    }),
+    z.strictObject({
+      kind: z.literal('figure'),
+      localId: NonemptyStringSchema,
+      assetId: IdentityStringSchema,
+      caption: NonemptyStringSchema,
+      alt: NonemptyStringSchema,
+    }),
+    z.strictObject({
+      kind: z.literal('call'),
+      binding: PythonIdentifierSchema,
+      helperId: IdentityStringSchema,
+      inputs: z.array(
+        z.strictObject({
+          name: PythonIdentifierSchema,
+          formulaText: z.string(),
+        }),
+      ),
+      outputs: z.array(NonemptyStringSchema).min(1),
+    }),
+    z.strictObject({
+      kind: z.literal('section'),
+      localId: NonemptyStringSchema,
+      title: NonemptyStringSchema,
+      content: z.array(MethodContentSchema),
+    }),
+  ]),
+);
+const MethodHelperSchema: z.ZodType<MethodHelperRecord> = z.lazy(() =>
+  z.strictObject({
+    id: IdentityStringSchema,
+    moduleId: ModuleIdSchema,
+    function: PythonIdentifierSchema,
+    sourceHash: HashSchema,
+    revision: HashSchema,
+    parameterNames: z.array(PythonIdentifierSchema),
+    outputNames: z.array(NonemptyStringSchema).min(1),
+    quantities: z.array(MethodQuantitySchema).min(1),
+    content: z.array(MethodContentSchema).min(1),
+    helpers: z.array(MethodHelperSchema),
+  }),
+);
 const MethodPlanSchema = z.strictObject({
   id: IdentityStringSchema,
   localId: NonemptyStringSchema,
@@ -212,6 +300,8 @@ const MethodPlanSchema = z.strictObject({
   parameterNames: z.array(PythonIdentifierSchema),
   outputNames: z.array(NonemptyStringSchema),
   quantities: z.array(MethodQuantitySchema).min(1),
+  content: z.array(MethodContentSchema).min(1),
+  helpers: z.array(MethodHelperSchema),
   location: SourceSpanSchema,
 });
 const BoundCellSchema = z.strictObject({
@@ -1472,6 +1562,133 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
     const sectionsById = new Map(
       execution.cso.sections.map((section) => [section.id, section]),
     );
+    const assetIds = new Set(execution.assets.map((asset) => asset.id));
+    const collectHelpers = (
+      helpers: MethodHelperRecord[],
+      path: (string | number)[],
+      into: Map<string, MethodHelperRecord>,
+    ): void => {
+      for (const [helperIndex, helper] of helpers.entries()) {
+        const helperModule = execution.sourceManifest.find(
+          (entry) => entry.moduleId === helper.moduleId,
+        );
+        if (!helperModule || helperModule.sha256 !== helper.sourceHash) {
+          issue(
+            'DEPENDENCY_SOURCE_MISMATCH',
+            [...path, helperIndex, 'sourceHash'],
+            'Helper source hash must match the captured module',
+          );
+        }
+        if (into.has(helper.id)) {
+          issue(
+            'CALL_MAPPING_MISMATCH',
+            [...path, helperIndex, 'id'],
+            'Helper identities must be unique within a method',
+          );
+        }
+        into.set(helper.id, helper);
+        collectHelpers(helper.helpers, [...path, helperIndex, 'helpers'], into);
+      }
+    };
+    const walkMethodContent = (
+      content: MethodContentItem[],
+      path: (string | number)[],
+      quantities: MethodQuantity[],
+      helpers: Map<string, MethodHelperRecord>,
+      bindings: Set<string>,
+    ): void => {
+      for (const [contentIndex, item] of content.entries()) {
+        const itemPath = [...path, contentIndex];
+        if (item.kind === 'quantity') {
+          if (
+            !quantities.some(
+              (quantity) => quantity.variableName === item.variableName,
+            )
+          ) {
+            issue(
+              'UNKNOWN_QUANTITY',
+              [...itemPath, 'variableName'],
+              'Method content must name an explained quantity',
+            );
+          }
+        } else if (item.kind === 'figure') {
+          if (!assetIds.has(item.assetId)) {
+            issue(
+              'UNRESOLVED_ASSET',
+              [...itemPath, 'assetId'],
+              'Method figure must name a captured asset',
+            );
+          }
+        } else if (item.kind === 'call') {
+          if (bindings.has(item.binding)) {
+            issue(
+              'CALL_MAPPING_MISMATCH',
+              [...itemPath, 'binding'],
+              'Each helper call keeps its own binding',
+            );
+          }
+          bindings.add(item.binding);
+          const helper = helpers.get(item.helperId);
+          if (!helper) {
+            issue(
+              'CALL_MAPPING_MISMATCH',
+              [...itemPath, 'helperId'],
+              'Call mapping must name a helper in this method',
+            );
+            continue;
+          }
+          const inputNames = item.inputs.map((input) => input.name);
+          if (
+            new Set(inputNames).size !== inputNames.length ||
+            inputNames.some((name) => !helper.parameterNames.includes(name))
+          ) {
+            issue(
+              'CALL_MAPPING_MISMATCH',
+              [...itemPath, 'inputs'],
+              'Call inputs must name distinct helper parameters',
+            );
+          }
+          if (
+            new Set(item.outputs).size !== item.outputs.length ||
+            item.outputs.some((name) => !helper.outputNames.includes(name))
+          ) {
+            issue(
+              'CALL_MAPPING_MISMATCH',
+              [...itemPath, 'outputs'],
+              'Call outputs must name distinct helper outputs',
+            );
+          }
+        } else if (item.kind === 'section') {
+          walkMethodContent(
+            item.content,
+            [...itemPath, 'content'],
+            quantities,
+            helpers,
+            bindings,
+          );
+        }
+      }
+    };
+    const checkHelperContent = (
+      helpers: MethodHelperRecord[],
+      path: (string | number)[],
+      known: Map<string, MethodHelperRecord>,
+    ): void => {
+      for (const [helperIndex, helper] of helpers.entries()) {
+        walkMethodContent(
+          helper.content,
+          [...path, helperIndex, 'content'],
+          helper.quantities,
+          known,
+          new Set(),
+        );
+        checkHelperContent(
+          helper.helpers,
+          [...path, helperIndex, 'helpers'],
+          known,
+        );
+      }
+    };
     for (const { method, index } of methodRecords.values()) {
       const recorded = execution.sourceManifest.find(
         (entry) => entry.moduleId === method.moduleId,
@@ -1490,6 +1707,20 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
           'Method declaration invocation does not resolve',
         );
       }
+      const helpers = new Map<string, MethodHelperRecord>();
+      collectHelpers(method.helpers, ['methods', index, 'helpers'], helpers);
+      walkMethodContent(
+        method.content,
+        ['methods', index, 'content'],
+        method.quantities,
+        helpers,
+        new Set(),
+      );
+      checkHelperContent(
+        method.helpers,
+        ['methods', index, 'helpers'],
+        helpers,
+      );
     }
     const ownedCases = new Set<string>();
     for (const { table, index } of tableRecords.values()) {

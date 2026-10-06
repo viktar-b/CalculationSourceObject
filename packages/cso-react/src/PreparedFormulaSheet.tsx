@@ -4,6 +4,8 @@ import {
   type PreparedDocument,
   PreparedDocumentSchema,
   type PreparedDocumentSection,
+  type PreparedMethodContent,
+  type PreparedMethodHelper,
   type SheetDocument,
 } from '@cs-object/core';
 import { Fragment, type ReactElement } from 'react';
@@ -71,6 +73,109 @@ export const PreparedFormulaSheet = ({
   );
   const symbols = new Map(sheet.symbols.map((symbol) => [symbol.id, symbol]));
   let symbolIndex = 0;
+  const renderMethodContent = (
+    content: readonly PreparedMethodContent[],
+    helpers: readonly PreparedMethodHelper[],
+    shown: Set<string>,
+  ): ReactElement[] => {
+    const helperById = new Map<string, PreparedMethodHelper>();
+    const indexHelpers = (records: readonly PreparedMethodHelper[]): void => {
+      for (const helper of records) {
+        helperById.set(helper.id, helper);
+        indexHelpers(helper.helpers);
+      }
+    };
+    indexHelpers(helpers);
+    const renderItems = (
+      items: readonly PreparedMethodContent[],
+    ): ReactElement[] =>
+      items.map((item, index) => {
+        if (item.kind === 'quantity') {
+          return (
+            <p
+              key={`quantity-${item.selectionName}-${index}`}
+              className="cso-method-quantity"
+              data-quantity={item.selectionName}
+            >
+              <GlyphMathBlock glyph={item.glyph} /> {item.description}{' '}
+              {item.unit}
+              {item.formulaText ? (
+                <span data-formula={item.formulaText}>
+                  {' '}
+                  = {item.formulaText}
+                </span>
+              ) : null}
+            </p>
+          );
+        }
+        if (item.kind === 'text') {
+          return (
+            <p
+              key={`text-${item.localId}`}
+              className="cso-method-text"
+              data-method-text={item.localId}
+            >
+              {item.content}
+            </p>
+          );
+        }
+        if (item.kind === 'figure') {
+          const asset = assets.get(item.assetId);
+          if (!asset) {
+            throw new Error(`Missing method asset '${item.assetId}'`);
+          }
+          return (
+            <figure
+              key={`figure-${item.localId}`}
+              className="cso-figure"
+              data-method-figure={item.localId}
+            >
+              <img src={asset.dataUrl} alt={item.alt} />
+              {item.caption ? <figcaption>{item.caption}</figcaption> : null}
+            </figure>
+          );
+        }
+        if (item.kind === 'section') {
+          return (
+            <section
+              key={`section-${item.localId}`}
+              className="cso-method-section"
+              data-method-section={item.localId}
+            >
+              <h4>{item.title}</h4>
+              {renderItems(item.content)}
+            </section>
+          );
+        }
+        const helper = helperById.get(item.helperId);
+        let explanation: ReactElement | null = null;
+        if (helper && !shown.has(helper.id)) {
+          shown.add(helper.id);
+          explanation = (
+            <div className="cso-method-helper" data-helper={helper.function}>
+              <h4>{helper.function}</h4>
+              {renderItems(helper.content)}
+            </div>
+          );
+        }
+        return (
+          <div
+            key={`call-${item.binding}`}
+            className="cso-method-call"
+            data-call={item.binding}
+          >
+            {explanation}
+            <p>
+              {item.binding}:{' '}
+              {item.inputs
+                .map((input) => `${input.name} = ${input.formulaText}`)
+                .join(', ')}
+            </p>
+          </div>
+        );
+      });
+    return renderItems(content);
+  };
   const renderSection = (section: PreparedDocumentSection): ReactElement => (
     <section
       key={section.id}
@@ -144,22 +249,7 @@ export const PreparedFormulaSheet = ({
                 className="cso-method"
               >
                 <h3>{item.title}</h3>
-                {item.quantities.map((quantity) => (
-                  <p
-                    key={quantity.selectionName}
-                    className="cso-method-quantity"
-                    data-quantity={quantity.selectionName}
-                  >
-                    <GlyphMathBlock glyph={quantity.glyph} />{' '}
-                    {quantity.description} {quantity.unit}
-                    {quantity.formulaText ? (
-                      <span data-formula={quantity.formulaText}>
-                        {' '}
-                        = {quantity.formulaText}
-                      </span>
-                    ) : null}
-                  </p>
-                ))}
+                {renderMethodContent(item.content, item.helpers, new Set())}
                 <EngineeringMetadata entries={item.context} />
               </section>
             );
