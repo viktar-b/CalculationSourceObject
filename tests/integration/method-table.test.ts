@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   mkdtempSync,
   readdirSync,
@@ -350,6 +351,104 @@ beforeAll(() => {
     compare.replace(
       'from _cso_bindings.rectangle import rectangle',
       'from _cso_bindings.wide_glyph import rectangle',
+    ),
+  );
+  const tallCases = Array.from({ length: 64 }, (_, index) => {
+    const name = `row${String(index + 1).padStart(2, '0')}`;
+    return `    ${name} = rectangle(width=${index + 1}.0, height=2.0)`;
+  });
+  const tallMap = Array.from({ length: 64 }, (_, index) => {
+    const name = `row${String(index + 1).padStart(2, '0')}`;
+    const heading =
+      index === 0
+        ? 'North elevation panel with a long wrapped heading'
+        : `Case ${String(index + 1).padStart(2, '0')}`;
+    return `"${heading}": ${name}`;
+  }).join(', ');
+  const tallStory = Array.from(
+    { length: 60 },
+    (_, index) => `Authored method paragraph ${index + 1} remains visible.`,
+  ).join(' ');
+  const tallRectangle = `${rectangle.replace(
+    'from cso_python import CalculationResults, calculation, section, symbol',
+    'from cso_python import CalculationResults, applicable, calculation, check, figure, section, symbol, text',
+  ).replace(
+    'return {"area": area, "perimeter": perimeter}',
+    `text(id="method-story", content="${tallStory}")
+    figure(id="sketch", path="sketch.png", media_type="image/png", caption="Panel sketch", alt="A rectangle")
+    applicable(id="area-limit", targets=("area",), explanation="Area exceeds the method limit.", predicate=area <= 20)
+    check(id="perimeter-check", targets=("perimeter",), explanation="Perimeter exceeds twelve metres.", predicate=perimeter <= 12)
+    return {"area": area, "perimeter": perimeter}`,
+  )}`;
+  writeFileSync(join(directory, 'tall_rectangle.cso.py'), tallRectangle);
+  writeFileSync(
+    join(directory, 'tall_rows.cso.py'),
+    `from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.tall_rectangle import rectangle
+
+@calculation(id="compare", title="Tall row comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+${tallCases.join('\n')}
+    table(id="rectangle-results", method="rectangle-method", title="Tall rows", cases={${tallMap}}, cases_axis="rows")
+    ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
+    return {"ready": ready}
+`,
+  );
+  const quantityLines = Array.from({ length: 48 }, (_, index) => {
+    const name = `extra_${String(index + 1).padStart(2, '0')}`;
+    return `    ${name}: Annotated[float, symbol(glyph="e${index + 1}", description="Extra ${index + 1}", unit="m")] = width`;
+  });
+  writeFileSync(
+    join(directory, 'tall_columns.cso.py'),
+    `from typing import Annotated, TypeAlias
+from cso_python import CalculationResults, applicable, calculation, check, section, symbol
+
+Width: TypeAlias = Annotated[float, symbol(glyph="w", description="Width", unit="m")]
+
+@calculation(id="series", title="Series")
+@section(id="series-section", title="Series", root=True)
+def series(width: Width) -> CalculationResults:
+${quantityLines.join('\n')}
+    applicable(id="width-limit", targets=("extra_48",), explanation="Width exceeds the series limit.", predicate=width <= 1)
+    check(id="width-check", targets=("extra_01",), explanation="Width exceeds one metre.", predicate=width <= 1)
+    return {${Array.from({ length: 48 }, (_, index) => `"extra_${String(index + 1).padStart(2, '0')}": extra_${String(index + 1).padStart(2, '0')}`).join(', ')}}
+`,
+  );
+  writeFileSync(
+    join(directory, 'tall_columns_compare.cso.py'),
+    `from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.tall_columns import series
+
+@calculation(id="compare", title="Tall column comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="series-method", calculation=series, title="How the series is calculated")
+    first = series(width=2.0)
+    second = series(width=3.0)
+    table(id="series-results", method="series-method", title="Series comparison", cases={"Case A": first, "Case B": second}, column_cap=1)
+    ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
+    return {"ready": ready}
+`,
+  );
+  const oversizedDescription = Array.from({ length: 140 }, () => 'oversized row').join(
+    '\n',
+  );
+  writeFileSync(
+    join(directory, 'oversized_row.cso.py'),
+    rectangle.replace(
+      'description="Width", unit="m"',
+      `description=${JSON.stringify(oversizedDescription)}, unit="m"`,
+    ),
+  );
+  writeFileSync(
+    join(directory, 'oversized_compare.cso.py'),
+    compare.replace(
+      'from _cso_bindings.rectangle import rectangle',
+      'from _cso_bindings.oversized_row import rectangle',
     ),
   );
   const bindings = spawnSync(
@@ -1065,5 +1164,66 @@ test('continues a wide comparison across measured column groups', () => {
   const unfit = publish('pdf', 'unfit_compare.cso.py', 'compare', sentinel);
   expect(unfit.status).not.toBe(0);
   expect(unfit.stdout).toContain('DOCUMENT_LAYOUT_OVERFLOW');
+  expect(readFileSync(sentinel, 'utf8')).toBe('keep');
+}, 180_000);
+
+function pdfPageTexts(path: string): string[] {
+  const info = spawnSync('pdfinfo', [path], { encoding: 'utf8' });
+  expect(info.status, info.stderr).toBe(0);
+  const count = Number(info.stdout.match(/Pages:\s+(\d+)/)?.[1]);
+  expect(count).toBeGreaterThan(0);
+  return Array.from({ length: count }, (_, index) => {
+    const page = spawnSync(
+      'pdftotext',
+      ['-f', String(index + 1), '-l', String(index + 1), '-layout', path, '-'],
+      { encoding: 'utf8' },
+    );
+    expect(page.status, page.stderr).toBe(0);
+    return page.stdout;
+  });
+}
+
+test('repeats comparison context across vertical page breaks', () => {
+  const rowsPdf = join(directory, 'tall-rows.pdf');
+  const rows = publish('pdf', 'tall_rows.cso.py', 'compare', rowsPdf);
+  expect(rows.status, rows.stdout || rows.stderr).toBe(0);
+  const rowPages = pdfPageTexts(rowsPdf);
+  expect(rowPages.length).toBeGreaterThan(1);
+  expect(rowPages.join('\n')).toContain('Panel sketch');
+  expect(rowPages.join('\n')).toContain('Authored method paragraph 60');
+  expect(rowPages.join('\n')).toContain('North elevation panel with a long wrapped heading');
+  expect(rowPages.some((page) => page.includes('Continued'))).toBe(true);
+  for (const page of rowPages) {
+    if (page.includes('Case ')) {
+      expect(page).toContain('Inputs');
+    }
+  }
+  expect(rowPages.at(-1)).toContain('Case 64');
+  expect(rowPages.join('\n')).toContain('Not applicable');
+  expect(rowPages.join('\n')).toContain('Perimeter exceeds twelve metres.');
+  const rowHash = createHash('sha256').update(readFileSync(rowsPdf)).digest('hex');
+  expect(rowHash).toMatch(/^[a-f0-9]{64}$/);
+
+  const columnsPdf = join(directory, 'tall-columns.pdf');
+  const columns = publish('pdf', 'tall_columns_compare.cso.py', 'compare', columnsPdf);
+  expect(columns.status, columns.stdout || columns.stderr).toBe(0);
+  const columnPages = pdfPageTexts(columnsPdf);
+  expect(columnPages.join('\n')).toContain('Part 1 of 2');
+  expect(columnPages.join('\n')).toContain('Part 2 of 2');
+  expect(columnPages.some((page) => page.includes('Continued'))).toBe(true);
+  expect(columnPages.join('\n')).toContain('Width exceeds the series limit.');
+  for (const page of columnPages) {
+    if (page.includes('Continued')) {
+      expect(page).toMatch(/Inputs|Outputs/);
+      expect(page).toContain('Width exceeds the series limit.');
+    }
+  }
+
+  const sentinel = join(directory, 'oversized-sentinel.pdf');
+  writeFileSync(sentinel, 'keep');
+  const oversized = publish('pdf', 'oversized_compare.cso.py', 'compare', sentinel);
+  expect(oversized.status).not.toBe(0);
+  expect(oversized.stdout).toContain('cannot fit with its repeated headings');
+  expect(oversized.stdout).toContain('DOCUMENT_LAYOUT_OVERFLOW');
   expect(readFileSync(sentinel, 'utf8')).toBe('keep');
 }, 180_000);
