@@ -1,15 +1,15 @@
 import {
   type CalculationSourceSectionItem,
+  createSheetFromCalculationSourceObject,
   type PreparedDocument,
   PreparedDocumentSchema,
   type PreparedDocumentSection,
   type SheetDocument,
-  createSheetFromCalculationSourceObject,
 } from '@cs-object/core';
-import type { ReactElement } from 'react';
-import { GlyphMathBlock } from './mathml/GlyphMathBlock.tsx';
+import { Fragment, type ReactElement } from 'react';
 import { EngineeringMetadata } from './EngineeringMetadata.tsx';
 import { FormulaSheetSymbolRow } from './formula-sheet/FormulaSheetSymbolRow.tsx';
+import { GlyphMathBlock } from './mathml/GlyphMathBlock.tsx';
 
 export interface PreparedFormulaSheetProps {
   readonly document: PreparedDocument;
@@ -133,6 +133,93 @@ export const PreparedFormulaSheet = ({
                 )}
                 <EngineeringMetadata entries={item.context} />
               </figure>
+            );
+          }
+          case 'method': {
+            return (
+              <section
+                key={item.sourcePlacementId}
+                data-source-placement={item.sourcePlacementId}
+                data-method-id={item.id}
+                className="cso-method"
+              >
+                <h3>{item.title}</h3>
+                {item.quantities.map((quantity) => (
+                  <p
+                    key={quantity.selectionName}
+                    className="cso-method-quantity"
+                    data-quantity={quantity.selectionName}
+                  >
+                    <GlyphMathBlock glyph={quantity.glyph} />{' '}
+                    {quantity.description} {quantity.unit}
+                    {quantity.formulaText ? (
+                      <span data-formula={quantity.formulaText}>
+                        {' '}
+                        = {quantity.formulaText}
+                      </span>
+                    ) : null}
+                  </p>
+                ))}
+                <EngineeringMetadata entries={item.context} />
+              </section>
+            );
+          }
+          case 'table': {
+            return (
+              <div
+                key={item.sourcePlacementId}
+                data-source-placement={item.sourcePlacementId}
+                data-comparison-id={item.id}
+                className="cso-comparison"
+              >
+                <h3>{item.title}</h3>
+                {item.emptyState ? (
+                  <p className="cso-comparison-empty">{item.emptyState}</p>
+                ) : null}
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Quantity</th>
+                      {item.cases.map((caseItem) => (
+                        <th
+                          key={caseItem.invocationId}
+                          data-case-heading={caseItem.heading}
+                        >
+                          {caseItem.heading}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {item.groups.map((group) => (
+                      <Fragment key={group.role}>
+                        <tr>
+                          <th colSpan={item.cases.length + 1}>{group.label}</th>
+                        </tr>
+                        {group.rows.map((row) => (
+                          <tr key={`${group.role}-${row.quantity}`}>
+                            <th>
+                              <GlyphMathBlock glyph={row.glyph} />{' '}
+                              {row.description} {row.unit}
+                            </th>
+                            {row.cells.map((cell) => (
+                              <td
+                                key={cell.invocationId}
+                                data-quantity={row.quantity}
+                                data-case={cell.heading}
+                                data-symbol-id={cell.symbolId}
+                              >
+                                {Object.is(cell.value, -0) ? '-0' : cell.value}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+                <EngineeringMetadata entries={item.context} />
+              </div>
             );
           }
           case 'symbol':

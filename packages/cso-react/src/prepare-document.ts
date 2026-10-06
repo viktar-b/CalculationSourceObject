@@ -1,13 +1,14 @@
 import {
-  executionBindingFrom,
   AssetRecordSchema,
   BoundPreparedDocumentSchema,
   type CalculationSourceObject,
   CalculationSourceObjectSchema,
   type CalculationSourceSectionItem,
+  contractIssuesToDiagnostics,
   type Diagnostic,
   type ExecutionPayload,
   ExecutionPayloadSchema,
+  executionBindingFrom,
   type HistoricalReview,
   HistoricalReviewSchema,
   type LegacyAssetManifest,
@@ -19,7 +20,6 @@ import {
   PreparedDocumentSectionSchema,
   type ResolvedAsset,
   ResolvedAssetSchema,
-  contractIssuesToDiagnostics,
 } from '@cs-object/core';
 
 import { activeSymbolIds } from './active-symbols.ts';
@@ -458,6 +458,183 @@ const resolveExecutionPlacementProvenance = (
   };
 };
 
+const groupedInvocationIds = (execution: ExecutionPayload): Set<string> =>
+  new Set(
+    (execution.tables ?? []).flatMap((table) =>
+      table.cases.map((item) => item.invocationId),
+    ),
+  );
+
+const replacesInvocation = (
+  invocationId: string | undefined,
+  grouped: ReadonlySet<string>,
+): boolean =>
+  invocationId !== undefined &&
+  [...grouped].some(
+    (id) => invocationId === id || invocationId.startsWith(`${id}/`),
+  );
+
+const presentedCell = (
+  execution: ExecutionPayload,
+  cell: NonNullable<ExecutionPayload['tables']>[number]['cells'][number],
+) => {
+  if (cell.role === 'input') {
+    const invocation = execution.invocations.find(
+      (item) => item.id === cell.caseInvocationId,
+    );
+    const value = invocation?.resolvedInputs[cell.quantity];
+    const numericKind = invocation?.resolvedInputKinds?.[cell.quantity];
+    if (
+      value === undefined ||
+      (numericKind !== 'int' && numericKind !== 'float')
+    ) {
+      fail('CELL_BINDING_MISMATCH', `Missing input '${cell.quantity}'`);
+    }
+    return {
+      heading: cell.heading,
+      invocationId: cell.caseInvocationId,
+      symbolId: cell.symbolId,
+      value,
+      numericKind: numericKind as 'int' | 'float',
+    };
+  }
+  const output = execution.authoring?.outputs.find(
+    (item) =>
+      item.invocationId === cell.caseInvocationId &&
+      item.name === cell.quantity &&
+      item.symbolId === cell.symbolId,
+  );
+  if (
+    !output ||
+    (output.numericKind !== 'int' && output.numericKind !== 'float')
+  ) {
+    fail('CELL_BINDING_MISMATCH', `Missing output '${cell.quantity}'`);
+  }
+  return {
+    heading: cell.heading,
+    invocationId: cell.caseInvocationId,
+    symbolId: cell.symbolId,
+    value: output.value,
+    numericKind: output.numericKind as 'int' | 'float',
+  };
+};
+
+const comparisonPlacement = (
+  execution: ExecutionPayload,
+  item: CalculationSourceSectionItem,
+  sectionId: string,
+  index: number,
+): PreparedDocumentItem => {
+  if (item.kind !== 'method' && item.kind !== 'table') {
+    fail('UNKNOWN_METHOD', 'Expected a method or table placement');
+  }
+  const provenance = resolveExecutionPlacementProvenance(execution, item);
+  const placement = {
+    context: [] as PreparedDocumentItem['context'],
+    sourcePlacementId: placementId(sectionId, index),
+    ...(typeof provenance.localId === 'string'
+      ? { localId: provenance.localId }
+      : {}),
+    ...(typeof provenance.invocationId === 'string'
+      ? { invocationId: provenance.invocationId }
+      : {}),
+    ...(provenance.location
+      ? { location: provenance.location as PreparedDocumentItem['location'] }
+      : {}),
+  };
+  if (item.kind === 'method') {
+    const method = execution.methods?.find((record) => record.id === item.id);
+    if (!method) fail('UNKNOWN_METHOD', `Method '${item.id}' is missing`);
+    return {
+      kind: 'method',
+      id: item.id,
+      title: method.title,
+      quantities: method.quantities.map((quantity) => ({
+        selectionName: quantity.selectionName,
+        role: quantity.role,
+        glyph: quantity.glyph,
+        description: quantity.description,
+        unit: quantity.unit,
+        formulaText: quantity.formulaText,
+      })),
+      ...placement,
+    };
+  }
+  const table = execution.tables?.find((record) => record.id === item.id);
+  if (!table) fail('UNKNOWN_METHOD', `Table '${item.id}' is missing`);
+  const method = execution.methods?.find(
+    (record) => record.id === table.methodId,
+  );
+  if (!method) fail('UNKNOWN_METHOD', `Method '${table.methodId}' is missing`);
+  const rows = (role: 'input' | 'output', names: readonly string[]) =>
+    names.map((name) => {
+      const quantity = method.quantities.find(
+        (candidate) =>
+          candidate.role === role && candidate.selectionName === name,
+      );
+      if (!quantity) {
+        fail(
+          'UNKNOWN_QUANTITY',
+          `Quantity '${name}' is missing from the method`,
+        );
+      }
+      return {
+        quantity: name,
+        role,
+        glyph: quantity.glyph,
+        description: quantity.description,
+        unit: quantity.unit,
+        cells: table.cases.map((caseItem) => {
+          const cell = table.cells.find(
+            (candidate) =>
+              candidate.caseInvocationId === caseItem.invocationId &&
+              candidate.quantity === name &&
+              candidate.role === role,
+          );
+          if (!cell) {
+            fail('CELL_BINDING_MISMATCH', `Missing cell for '${name}'`);
+          }
+          return presentedCell(execution, cell);
+        }),
+      };
+    });
+  return {
+    kind: 'table',
+    id: item.id,
+    title: table.title,
+    casesAxis: 'columns',
+    cases: table.cases.map(({ heading, invocationId }) => ({
+      heading,
+      invocationId,
+    })),
+    groups: [
+      ...(table.inputs.length > 0
+        ? [
+            {
+              role: 'input' as const,
+              label: 'Inputs' as const,
+              rows: rows('input', table.inputs),
+            },
+          ]
+        : []),
+      ...(table.outputs.length > 0
+        ? [
+            {
+              role: 'output' as const,
+              label: 'Outputs' as const,
+              rows: rows('output', table.outputs),
+            },
+          ]
+        : []),
+    ],
+    ...(table.cases.length === 0
+      ? { emptyState: 'No cases evaluated' as const }
+      : {}),
+    replacedSections: table.cases.map((caseItem) => caseItem.sectionId),
+    ...placement,
+  };
+};
+
 export interface PrepareExecutionDocumentOptions {
   readonly execution: ExecutionPayload;
   readonly assets: readonly ResolvedAsset[];
@@ -493,25 +670,47 @@ export const prepareExecutionDocument = (
       );
     }
   }
-  const sections = reachableSections(cso).map((section) => ({
-    id: section.id,
-    title: section.title,
-    sourcePlacementId: placementId(section.id, 'heading'),
-    context: [],
-    localId: section.metadata?.localId,
-    invocationId: section.metadata?.invocationId,
-    location: section.metadata?.location,
-    metadata: retainedMetadata(section.metadata, true),
-    items: section.items.map((item, index) => {
-      return {
-        ...itemFields(item),
-        context: [],
-        contextSource: retainItemContextSource(item, true),
-        sourcePlacementId: placementId(section.id, index),
-        ...resolveExecutionPlacementProvenance(execution, item),
-      };
-    }),
-  }));
+  const grouped = groupedInvocationIds(execution);
+  const sectionsById = new Map(
+    cso.sections.map((section) => [section.id, section]),
+  );
+  const replaced = (section: (typeof cso.sections)[number]): boolean =>
+    replacesInvocation(
+      typeof section.metadata?.invocationId === 'string'
+        ? section.metadata.invocationId
+        : undefined,
+      grouped,
+    );
+  const sections = reachableSections(cso)
+    .filter((section) => !replaced(section))
+    .map((section) => ({
+      id: section.id,
+      title: section.title,
+      sourcePlacementId: placementId(section.id, 'heading'),
+      context: [],
+      localId: section.metadata?.localId,
+      invocationId: section.metadata?.invocationId,
+      location: section.metadata?.location,
+      metadata: retainedMetadata(section.metadata, true),
+      items: section.items.flatMap((item, index) => {
+        if (item.kind === 'section') {
+          const target = sectionsById.get(item.id);
+          if (target && replaced(target)) return [];
+        }
+        if (item.kind === 'method' || item.kind === 'table') {
+          return [comparisonPlacement(execution, item, section.id, index)];
+        }
+        return [
+          {
+            ...itemFields(item),
+            context: [],
+            contextSource: retainItemContextSource(item, true),
+            sourcePlacementId: placementId(section.id, index),
+            ...resolveExecutionPlacementProvenance(execution, item),
+          } as PreparedDocumentItem,
+        ];
+      }),
+    }));
   const displayed = new Set(
     sections.flatMap((section) =>
       section.items.flatMap((item) =>
@@ -530,7 +729,13 @@ export const prepareExecutionDocument = (
   );
   const { metadata: _sourceMetadata, ...sourceProvenance } = cso.source;
   const document = parseDocument({
-    documentVersion: '2',
+    documentVersion: sections.some((section) =>
+      section.items.some(
+        (item) => item.kind === 'method' || item.kind === 'table',
+      ),
+    )
+      ? '3'
+      : '2',
     context: [],
     source: {
       kind: 'execution',

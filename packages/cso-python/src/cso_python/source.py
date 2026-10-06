@@ -20,6 +20,8 @@ HELPERS = {
     "symbol",
     "given",
     "load_calculation",
+    "method",
+    "table",
     "documented_result",
     "calculation_call",
     "text",

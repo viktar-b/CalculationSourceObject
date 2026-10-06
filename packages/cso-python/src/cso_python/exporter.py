@@ -714,7 +714,15 @@ def convert_annotated_python(
     source_text = path.read_text(encoding="utf-8")
     module_ast = ast.parse(source_text, filename=str(path))
     function = find_function(module_ast, function_name)
-    execution_helpers = {"calculation_call", "load_calculation", "text", "figure", "document_section"}
+    execution_helpers = {
+        "calculation_call",
+        "load_calculation",
+        "text",
+        "figure",
+        "document_section",
+        "method",
+        "table",
+    }
     legacy_authoring_imports = {
         "CalculationFunction", "CalculationResults", "CalculationSpec",
         "SectionSpec", "SymbolSpec", "calculation", "section", "symbol",

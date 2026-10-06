@@ -3,10 +3,10 @@ import { CalculationSourceSymbolSchema } from '../calculation-source/object-sche
 import {
   AssetRecordSchema,
   ExecutionBindingSchema,
+  executionBindingKey,
   HashSchema,
   NonemptyStringSchema,
   SourceSpanSchema,
-  executionBindingKey,
   sha256Bytes,
 } from './common.ts';
 import { ExecutionPayloadSchema, executionBindingFrom } from './execution.ts';
@@ -203,6 +203,30 @@ const executionPlacementFields: ('localId' | 'invocationId' | 'location')[] = [
   'location',
 ];
 
+const PreparedMethodQuantitySchema = z.strictObject({
+  selectionName: NonemptyStringSchema,
+  role: z.enum(['input', 'intermediate', 'output']),
+  glyph: NonemptyStringSchema,
+  description: NonemptyStringSchema,
+  unit: z.string(),
+  formulaText: z.string(),
+});
+const PreparedTableCellSchema = z.strictObject({
+  heading: NonemptyStringSchema,
+  invocationId: NonemptyStringSchema,
+  symbolId: NonemptyStringSchema,
+  value: z.number().finite(),
+  numericKind: z.enum(['int', 'float']),
+});
+const PreparedTableRowSchema = z.strictObject({
+  quantity: NonemptyStringSchema,
+  role: z.enum(['input', 'output']),
+  glyph: NonemptyStringSchema,
+  description: NonemptyStringSchema,
+  unit: z.string(),
+  cells: z.array(PreparedTableCellSchema),
+});
+
 export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('section'),
@@ -243,6 +267,37 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
     contextSource: HistoricalJsonObjectSchema.optional(),
     ...placementFields,
   }),
+  z.strictObject({
+    kind: z.literal('method'),
+    id: NonemptyStringSchema,
+    title: NonemptyStringSchema,
+    quantities: z.array(PreparedMethodQuantitySchema).min(1),
+    contextSource: HistoricalJsonObjectSchema.optional(),
+    ...placementFields,
+  }),
+  z.strictObject({
+    kind: z.literal('table'),
+    id: NonemptyStringSchema,
+    title: NonemptyStringSchema,
+    casesAxis: z.literal('columns'),
+    cases: z.array(
+      z.strictObject({
+        heading: NonemptyStringSchema,
+        invocationId: NonemptyStringSchema,
+      }),
+    ),
+    groups: z.array(
+      z.strictObject({
+        role: z.enum(['input', 'output']),
+        label: z.enum(['Inputs', 'Outputs']),
+        rows: z.array(PreparedTableRowSchema),
+      }),
+    ),
+    emptyState: z.literal('No cases evaluated').optional(),
+    replacedSections: z.array(NonemptyStringSchema),
+    contextSource: HistoricalJsonObjectSchema.optional(),
+    ...placementFields,
+  }),
 ]);
 
 export const PreparedDocumentSectionSchema = z.strictObject({
@@ -255,7 +310,7 @@ export const PreparedDocumentSectionSchema = z.strictObject({
 
 export const PreparedDocumentSchema = z
   .strictObject({
-    documentVersion: z.literal('2'),
+    documentVersion: z.enum(['2', '3']),
     context: ContextSchema,
     source: z.discriminatedUnion('kind', [
       ExecutionBindingSchema.safeExtend({ kind: z.literal('execution') }),
@@ -274,6 +329,19 @@ export const PreparedDocumentSchema = z
     historicalReviews: z.array(HistoricalReviewSchema),
   })
   .superRefine((document, ctx) => {
+    const comparison = document.sections.some((section) =>
+      section.items.some(
+        (item) => item.kind === 'method' || item.kind === 'table',
+      ),
+    );
+    if ((document.documentVersion === '3') !== comparison) {
+      addIssue(
+        ctx,
+        'INCOMPATIBLE_CONTRACT',
+        'Comparison documents use document version 3',
+        ['documentVersion'],
+      );
+    }
     validatePlacements(document, ctx);
     validateContentIds(document, ctx);
     validateAssets(document, ctx);
@@ -314,6 +382,25 @@ export const BoundPreparedDocumentSchema = z
         'Prepared content must bind to the supplied entry, source closure, function, and resolved inputs',
         ['document', 'source'],
       );
+    }
+    const methodIds = new Set(
+      (execution.methods ?? []).map((method) => method.id),
+    );
+    const tableIds = new Set((execution.tables ?? []).map((table) => table.id));
+    for (const [sectionIndex, section] of document.sections.entries()) {
+      for (const [itemIndex, item] of section.items.entries()) {
+        if (
+          (item.kind === 'method' && !methodIds.has(item.id)) ||
+          (item.kind === 'table' && !tableIds.has(item.id))
+        ) {
+          addIssue(
+            ctx,
+            'DOCUMENT_EXECUTION_BINDING_MISMATCH',
+            'Prepared comparison items must bind to captured method and table records',
+            ['document', 'sections', sectionIndex, 'items', itemIndex, 'id'],
+          );
+        }
+      }
     }
   });
 

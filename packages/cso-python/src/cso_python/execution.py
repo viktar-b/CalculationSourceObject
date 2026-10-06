@@ -306,11 +306,7 @@ class Execution:
         source_hash = next(
             m["sha256"] for m in manifest if m["moduleId"] == root.module.id
         )
-        return {
-            "protocolVersion": "2",
-            "ok": True,
-            "diagnostics": [],
-            "execution": {
+        execution = {
                 "authoring": {
                     "version": "2",
                     "parameters": [
@@ -358,7 +354,20 @@ class Execution:
                 "observations": self.observations,
                 "assets": list(self.planner.assets.values()),
                 "versions": versions(),
-            },
+            }
+        protocol = "2"
+        if self.planner.methods or self.planner.tables:
+            protocol = "3"
+            execution["cso"]["schemaVersion"] = "1.1.0"
+            if self.planner.methods:
+                execution["methods"] = self.planner.methods
+            if self.planner.tables:
+                execution["tables"] = self.planner.tables
+        return {
+            "protocolVersion": protocol,
+            "ok": True,
+            "diagnostics": [],
+            "execution": execution,
         }
 
 

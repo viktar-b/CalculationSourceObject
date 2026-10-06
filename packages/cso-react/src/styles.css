@@ -122,6 +122,12 @@ math {
 .cso-figure figcaption { margin-top: 2mm; font-size: 11px; }
 .cso-symbol-row { break-inside: avoid; page-break-inside: avoid; }
 .cso-symbol-placement { overflow-wrap: anywhere; }
+.cso-method, .cso-comparison { margin: 3mm 0 5mm; }
+.cso-method h3, .cso-comparison h3 { font-size: 13px; font-weight: 650; margin: 0 0 2mm; }
+.cso-method-quantity { margin: 1mm 0; }
+.cso-comparison table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
+.cso-comparison th, .cso-comparison td { border: 1px solid #98a2b3; padding: 1mm; overflow-wrap: anywhere; vertical-align: top; }
+.cso-comparison-empty { font-style: italic; }
 @media print {
   [data-formula-sheet] { width: var(--cso-print-content-width) !important; min-width: 0 !important; min-height: 0 !important; padding: 0 !important; border: none !important; display: block !important; }
   .cso-document { margin: 0; }

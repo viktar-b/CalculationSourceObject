@@ -11,8 +11,10 @@ from .authoring import (
     documented_result,
     figure,
     given,
+    method,
     section,
     symbol,
+    table,
     text,
 )
 from .execution import calculation_call
@@ -32,7 +34,9 @@ __all__ = [
     "given",
     "load_calculation",
     "CalculationHandle",
+    "method",
     "section",
     "symbol",
+    "table",
     "text",
 ]

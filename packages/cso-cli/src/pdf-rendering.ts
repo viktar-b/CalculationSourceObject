@@ -1,5 +1,5 @@
-import { chromium, type Page } from 'playwright';
 import type { Diagnostic, PreparedDocument } from '@cs-object/core';
+import { chromium, type Page } from 'playwright';
 import type { PresentationMapping } from './evidence.ts';
 import { buildPreparedHtml } from './prepared-html.ts';
 
@@ -165,6 +165,15 @@ function inspectPreparedPresentationInPage(
         });
         break;
       case 'section':
+        break;
+      case 'method':
+      case 'table':
+        mappings.push({
+          pointer: itemPointer,
+          role:
+            item.kind === 'method' ? 'calculation method' : 'comparison table',
+          selector: itemSelector,
+        });
         break;
     }
   }

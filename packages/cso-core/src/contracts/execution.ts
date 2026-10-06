@@ -1,27 +1,27 @@
 import { z } from 'zod';
-import { NumericValueSchema } from './numbers.ts';
-import { AuthoringEvidenceSchema } from './authoring.ts';
-import { scopedGlyph } from './glyphs.ts';
 import { CalculationSourceObjectSchema } from '../calculation-source/object-schema.ts';
+import { AuthoringEvidenceSchema } from './authoring.ts';
 import {
   AssetRecordSchema,
+  collectCsoSymbols,
   DiagnosticSchema,
+  type ExecutionBinding,
   HashSchema,
   ModuleIdSchema,
   NodeAddressSchema,
   NonemptyStringSchema,
+  namespacedId,
   ProvenanceSchema,
   PythonIdentifierSchema,
   ResolvedInputEvidenceSchema,
-  type ExecutionBinding,
+  resolvedInputKind,
   SourceManifestSchema,
   SourceSpanSchema,
-  VersionsSchema,
-  collectCsoSymbols,
-  namespacedId,
-  resolvedInputKind,
   sourceClosureHash,
+  VersionsSchema,
 } from './common.ts';
+import { scopedGlyph } from './glyphs.ts';
+import { NumericValueSchema } from './numbers.ts';
 
 const invalidUnicodePattern = /[\uD800-\uDFFF]/u;
 const IdentityStringSchema = NonemptyStringSchema.refine(
@@ -162,6 +162,86 @@ export const OperationObservationSchema = NumericValueSchema.safeExtend({
   location: SourceSpanSchema,
 });
 
+const SymbolicFormulaNodeSchema = z.strictObject({
+  key: NonemptyStringSchema,
+  location: SourceSpanSchema,
+  mode: z.enum(['LITERAL', 'SYMBOL', 'FUNCTION', 'GIVEN_PARAMETER']),
+  draft: z.string().optional(),
+  literal: z
+    .strictObject({
+      kind: z.literal('number'),
+      numericKind: z.enum(['int', 'float']),
+      value: z.number().finite(),
+    })
+    .optional(),
+  ref: z
+    .strictObject({
+      kind: z.enum(['name', 'output']),
+      name: z.string().optional(),
+      call: z.string().optional(),
+      output: z.string().optional(),
+    })
+    .optional(),
+  parameterName: z.string().optional(),
+  parameter: z.string().optional(),
+  funcSpec: z.strictObject({ id: NonemptyStringSchema }).optional(),
+  funcArgs: z.array(z.strictObject({ key: NonemptyStringSchema })).optional(),
+});
+const MethodQuantitySchema = z.strictObject({
+  variableName: PythonIdentifierSchema,
+  localId: NonemptyStringSchema,
+  kind: z.enum(['input', 'constant', 'formula', 'unsupported']),
+  role: z.enum(['input', 'intermediate', 'output']),
+  selectionName: NonemptyStringSchema,
+  glyph: NonemptyStringSchema,
+  description: NonemptyStringSchema,
+  unit: z.string(),
+  formulaText: z.string(),
+  nodes: z.array(SymbolicFormulaNodeSchema),
+});
+const MethodPlanSchema = z.strictObject({
+  id: IdentityStringSchema,
+  localId: NonemptyStringSchema,
+  invocationId: IdentityStringSchema,
+  title: NonemptyStringSchema,
+  moduleId: ModuleIdSchema,
+  function: PythonIdentifierSchema,
+  sourceHash: HashSchema,
+  interfaceFingerprint: HashSchema,
+  revision: HashSchema,
+  parameterNames: z.array(PythonIdentifierSchema),
+  outputNames: z.array(NonemptyStringSchema),
+  quantities: z.array(MethodQuantitySchema).min(1),
+  location: SourceSpanSchema,
+});
+const BoundCellSchema = z.strictObject({
+  caseInvocationId: IdentityStringSchema,
+  heading: NonemptyStringSchema,
+  quantity: NonemptyStringSchema,
+  role: z.enum(['input', 'output']),
+  symbolId: IdentityStringSchema,
+  unit: z.string(),
+});
+const LogicalTableSchema = z.strictObject({
+  id: IdentityStringSchema,
+  localId: NonemptyStringSchema,
+  invocationId: IdentityStringSchema,
+  title: NonemptyStringSchema,
+  methodId: IdentityStringSchema,
+  casesAxis: z.literal('columns'),
+  inputs: z.array(NonemptyStringSchema),
+  outputs: z.array(NonemptyStringSchema),
+  cases: z.array(
+    z.strictObject({
+      heading: NonemptyStringSchema,
+      invocationId: IdentityStringSchema,
+      sectionId: IdentityStringSchema,
+    }),
+  ),
+  cells: z.array(BoundCellSchema),
+  location: SourceSpanSchema,
+});
+
 const ExecutionPayloadBaseSchema = z
   .object({
     cso: CalculationSourceObjectSchema,
@@ -177,6 +257,8 @@ const ExecutionPayloadBaseSchema = z
     invocations: z.array(InvocationSchema).min(1),
     observations: z.array(SymbolObservationSchema),
     operationObservations: z.array(OperationObservationSchema).optional(),
+    methods: z.array(MethodPlanSchema).min(1).optional(),
+    tables: z.array(LogicalTableSchema).min(1).optional(),
     assets: z.array(AssetRecordSchema),
     versions: VersionsSchema,
   })
@@ -408,13 +490,13 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
     };
     checkMetadata(execution.cso.source.metadata, ['cso', 'source', 'metadata']);
     const NamespaceSchema = z.tuple([
-      z.enum(['symbol', 'section', 'text', 'figure']),
+      z.enum(['symbol', 'section', 'text', 'figure', 'method', 'table']),
       IdentityStringSchema,
       IdentityStringSchema,
     ]);
     const checkNamespace = (
       id: string,
-      kind: 'symbol' | 'section' | 'text' | 'figure',
+      kind: 'symbol' | 'section' | 'text' | 'figure' | 'method' | 'table',
       path: Path,
       metadata?: Record<string, unknown>,
       metadataPath: Path = [...path.slice(0, -1), 'metadata'],
@@ -517,6 +599,13 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
             ],
             item.metadata,
             ['cso', 'sections', sectionIndex, 'items', itemIndex, 'metadata'],
+          );
+        } else if (item.kind === 'method' || item.kind === 'table') {
+          checkNamespace(
+            item.id,
+            item.kind,
+            ['cso', 'sections', sectionIndex, 'items', itemIndex, 'id'],
+            item.metadata,
           );
         } else {
           checkMetadata(item.metadata, [
@@ -1329,6 +1418,174 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
         );
       }
     }
+    const comparisonRecords =
+      (execution.methods?.length ?? 0) > 0 ||
+      (execution.tables?.length ?? 0) > 0;
+    if ((execution.cso.schemaVersion === '1.1.0') !== comparisonRecords) {
+      issue(
+        'INCOMPATIBLE_CONTRACT',
+        ['cso', 'schemaVersion'],
+        'Comparison evidence uses calculation schema 1.1.0',
+      );
+    }
+    if (comparisonRecords && execution.authoring === undefined) {
+      issue(
+        'INCOMPATIBLE_CONTRACT',
+        ['authoring'],
+        'Comparison evidence requires authoring records',
+      );
+    }
+    const methodRecords = new Map(
+      (execution.methods ?? []).map((method, index) => [
+        method.id,
+        { method, index },
+      ]),
+    );
+    const tableRecords = new Map(
+      (execution.tables ?? []).map((table, index) => [
+        table.id,
+        { table, index },
+      ]),
+    );
+    const placedMethods = new Set<string>();
+    const placedTables = new Set<string>();
+    for (const section of execution.cso.sections) {
+      for (const item of section.items) {
+        if (item.kind === 'method') placedMethods.add(item.id);
+        if (item.kind === 'table') placedTables.add(item.id);
+      }
+    }
+    if (
+      placedMethods.symmetricDifference(new Set(methodRecords.keys())).size >
+        0 ||
+      placedTables.symmetricDifference(new Set(tableRecords.keys())).size > 0
+    ) {
+      issue(
+        'INCOMPATIBLE_CONTRACT',
+        ['methods'],
+        'Method and table placements must match their evidence records',
+      );
+    }
+    const symbolsById = new Map(
+      collectCsoSymbols(execution.cso).map((symbol) => [symbol.id, symbol]),
+    );
+    const sectionsById = new Map(
+      execution.cso.sections.map((section) => [section.id, section]),
+    );
+    for (const { method, index } of methodRecords.values()) {
+      const recorded = execution.sourceManifest.find(
+        (entry) => entry.moduleId === method.moduleId,
+      );
+      if (!recorded || recorded.sha256 !== method.sourceHash) {
+        issue(
+          'METHOD_SOURCE_MISMATCH',
+          ['methods', index, 'sourceHash'],
+          'Method source hash must match the captured module',
+        );
+      }
+      if (!invocations.has(method.invocationId)) {
+        issue(
+          'UNKNOWN_INVOCATION',
+          ['methods', index, 'invocationId'],
+          'Method declaration invocation does not resolve',
+        );
+      }
+    }
+    const ownedCases = new Set<string>();
+    for (const { table, index } of tableRecords.values()) {
+      const method = methodRecords.get(table.methodId)?.method;
+      if (!method) {
+        issue(
+          'UNKNOWN_METHOD',
+          ['tables', index, 'methodId'],
+          'Table method does not resolve',
+        );
+        continue;
+      }
+      const headings = new Set<string>();
+      for (const [caseIndex, item] of table.cases.entries()) {
+        if (headings.has(item.heading) || ownedCases.has(item.invocationId)) {
+          issue(
+            'OVERLAPPING_TABLE',
+            ['tables', index, 'cases', caseIndex],
+            'A case heading and invocation belong to one table',
+          );
+        }
+        headings.add(item.heading);
+        ownedCases.add(item.invocationId);
+        const invocation = invocations.get(item.invocationId);
+        const section = sectionsById.get(item.sectionId);
+        if (
+          !invocation ||
+          invocation.moduleId !== method.moduleId ||
+          invocation.function !== method.function ||
+          section?.metadata?.invocationId !== item.invocationId
+        ) {
+          issue(
+            'CASE_SOURCE_MISMATCH',
+            ['tables', index, 'cases', caseIndex],
+            'Case invocation, section, and method source must agree',
+          );
+        }
+      }
+      const expectedCells = table.cases.flatMap((item) => [
+        ...table.inputs.map((quantity) => ({
+          invocationId: item.invocationId,
+          quantity,
+          role: 'input' as const,
+        })),
+        ...table.outputs.map((quantity) => ({
+          invocationId: item.invocationId,
+          quantity,
+          role: 'output' as const,
+        })),
+      ]);
+      if (table.cells.length !== expectedCells.length) {
+        issue(
+          'CELL_BINDING_MISMATCH',
+          ['tables', index, 'cells'],
+          'Every selected case quantity has one bound cell',
+        );
+      }
+      for (const [cellIndex, cell] of table.cells.entries()) {
+        const expected = expectedCells[cellIndex];
+        const quantity = method.quantities.find(
+          (item) =>
+            item.role === cell.role && item.selectionName === cell.quantity,
+        );
+        const symbol = symbolsById.get(cell.symbolId);
+        const parameter = execution.authoring?.parameters.find(
+          (item) =>
+            item.invocationId === cell.caseInvocationId &&
+            item.parameterName === cell.quantity,
+        );
+        const output = execution.authoring?.outputs.find(
+          (item) =>
+            item.invocationId === cell.caseInvocationId &&
+            item.name === cell.quantity,
+        );
+        const boundSymbolId =
+          cell.role === 'input' ? parameter?.symbolId : output?.symbolId;
+        if (
+          !expected ||
+          expected.invocationId !== cell.caseInvocationId ||
+          expected.quantity !== cell.quantity ||
+          expected.role !== cell.role ||
+          !quantity ||
+          quantity.unit !== cell.unit ||
+          !symbol ||
+          symbol.unit !== cell.unit ||
+          boundSymbolId !== cell.symbolId
+        ) {
+          issue(
+            'CELL_BINDING_MISMATCH',
+            ['tables', index, 'cells', cellIndex, 'symbolId'],
+            'Cell binding must resolve to the captured quantity',
+            { symbolId: cell.symbolId },
+          );
+        }
+      }
+    }
   },
 );
 
@@ -1336,7 +1593,7 @@ export const ExecutionResponseSchema = z
   .discriminatedUnion('ok', [
     z
       .object({
-        protocolVersion: z.enum(['1', '2']),
+        protocolVersion: z.enum(['1', '2', '3']),
         ok: z.literal(true),
         diagnostics: z.array(DiagnosticSchema),
         execution: ExecutionPayloadSchema,
@@ -1344,7 +1601,7 @@ export const ExecutionResponseSchema = z
       .strict(),
     z
       .object({
-        protocolVersion: z.enum(['1', '2']),
+        protocolVersion: z.enum(['1', '2', '3']),
         ok: z.literal(false),
         diagnostics: z.array(DiagnosticSchema).min(1),
         provenance: ProvenanceSchema.optional(),
@@ -1355,14 +1612,23 @@ export const ExecutionResponseSchema = z
     if (!response.ok) {
       return;
     }
-    if (
-      (response.protocolVersion === '2') !==
-      (response.execution.authoring !== undefined)
-    ) {
+    const authoring = response.execution.authoring !== undefined;
+    const comparison =
+      (response.execution.methods?.length ?? 0) > 0 ||
+      (response.execution.tables?.length ?? 0) > 0;
+    if ((response.protocolVersion !== '1') !== authoring) {
       ctx.addIssue({
         code: 'custom',
         message: 'Protocol version must match authoring evidence',
         path: ['protocolVersion'],
+      });
+    }
+    if ((response.protocolVersion === '3') !== comparison) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Protocol version must match comparison evidence',
+        path: ['protocolVersion'],
+        params: { diagnosticCode: 'INCOMPATIBLE_CONTRACT' },
       });
     }
     const modules = new Set(

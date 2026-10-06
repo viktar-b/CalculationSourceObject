@@ -1,14 +1,15 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { z } from 'zod';
-import {
-  NumericKindSchema,
-  SupportedNumberSchema,
-  numericValueIssue,
-} from './numbers.ts';
 import type {
   CalculationSourceObject,
   CalculationSourceSymbol,
 } from '../calculation-source/object-schema.ts';
+import {
+  NumericKindSchema,
+  numericValueIssue,
+  SupportedNumberSchema,
+} from './numbers.ts';
+
 export { SupportedNumberSchema } from './numbers.ts';
 
 const invalidUnicodePattern = /[\uD800-\uDFFF]/u;
@@ -348,7 +349,7 @@ export const sourceClosureHash = (
   manifest: readonly SourceManifestEntry[],
 ): string => sha256Bytes(encoder.encode(serializeSourceManifest(manifest)));
 export const namespacedId = (
-  kind: 'symbol' | 'section' | 'text' | 'figure',
+  kind: 'symbol' | 'section' | 'text' | 'figure' | 'method' | 'table',
   invocationId: string,
   localId: string,
 ): string =>

@@ -38,6 +38,10 @@ class Planner:
         self.asset_files: dict[Path, tuple[Path, bytes]] = {}
         self.source_plans = {}
         self.compiled_plan_keys: list[tuple[str, str, str]] = []
+        self.methods: list[Json] = []
+        self.tables: list[Json] = []
+        self.method_index: dict[tuple[str, str], Json] = {}
+        self.grouped_invocations: set[str] = set()
 
     def unchanged(self) -> bool:
         if not self.capture.unchanged():
@@ -873,6 +877,14 @@ class Planner:
                     }
                 )
                 self.body(inv, child, ids, True, step.child_steps or [])
+            elif (
+                isinstance(node, ast.Expr)
+                and isinstance(node.value, ast.Call)
+                and authoring_name(node.value.func) in {"method", "table"}
+            ):
+                from .comparison import place_comparison
+
+                place_comparison(self, inv, node, section, ids)
             elif (
                 isinstance(node, ast.Expr)
                 and isinstance(node.value, ast.Call)
