@@ -273,7 +273,10 @@ def compare() -> CalculationResults:
     def test_method_content_awaiting_later_slices_is_diagnosed(self):
         source = (self.root / "rectangle.cso.py").read_text()
         (self.root / "rectangle.cso.py").write_text(
-            source.replace(" = width * height", " = width if width > height else height")
+            source.replace(
+                "    area:",
+                "    with open('x'):\n        pass\n    area:",
+            )
         )
         (self.root / "compare.cso.py").write_text(
             '''from typing import Annotated
@@ -602,3 +605,238 @@ def compare() -> CalculationResults:
         self.assertEqual(execution["tables"][0]["casesAxis"], "rows")
         self.assertEqual(execution["tables"][0]["cases"], [])
         self.assertEqual(execution["tables"][0]["cells"], [])
+
+    def test_conditional_records_exact_selected_branch(self):
+        self.write_choice()
+        payload = self.execution()["execution"]
+        chosen = next(item for item in payload["methods"][0]["quantities"] if item["variableName"] == "chosen")
+        self.assertEqual(chosen["formulaText"], "(w if w > h else h)")
+        outcomes = payload["branchOutcomes"]
+        self.assertEqual([item["value"] for item in outcomes], [True, False])
+        self.assertEqual([item["label"] for item in outcomes], ["w", "h"])
+        self.assertEqual([item["invocationId"] for item in outcomes], ["root/narrow", "root/wide"])
+        self.assertEqual(payload["tables"][0]["casesAxis"], "rows")
+        self.assertTrue(any(item["id"] == "root/spare" for item in payload["invocations"]))
+        self.assertEqual(
+            [symbol_result(payload, outcome["symbolId"]) for outcome in outcomes],
+            [4, 4],
+        )
+
+    def test_empty_conditional_method_records_no_outcomes(self):
+        self.write_choice(cases="{}")
+        execution = self.execution()["execution"]
+        self.assertNotIn("branchOutcomes", execution)
+        self.assertEqual(
+            execution["methods"][0]["quantities"][-1]["formulaText"],
+            "(w if w > h else h)",
+        )
+
+    def test_short_circuit_omits_dormant_comparison(self):
+        self.write_guard()
+        execution = self.execution()["execution"]
+        outcome = execution["branchOutcomes"][0]
+        chosen = next(item for item in execution["methods"][0]["quantities"] if item["variableName"] == "chosen")
+        nodes = {node["key"]: node for node in chosen["nodes"]}
+        dormant = next(
+            node["key"]
+            for node in chosen["nodes"]
+            if node.get("funcSpec", {}).get("id") == "fg.gt"
+            and any((nodes[argument["key"]].get("literal") or {}).get("value") == 10 for argument in node["funcArgs"])
+        )
+        self.assertEqual(outcome["value"], False)
+        self.assertNotIn(dormant, outcome["usedKeys"])
+        self.assertEqual(outcome["label"], "0")
+
+    def test_comparison_chain_short_circuits(self):
+        self.write_chain()
+        outcomes = self.execution()["execution"]["branchOutcomes"]
+        self.assertEqual([item["value"] for item in outcomes], [False, True])
+        self.assertLess(len(outcomes[0]["usedKeys"]), len(outcomes[1]["usedKeys"]))
+
+    def test_dormant_division_is_not_executed(self):
+        self.write_division(2)
+        execution = self.execution()["execution"]
+        chosen = next(item for item in execution["methods"][0]["quantities"] if item["variableName"] == "chosen")
+        divide = next(node["key"] for node in chosen["nodes"] if node.get("funcSpec", {}).get("id") == "fg.divide")
+        outcome = execution["branchOutcomes"][0]
+        self.assertEqual(outcome["value"], True)
+        self.assertNotIn(divide, outcome["usedKeys"])
+        self.assertIn("else", chosen["formulaText"])
+
+    def test_nested_conditional_records_only_the_selected_path(self):
+        self.write_nested()
+        outcomes = self.execution()["execution"]["branchOutcomes"]
+        self.assertEqual([item["nodeKey"] for item in outcomes], ["n5", "n1"])
+        self.assertEqual([item["value"] for item in outcomes], [False, True])
+        self.assertEqual(outcomes[0]["label"], "0")
+        self.assertEqual(outcomes[1]["label"], "(w if w > 0 else 0)")
+        self.assertNotIn("n9", outcomes[0]["usedKeys"])
+
+    def test_selected_division_by_zero_fails_the_run(self):
+        self.write_division(0)
+        response = execute(self.root / "compare.cso.py", "compare", {})
+        self.assertFalse(response["ok"])
+        self.assertNotIn("execution", response)
+
+    def write_choice(self, cases=None):
+        (self.root / "choice.cso.py").write_text(
+            '''from typing import Annotated
+from cso_python import CalculationResults, calculation, section, symbol
+
+@calculation(id="choice", title="Choice")
+@section(id="choice-section", title="Choice", root=True)
+def choice(width: Annotated[float, symbol(glyph="w", description="Width", unit="m")], height: Annotated[float, symbol(glyph="h", description="Height", unit="m")]) -> CalculationResults:
+    chosen: Annotated[float, symbol(glyph="c", description="Chosen", unit="m")] = width if width > height else height
+    return {"chosen": chosen}
+'''
+        )
+        body = '''narrow = choice(width=4, height=1)
+    wide = choice(width=1, height=4)
+    spare = choice(width=2, height=2)
+    table(id="choice-results", method="choice-method", title="Choice comparison", cases={"Narrow": narrow, "Wide": wide}, cases_axis="rows")''' if cases is None else f'''table(id="choice-results", method="choice-method", title="Choice comparison", cases={cases})'''
+        (self.root / "compare.cso.py").write_text(
+            f'''from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.choice import choice
+
+@calculation(id="compare", title="Choice comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="choice-method", calculation=choice, title="How the larger side is chosen")
+    {body}
+    ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
+    return {{"ready": ready}}
+'''
+        )
+        generate(self.root)
+
+    def write_guard(self):
+        (self.root / "guard.cso.py").write_text(
+            '''from typing import Annotated
+from cso_python import CalculationResults, calculation, section, symbol
+
+@calculation(id="guard", title="Guard")
+@section(id="guard-section", title="Guard", root=True)
+def guard(width: Annotated[float, symbol(glyph="w", description="Width", unit="m")]) -> CalculationResults:
+    chosen: Annotated[float, symbol(glyph="c", description="Chosen", unit="")] = 1 if width > 0 and width > 10 else 0
+    return {"chosen": chosen}
+'''
+        )
+        (self.root / "compare.cso.py").write_text(
+            '''from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.guard import guard
+
+@calculation(id="compare", title="Guard comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="guard-method", calculation=guard, title="How the guard is calculated")
+    negative = guard(width=-1)
+    table(id="guard-results", method="guard-method", title="Guard comparison", cases={"Negative": negative})
+    ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
+    return {"ready": ready}
+'''
+        )
+        generate(self.root)
+
+    def write_chain(self):
+        (self.root / "chain.cso.py").write_text(
+            '''from typing import Annotated
+from cso_python import CalculationResults, calculation, section, symbol
+
+@calculation(id="chain", title="Chain")
+@section(id="chain-section", title="Chain", root=True)
+def chain(width: Annotated[float, symbol(glyph="w", description="Width", unit="m")]) -> CalculationResults:
+    chosen: Annotated[float, symbol(glyph="c", description="Chosen", unit="")] = 1 if 0 < width < 10 else 0
+    return {"chosen": chosen}
+'''
+        )
+        (self.root / "compare.cso.py").write_text(
+            '''from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.chain import chain
+
+@calculation(id="compare", title="Chain comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="chain-method", calculation=chain, title="How the band is calculated")
+    below = chain(width=-1)
+    inside = chain(width=5)
+    table(id="chain-results", method="chain-method", title="Chain comparison", cases={"Below": below, "Inside": inside})
+    ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
+    return {"ready": ready}
+'''
+        )
+        generate(self.root)
+
+    def write_nested(self):
+        (self.root / "nested.cso.py").write_text(
+            '''from typing import Annotated
+from cso_python import CalculationResults, calculation, section, symbol
+
+@calculation(id="nested", title="Nested")
+@section(id="nested-section", title="Nested", root=True)
+def nested(width: Annotated[float, symbol(glyph="w", description="Width", unit="m")], height: Annotated[float, symbol(glyph="h", description="Height", unit="m")]) -> CalculationResults:
+    chosen: Annotated[float, symbol(glyph="c", description="Chosen", unit="m")] = (width if width > 0 else 0) if height > 0 else height
+    return {"chosen": chosen}
+'''
+        )
+        (self.root / "compare.cso.py").write_text(
+            '''from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.nested import nested
+
+@calculation(id="compare", title="Nested comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="nested-method", calculation=nested, title="How the nested choice is calculated")
+    sample = nested(width=-1, height=1)
+    table(id="nested-results", method="nested-method", title="Nested comparison", cases={"Sample": sample})
+    ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
+    return {"ready": ready}
+'''
+        )
+        generate(self.root)
+
+    def write_division(self, width: int):
+        (self.root / "division.cso.py").write_text(
+            '''from typing import Annotated
+from cso_python import CalculationResults, calculation, section, symbol
+
+@calculation(id="division", title="Division")
+@section(id="division-section", title="Division", root=True)
+def division(width: Annotated[float, symbol(glyph="w", description="Width", unit="m")]) -> CalculationResults:
+    chosen: Annotated[float, symbol(glyph="c", description="Chosen", unit="m")] = width if width > 0 else 1 / width
+    return {"chosen": chosen}
+'''
+        )
+        (self.root / "compare.cso.py").write_text(
+            f'''from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.division import division
+
+@calculation(id="compare", title="Division comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="division-method", calculation=division, title="How the guarded width is calculated")
+    sample = division(width={width})
+    table(id="division-results", method="division-method", title="Division comparison", cases={{"Sample": sample}})
+    ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
+    return {{"ready": ready}}
+'''
+        )
+        generate(self.root)
+
+
+def symbol_result(execution, symbol_id: str):
+    def walk(sections):
+        for section in sections:
+            for item in section["items"]:
+                if item["kind"] == "symbol" and item["symbol"]["id"] == symbol_id:
+                    return item["symbol"]["valueTree"]["result"]["value"]
+            found = walk(section.get("sections") or [])
+            if found is not None:
+                return found
+        return None
+
+    return walk(execution["cso"]["sections"])

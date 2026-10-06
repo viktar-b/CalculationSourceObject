@@ -17,6 +17,14 @@ _OPERATORS = {
     "fg.divide": "/",
     "fg.pow": "^",
 }
+_COMPARISONS = {
+    "fg.lt": "<",
+    "fg.le": "<=",
+    "fg.gt": ">",
+    "fg.ge": ">=",
+    "fg.eq": "==",
+    "fg.ne": "!=",
+}
 
 
 def place_comparison(planner, inv, statement: ast.Expr, section: Json, ids: set[str]) -> None:
@@ -150,13 +158,6 @@ def _place_method(planner, inv, call: ast.Call, section: Json, ids: set[str]) ->
 def _reject_deferred_content(planner, inv, module, function_name: str, at: ast.AST) -> None:
     function = module.functions[function_name]
     for node in ast.walk(ast.Module(body=function.body, type_ignores=[])):
-        if isinstance(node, ast.IfExp):
-            planner.error(
-                inv,
-                at,
-                "UNSUPPORTED_METHOD_CONTENT",
-                "Conditional method content is not available in this slice",
-            )
         if isinstance(node, ast.With) and not _is_document_section(node):
             planner.error(
                 inv,
@@ -253,35 +254,45 @@ def _quantity(variable: str, selection: str, kind: str, role: str, metadata: Jso
     }
 
 
-def _formula_text(nodes: list[Json], glyphs: dict[str, str]) -> str:
+def _formula_text(nodes: list[Json], glyphs: dict[str, str], key: str | None = None) -> str:
     if not nodes:
         return ""
     by_key = {node["key"]: node for node in nodes}
 
-    def walk(key: str) -> str:
-        node = by_key[key]
+    def walk(node_key: str) -> str:
+        node = by_key[node_key]
         mode = node["mode"]
         if mode == "LITERAL":
             return str(node.get("draft", node["literal"]["value"]))
         if mode == "SYMBOL":
-            ref = node["ref"]
+            ref = node.get("ref") or {}
             if ref.get("kind") == "output":
                 return f"{ref['call']}.{ref['output']}"
             name = ref.get("name") or ref.get("output")
-            return glyphs.get(name, name)
+            return glyphs.get(name, name or node_key)
         if mode == "GIVEN_PARAMETER":
             return glyphs.get(node["parameter"], node["parameter"])
         if mode == "FUNCTION":
-            arguments = [walk(argument["key"]) for argument in node["funcArgs"]]
-            operator = _OPERATORS.get(node["funcSpec"]["id"])
-            if node["funcSpec"]["id"] == "fg.uminus":
-                return f"-{arguments[0]}"
-            if operator and len(arguments) == 2:
-                return f"({arguments[0]} {operator} {arguments[1]})"
-            return f"{node['funcSpec']['id']}({', '.join(arguments)})"
+            arguments = [argument["key"] for argument in node["funcArgs"]]
+            function_id = node["funcSpec"]["id"]
+            if function_id == "fg.cnd":
+                return f"({walk(arguments[1])} if {walk(arguments[0])} else {walk(arguments[2])})"
+            if function_id in {"fg.and", "fg.or"}:
+                joiner = " and " if function_id == "fg.and" else " or "
+                return f"({joiner.join(walk(argument) for argument in arguments)})"
+            comparison = _COMPARISONS.get(function_id)
+            if comparison and len(arguments) == 2:
+                return f"{walk(arguments[0])} {comparison} {walk(arguments[1])}"
+            rendered = [walk(argument) for argument in arguments]
+            operator = _OPERATORS.get(function_id)
+            if function_id == "fg.uminus":
+                return f"-{rendered[0]}"
+            if operator and len(rendered) == 2:
+                return f"({rendered[0]} {operator} {rendered[1]})"
+            return f"{function_id}({', '.join(rendered)})"
         return ""
 
-    return walk(nodes[0]["key"])
+    return walk(key or nodes[0]["key"])
 
 
 def _method_content(
@@ -704,4 +715,173 @@ def _overlaps(owned: set[str], invocation_id: str) -> bool:
         or other.startswith(invocation_id + "/")
         or invocation_id.startswith(other + "/")
         for other in owned
+    )
+
+
+def collect_branch_outcomes(planner) -> list[Json]:
+    """Record predicate results from the single captured execution."""
+    invocations = {invocation.id: invocation for invocation in planner.invocations}
+    values = _symbol_values(planner)
+    outcomes: list[Json] = []
+    for table in planner.tables:
+        method = next(item for item in planner.methods if item["id"] == table["methodId"])
+        glyphs = {
+            quantity["variableName"]: quantity["glyph"] for quantity in method["quantities"]
+        }
+        for quantity in method["quantities"]:
+            glyphs.setdefault(quantity["selectionName"], quantity["glyph"])
+        for case in table["cases"]:
+            child = invocations[case["invocationId"]]
+            for quantity in method["quantities"]:
+                if quantity["role"] == "input":
+                    continue
+                symbol = child.symbols.get(quantity["variableName"])
+                if symbol is None:
+                    continue
+                nodes = {node["key"]: node for node in symbol.cso["valueTree"]["nodes"]}
+                _visit_formula(
+                    child,
+                    quantity,
+                    glyphs,
+                    nodes,
+                    values,
+                    symbol.cso["valueTree"]["rootKey"],
+                    outcomes,
+                )
+    return outcomes
+
+
+def _symbol_values(planner) -> dict[str, int | float]:
+    values: dict[str, int | float] = {}
+    for invocation in planner.invocations:
+        symbols = [
+            *invocation.symbols.values(),
+            *invocation.parameter_symbols.values(),
+        ]
+        for symbol in symbols:
+            result = symbol.cso["valueTree"].get("result")
+            if isinstance(result, dict) and "value" in result:
+                values[symbol.cso["id"]] = result["value"]
+    return values
+
+
+def _visit_formula(invocation, quantity, glyphs, nodes, values, key: str, outcomes: list[Json]) -> None:
+    node = nodes[key]
+    if node.get("mode") != "FUNCTION":
+        return
+    function_id = node.get("funcSpec", {}).get("id")
+    arguments = [argument["key"] for argument in node.get("funcArgs") or []]
+    if function_id == "fg.cnd":
+        _record_conditional(invocation, quantity, glyphs, nodes, values, key, outcomes)
+        return
+    for argument in arguments:
+        _visit_formula(invocation, quantity, glyphs, nodes, values, argument, outcomes)
+
+
+def _record_conditional(invocation, quantity, glyphs, nodes, values, key: str, outcomes: list[Json]) -> set[str]:
+    node = nodes[key]
+    arguments = [argument["key"] for argument in node["funcArgs"]]
+    used: set[str] = set()
+    selected = _predicate_value(nodes, values, arguments[0], used)
+    chosen = arguments[1] if selected else arguments[2]
+    used.update(_evaluated_keys(invocation, quantity, glyphs, nodes, values, chosen, outcomes))
+    used.add(key)
+    outcomes.append(
+        {
+            "invocationId": invocation.id,
+            "symbolId": invocation.symbols[quantity["variableName"]].cso["id"],
+            "nodeKey": key,
+            "value": selected,
+            "usedKeys": sorted(used),
+            "label": _formula_text(quantity["nodes"], glyphs, chosen),
+        }
+    )
+    return used
+
+
+def _evaluated_keys(invocation, quantity, glyphs, nodes, values, key: str, outcomes: list[Json]) -> set[str]:
+    node = nodes[key]
+    if node.get("mode") == "FUNCTION" and node.get("funcSpec", {}).get("id") == "fg.cnd":
+        return _record_conditional(invocation, quantity, glyphs, nodes, values, key, outcomes)
+    used = {key}
+    for argument in node.get("funcArgs") or []:
+        used.update(
+            _evaluated_keys(
+                invocation, quantity, glyphs, nodes, values, argument["key"], outcomes
+            )
+        )
+    return used
+
+
+def _predicate_value(nodes, values, key: str, used: set[str]) -> bool:
+    node = nodes[key]
+    used.add(key)
+    function_id = node["funcSpec"]["id"]
+    arguments = [argument["key"] for argument in node["funcArgs"]]
+    if function_id == "fg.and":
+        for argument in arguments:
+            if not _predicate_value(nodes, values, argument, used):
+                return False
+        return True
+    if function_id == "fg.or":
+        for argument in arguments:
+            if _predicate_value(nodes, values, argument, used):
+                return True
+        return False
+    if function_id not in _COMPARISONS:
+        raise SourceError(
+            "INVALID_CONDITIONAL",
+            "A conditional test requires numeric comparisons",
+            location=node.get("metadata", {}).get("location"),
+        )
+    left = _number_value(nodes, values, arguments[0], used)
+    right = _number_value(nodes, values, arguments[1], used)
+    return {
+        "fg.lt": left < right,
+        "fg.le": left <= right,
+        "fg.gt": left > right,
+        "fg.ge": left >= right,
+        "fg.eq": left == right,
+        "fg.ne": left != right,
+    }[function_id]
+
+
+def _number_value(nodes, values, key: str, used: set[str]) -> int | float:
+    node = nodes[key]
+    used.add(key)
+    mode = node["mode"]
+    if mode == "LITERAL":
+        return node["literal"]["value"]
+    if mode == "SYMBOL":
+        symbol_id = node["symbol"]["id"]
+        if symbol_id not in values:
+            raise SourceError(
+                "INVALID_CONDITIONAL",
+                "Conditional evidence is missing a captured operand",
+                location=node.get("metadata", {}).get("location"),
+            )
+        return values[symbol_id]
+    function_id = node["funcSpec"]["id"]
+    arguments = [argument["key"] for argument in node["funcArgs"]]
+    if function_id == "fg.cnd":
+        selected = _predicate_value(nodes, values, arguments[0], used)
+        return _number_value(nodes, values, arguments[1] if selected else arguments[2], used)
+    if function_id == "fg.uminus":
+        return -_number_value(nodes, values, arguments[0], used)
+    if function_id in _OPERATORS and len(arguments) == 2:
+        left = _number_value(nodes, values, arguments[0], used)
+        right = _number_value(nodes, values, arguments[1], used)
+        if function_id == "fg.add":
+            return left + right
+        if function_id == "fg.subtract":
+            return left - right
+        if function_id == "fg.multiply":
+            return left * right
+        if function_id == "fg.divide":
+            return left / right
+        return left**right
+    raise SourceError(
+        "INVALID_CONDITIONAL",
+        "Conditional evidence uses an unsupported operand",
+        location=node.get("metadata", {}).get("location"),
     )

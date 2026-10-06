@@ -369,6 +369,18 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
       }),
     ),
     emptyState: z.literal('No cases evaluated').optional(),
+    branchNotes: z
+      .array(
+        z.strictObject({
+          heading: NonemptyStringSchema,
+          invocationId: NonemptyStringSchema,
+          symbolId: NonemptyStringSchema,
+          nodeKey: NonemptyStringSchema,
+          label: NonemptyStringSchema,
+        }),
+      )
+      .min(1)
+      .optional(),
     replacedSections: z.array(NonemptyStringSchema),
     contextSource: HistoricalJsonObjectSchema.optional(),
     ...placementFields,

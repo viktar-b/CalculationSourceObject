@@ -566,6 +566,41 @@ const presentMethodHelpers = (
     helpers: presentMethodHelpers(helper.helpers),
   }));
 
+const presentedBranchNotes = (
+  execution: ExecutionPayload,
+  table: NonNullable<ExecutionPayload['tables']>[number],
+) => {
+  const outcomes = (execution.branchOutcomes ?? []).filter((outcome) =>
+    table.cases.some((item) => item.invocationId === outcome.invocationId),
+  );
+  const labels = new Map<string, string[]>();
+  const groupKey = (outcome: (typeof outcomes)[number]) => {
+    const invocation = execution.invocations.find(
+      (item) => item.id === outcome.invocationId,
+    );
+    const variable = invocation?.symbols.find(
+      (item) => item.symbolId === outcome.symbolId,
+    )?.variableName;
+    return `${variable ?? ''}|${outcome.nodeKey}`;
+  };
+  for (const outcome of outcomes) {
+    const key = groupKey(outcome);
+    labels.set(key, [...(labels.get(key) ?? []), outcome.label]);
+  }
+  return table.cases.flatMap((caseItem) =>
+    outcomes
+      .filter((outcome) => outcome.invocationId === caseItem.invocationId)
+      .filter((outcome) => new Set(labels.get(groupKey(outcome))).size > 1)
+      .map((outcome) => ({
+        heading: caseItem.heading,
+        invocationId: caseItem.invocationId,
+        symbolId: outcome.symbolId,
+        nodeKey: outcome.nodeKey,
+        label: outcome.label,
+      })),
+  );
+};
+
 const comparisonPlacement = (
   execution: ExecutionPayload,
   item: CalculationSourceSectionItem,
@@ -648,11 +683,13 @@ const comparisonPlacement = (
         }),
       };
     });
+  const branchNotes = presentedBranchNotes(execution, table);
   return {
     kind: 'table',
     id: item.id,
     title: table.title,
     casesAxis: table.casesAxis,
+    ...(branchNotes.length > 0 ? { branchNotes } : {}),
     cases: table.cases.map(({ heading, invocationId }) => ({
       heading,
       invocationId,

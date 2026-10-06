@@ -74,6 +74,36 @@ const rowPublication = publication.replace(
   'cases={"Case A": first_panel, "Case B": second_panel}, cases_axis="rows"',
 );
 
+const route = `from typing import Annotated, TypeAlias
+from cso_python import CalculationResults, calculation, section, symbol
+
+Width: TypeAlias = Annotated[float, symbol(glyph="w", description="Width", unit="m")]
+Height: TypeAlias = Annotated[float, symbol(glyph="h", description="Height", unit="m")]
+
+@calculation(id="route", title="Route")
+@section(id="route-section", title="Route", root=True)
+def route(width: Width, height: Height) -> CalculationResults:
+    chosen: Annotated[float, symbol(glyph="c", description="Chosen", unit="m")] = width if width > height else height
+    guarded: Annotated[float, symbol(glyph="g", description="Guarded", unit="m")] = width if width > 0 else 1 / width
+    return {"chosen": chosen, "guarded": guarded}
+`;
+
+const branchCompare = `from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.route import route
+
+@calculation(id="compare", title="Route comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="route-method", calculation=route, title="How the route is calculated")
+    narrow = route(width=4, height=1)
+    wide = route(width=1, height=4)
+    spare = route(width=2, height=2)
+    table(id="route-results", method="route-method", title="Route comparison", cases={"Narrow": narrow, "Wide": wide}, cases_axis="rows")
+    compared: Annotated[float, symbol(glyph="R", description="Compared", unit="m")] = narrow["chosen"]
+    return {"compared": compared}
+`;
+
 const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
   'base64',
@@ -163,6 +193,8 @@ beforeAll(() => {
   writeFileSync(join(directory, 'panel.cso.py'), panel);
   writeFileSync(join(directory, 'panel_compare.cso.py'), panelCompare);
   writeFileSync(join(directory, 'panel_publish.cso.py'), panelCompare);
+  writeFileSync(join(directory, 'route.cso.py'), route);
+  writeFileSync(join(directory, 'branch_compare.cso.py'), branchCompare);
   const bindings = spawnSync(
     python,
     ['-I', '-m', 'cso_python', 'bindings', directory],
@@ -467,6 +499,87 @@ test('publishes nested helper explanations without pruning authored context', as
 
   const pdfPath = join(directory, 'panel.pdf');
   const pdf = publish('pdf', 'panel_publish.cso.py', 'compare', pdfPath);
+  expect(pdf.status, pdf.stdout || pdf.stderr).toBe(0);
+  const info = spawnSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
+  expect(info.status, info.stderr).toBe(0);
+  expect(info.stdout).toContain('Pages:           2');
+}, 180_000);
+
+test('publishes verified conditional notes without rerunning dormant branches', async () => {
+  const execution = capture('branch_compare.cso.py', 'compare');
+  expect(verifyExecution({ execution }).ok).toBe(true);
+  const method = execution.methods?.[0];
+  if (!method) throw new Error('Missing method');
+  const chosen = method.quantities.find(
+    (item) => item.variableName === 'chosen',
+  );
+  const guarded = method.quantities.find(
+    (item) => item.variableName === 'guarded',
+  );
+  expect(chosen?.formulaText).toBe('(w if w > h else h)');
+  expect(guarded?.formulaText).toContain('else');
+  const divide = guarded?.nodes.find(
+    (node) => node.mode === 'FUNCTION' && node.funcSpec.id === 'fg.divide',
+  );
+  if (!divide) throw new Error('Missing dormant division');
+  const outcomes = execution.branchOutcomes ?? [];
+  expect(outcomes.map((item) => item.label)).toEqual(['w', 'w', 'h', 'w']);
+  const guardedOutcomes = outcomes.filter((item) =>
+    item.symbolId.includes('"guarded"'),
+  );
+  expect(guardedOutcomes).toHaveLength(2);
+  for (const outcome of guardedOutcomes) {
+    expect(outcome.usedKeys).not.toContain(divide.key);
+  }
+  expect(outcomes.some((item) => item.invocationId === 'root/spare')).toBe(
+    false,
+  );
+  const document = prepareExecutionDocument({ execution, assets: [] });
+  const table = document.sections[0]?.items.find(
+    (item) => item.kind === 'table',
+  );
+  if (table?.kind !== 'table') throw new Error('Missing table');
+  expect(table.casesAxis).toBe('rows');
+  expect(table.branchNotes?.map((note) => note.label)).toEqual(['w', 'h']);
+  expect(
+    document.sections.some((section) => section.invocationId === 'root/spare'),
+  ).toBe(true);
+  expect(
+    document.sections.some((section) => section.invocationId === 'root/narrow'),
+  ).toBe(false);
+
+  const flipped = structuredClone(execution);
+  const first = flipped.branchOutcomes?.[0];
+  if (!first) throw new Error('Missing branch outcome');
+  first.value = !first.value;
+  expect(
+    verifyExecution({ execution: flipped }).diagnostics.some(
+      (item) => item.code === 'BRANCH_OUTCOME_MISMATCH',
+    ),
+  ).toBe(true);
+  const widened = structuredClone(execution);
+  widened.branchOutcomes?.[0]?.usedKeys.push(divide.key);
+  expect(
+    verifyExecution({ execution: widened }).diagnostics.some(
+      (item) => item.code === 'BRANCH_OUTCOME_MISMATCH',
+    ),
+  ).toBe(true);
+
+  const htmlPath = join(directory, 'branch.html');
+  const html = publish('html', 'branch_compare.cso.py', 'compare', htmlPath, [
+    '--check-layout',
+  ]);
+  expect(html.status, html.stdout || html.stderr).toBe(0);
+  const htmlText = readFileSync(htmlPath, 'utf8');
+  expect(htmlText).toContain('data-cases-axis="rows"');
+  expect(htmlText).toContain('data-branch-note="Narrow"');
+  expect(htmlText).toContain('data-formula="w"');
+  expect(htmlText).toContain('data-branch-note="Wide"');
+  expect(htmlText).toContain('data-formula="h"');
+  expect(htmlText.match(/otherwise\./g)).toHaveLength(4);
+  expect(htmlText).toContain('scope="row" data-case-heading="Narrow"');
+  const pdfPath = join(directory, 'branch.pdf');
+  const pdf = publish('pdf', 'branch_compare.cso.py', 'compare', pdfPath);
   expect(pdf.status, pdf.stdout || pdf.stderr).toBe(0);
   const info = spawnSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
   expect(info.status, info.stderr).toBe(0);

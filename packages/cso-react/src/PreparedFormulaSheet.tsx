@@ -274,6 +274,18 @@ export const PreparedFormulaSheet = ({
                 className="cso-comparison"
               >
                 <h3>{item.title}</h3>
+                {item.branchNotes?.map((note) => (
+                  <p
+                    key={`${note.invocationId}-${note.symbolId}-${note.nodeKey}`}
+                    className="cso-branch-note"
+                    data-branch-note={note.heading}
+                    data-symbol-id={note.symbolId}
+                    data-node-key={note.nodeKey}
+                    data-formula={note.label}
+                  >
+                    {note.heading}: {note.label}
+                  </p>
+                ))}
                 {item.emptyState ? (
                   <p className="cso-comparison-empty">{item.emptyState}</p>
                 ) : null}

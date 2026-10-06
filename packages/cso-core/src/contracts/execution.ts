@@ -21,6 +21,7 @@ import {
   VersionsSchema,
 } from './common.ts';
 import { scopedGlyph } from './glyphs.ts';
+import { branchLabel, reproduceBranches } from '../verification/branches.ts';
 import { NumericValueSchema } from './numbers.ts';
 
 const invalidUnicodePattern = /[\uD800-\uDFFF]/u;
@@ -331,6 +332,14 @@ const LogicalTableSchema = z.strictObject({
   cells: z.array(BoundCellSchema),
   location: SourceSpanSchema,
 });
+const BranchOutcomeSchema = z.strictObject({
+  invocationId: IdentityStringSchema,
+  symbolId: IdentityStringSchema,
+  nodeKey: NonemptyStringSchema,
+  value: z.boolean(),
+  usedKeys: z.array(NonemptyStringSchema).min(1),
+  label: NonemptyStringSchema,
+});
 
 const ExecutionPayloadBaseSchema = z
   .object({
@@ -349,6 +358,7 @@ const ExecutionPayloadBaseSchema = z
     operationObservations: z.array(OperationObservationSchema).optional(),
     methods: z.array(MethodPlanSchema).min(1).optional(),
     tables: z.array(LogicalTableSchema).min(1).optional(),
+    branchOutcomes: z.array(BranchOutcomeSchema).min(1).optional(),
     assets: z.array(AssetRecordSchema),
     versions: VersionsSchema,
   })
@@ -1720,6 +1730,105 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
         method.helpers,
         ['methods', index, 'helpers'],
         helpers,
+      );
+    }
+    const symbolResults = new Map<string, number>();
+    for (const symbol of symbolsById.values()) {
+      const result = symbol.valueTree.result;
+      if (result && result.kind === 'number') {
+        symbolResults.set(symbol.id, result.value);
+      }
+    }
+    const expectedBranches: {
+      invocationId: string;
+      symbolId: string;
+      nodeKey: string;
+      value: boolean;
+      usedKeys: readonly string[];
+      label: string;
+    }[] = [];
+    let branchesReproduced = true;
+    for (const table of execution.tables ?? []) {
+      const method = methodRecords.get(table.methodId)?.method;
+      if (!method) continue;
+      const glyphs = new Map<string, string>();
+      for (const quantity of method.quantities) {
+        glyphs.set(quantity.variableName, quantity.glyph);
+        glyphs.set(quantity.selectionName, quantity.glyph);
+      }
+      for (const caseItem of table.cases) {
+        const invocation = invocations.get(caseItem.invocationId);
+        if (!invocation) continue;
+        for (const quantity of method.quantities) {
+          if (quantity.role === 'input') continue;
+          const definition = invocation.symbols.find(
+            (item) => item.variableName === quantity.variableName,
+          );
+          const symbol = definition
+            ? symbolsById.get(definition.symbolId)
+            : undefined;
+          if (!definition || !symbol) continue;
+          const reproduced = reproduceBranches(
+            symbol.valueTree.nodes,
+            symbol.valueTree.rootKey,
+            symbolResults,
+          );
+          if (!reproduced) {
+            branchesReproduced = false;
+            continue;
+          }
+          for (const branch of reproduced) {
+            const label = branchLabel(
+              quantity.nodes,
+              glyphs,
+              branch.selectedKey,
+            );
+            if (!label) {
+              branchesReproduced = false;
+              continue;
+            }
+            expectedBranches.push({
+              invocationId: caseItem.invocationId,
+              symbolId: definition.symbolId,
+              nodeKey: branch.nodeKey,
+              value: branch.value,
+              usedKeys: branch.usedKeys,
+              label,
+            });
+          }
+        }
+      }
+    }
+    const recordedBranches = execution.branchOutcomes ?? [];
+    const branchIdentity = (item: {
+      invocationId: string;
+      symbolId: string;
+      nodeKey: string;
+      value: boolean;
+      usedKeys: readonly string[];
+      label: string;
+    }) =>
+      JSON.stringify([
+        item.invocationId,
+        item.symbolId,
+        item.nodeKey,
+        item.value,
+        item.usedKeys,
+        item.label,
+      ]);
+    const recordedIdentities = recordedBranches.map(branchIdentity).sort();
+    const expectedIdentities = expectedBranches.map(branchIdentity).sort();
+    if (
+      !branchesReproduced ||
+      recordedIdentities.length !== expectedIdentities.length ||
+      recordedIdentities.some(
+        (item, index) => item !== expectedIdentities[index],
+      )
+    ) {
+      issue(
+        'BRANCH_OUTCOME_MISMATCH',
+        ['branchOutcomes'],
+        'Branch outcomes must reproduce the captured predicate exactly',
       );
     }
     const ownedCases = new Set<string>();

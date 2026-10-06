@@ -14,6 +14,7 @@ import types
 from pathlib import Path
 from typing import Any
 
+from .comparison import collect_branch_outcomes
 from .exporter import authored_output_to_stderr
 from .glyphs import qualify_glyphs
 from .planner import Planner
@@ -363,6 +364,9 @@ class Execution:
                 execution["methods"] = self.planner.methods
             if self.planner.tables:
                 execution["tables"] = self.planner.tables
+            outcomes = collect_branch_outcomes(self.planner)
+            if outcomes:
+                execution["branchOutcomes"] = outcomes
         return {
             "protocolVersion": protocol,
             "ok": True,
