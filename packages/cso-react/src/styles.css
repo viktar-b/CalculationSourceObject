@@ -127,10 +127,20 @@ math {
 .cso-method-quantity, .cso-method-text, .cso-method-call, .cso-branch-note { margin: 1mm 0; }
 .cso-method-helper, .cso-method-section { margin: 2mm 0 2mm 4mm; }
 .cso-method-helper h4, .cso-method-section h4 { font-size: 12px; font-weight: 650; margin: 0 0 1mm; }
-.cso-comparison table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
+.cso-comparison table { width: max-content; min-width: 100%; border-collapse: collapse; table-layout: auto; font-size: 11px; }
 .cso-comparison th, .cso-comparison td { border: 1px solid #98a2b3; padding: 1mm; overflow-wrap: anywhere; vertical-align: top; }
+.cso-comparison [data-comparison-label] { position: sticky; left: 0; z-index: 1; background: white; }
+.cso-comparison math { flex-wrap: nowrap !important; white-space: nowrap; }
+.cso-comparison-scroll { overflow-x: auto; max-width: 100%; }
 .cso-comparison-empty { font-style: italic; }
+@media screen {
+  .cso-comparison-parts { display: none; }
+}
 @media print {
+  .cso-comparison-scroll, .cso-comparison > .cso-branch-note { display: none; }
+  .cso-comparison-part { break-inside: avoid; }
+  .cso-comparison-part + .cso-comparison-part { margin-top: 4mm; }
+  .cso-comparison-part table { width: 100%; }
   [data-formula-sheet] { width: var(--cso-print-content-width) !important; min-width: 0 !important; min-height: 0 !important; padding: 0 !important; border: none !important; display: block !important; }
   .cso-document { margin: 0; }
   .cso-section, .cso-symbol-placement { display: block; }

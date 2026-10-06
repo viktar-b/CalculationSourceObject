@@ -147,6 +147,7 @@ def table(
     inputs: tuple[str, ...] | None = None,
     outputs: tuple[str, ...] | None = None,
     cases_axis: str = "columns",
+    column_cap: int | None = None,
 ) -> None:
     """Record an identity-bound comparison of earlier calculation calls."""
 

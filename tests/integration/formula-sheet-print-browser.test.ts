@@ -1,8 +1,10 @@
-import { readFileSync } from 'node:fs';
-import { chromium, type Browser, type Page } from 'playwright';
-import { ModuleKind, ScriptTarget, transpileModule } from 'typescript';
+import { createRequire } from 'node:module';
+import { type Browser, chromium, type Page } from 'playwright';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import type { printFormulaSheet } from '../../packages/cso-react/src/formula-sheet/print';
+
+const require = createRequire(import.meta.url);
+const esbuild = require('esbuild') as typeof import('esbuild');
 
 declare global {
   interface Window {
@@ -30,21 +32,22 @@ const setup = async (): Promise<Page> => {
   await page.setContent(
     '<title>Original</title><article data-formula-sheet><img></article>',
   );
-  const source = readFileSync(
-    new URL(
-      '../../packages/cso-react/src/formula-sheet/print.ts',
-      import.meta.url,
-    ),
-    'utf8',
+  const source = new URL(
+    '../../packages/cso-react/src/formula-sheet/print.ts',
+    import.meta.url,
   );
-  const { outputText } = transpileModule(source, {
-    compilerOptions: {
-      module: ModuleKind.CommonJS,
-      target: ScriptTarget.ES2020,
-    },
+  const bundled = esbuild.buildSync({
+    entryPoints: [source.pathname],
+    bundle: true,
+    write: false,
+    format: 'iife',
+    globalName: 'specPrintBundle',
+    platform: 'browser',
   });
+  const outputText = bundled.outputFiles[0]?.text;
+  if (!outputText) throw new Error('Missing print helper bundle');
   await page.addScriptTag({
-    content: `window.specPrint = (() => { const exports = {}; ${outputText}; return exports.printFormulaSheet; })();`,
+    content: `${outputText}; window.specPrint = specPrintBundle.printFormulaSheet;`,
   });
   await page.evaluate(() => {
     window.printProbe = {

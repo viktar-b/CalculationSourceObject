@@ -856,6 +856,7 @@ const comparisonPlacement = (
     id: item.id,
     title: table.title,
     casesAxis: table.casesAxis,
+    ...(table.columnCap ? { columnCap: table.columnCap } : {}),
     ...(branchNotes.length > 0 ? { branchNotes } : {}),
     ...(engineeringChecks.length > 0 ? { engineeringChecks } : {}),
     ...(applicabilityNotes.length > 0 ? { applicabilityNotes } : {}),

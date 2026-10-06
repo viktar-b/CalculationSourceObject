@@ -298,12 +298,28 @@ export const PreparedFormulaSheet = ({
             const shownCell = (
               cell: (typeof item.groups)[number]['rows'][number]['cells'][number],
             ) => (cell.applicability ? 'Not applicable' : cellText(cell.value));
+            const quantityColumn = new Map<string, number>();
+            for (const group of item.groups) {
+              for (const row of group.rows) {
+                quantityColumn.set(
+                  `${group.role}:${row.quantity}`,
+                  quantityColumn.size,
+                );
+              }
+            }
+            const groupColumns = (group: (typeof item.groups)[number]) =>
+              group.rows
+                .map((row) =>
+                  quantityColumn.get(`${group.role}:${row.quantity}`),
+                )
+                .join(',');
             return (
               <div
                 key={item.sourcePlacementId}
                 data-source-placement={item.sourcePlacementId}
                 data-comparison-id={item.id}
                 data-cases-axis={item.casesAxis}
+                data-column-cap={item.columnCap}
                 className="cso-comparison"
               >
                 <h3>{item.title}</h3>
@@ -365,129 +381,163 @@ export const PreparedFormulaSheet = ({
                   <p className="cso-comparison-empty">{item.emptyState}</p>
                 ) : null}
                 {item.casesAxis === 'rows' ? (
-                  <table>
-                    <thead>
-                      <tr>
-                        <th scope="col">Case</th>
-                        {item.groups.map((group) => (
-                          <th
-                            key={group.role}
-                            scope="colgroup"
-                            colSpan={group.rows.length}
-                          >
-                            {group.label}
+                  <div
+                    className="cso-comparison-scroll"
+                    data-comparison-scroll=""
+                  >
+                    <table data-comparison-table="screen">
+                      <thead>
+                        <tr>
+                          <th scope="col" data-comparison-label="">
+                            Case
                           </th>
-                        ))}
-                      </tr>
-                      <tr>
-                        <th scope="col">Quantity</th>
-                        {item.groups.flatMap((group) =>
-                          group.rows.map((row) => (
+                          {item.groups.map((group) => (
                             <th
-                              key={`${group.role}-${row.quantity}`}
-                              scope="col"
-                              data-quantity={row.quantity}
-                            >
-                              {quantityHeading(row)}
-                            </th>
-                          )),
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {item.cases.map((caseItem) => (
-                        <tr key={caseItem.invocationId}>
-                          <th scope="row" data-case-heading={caseItem.heading}>
-                            {caseItem.heading}
-                          </th>
-                          {item.groups.flatMap((group) =>
-                            group.rows.map((row) => {
-                              const cell = row.cells.find(
-                                (candidate) =>
-                                  candidate.invocationId ===
-                                  caseItem.invocationId,
-                              );
-                              if (!cell) {
-                                throw new Error(
-                                  `Missing ${row.quantity} for ${caseItem.heading}`,
-                                );
-                              }
-                              return (
-                                <td
-                                  key={`${caseItem.invocationId}-${row.quantity}`}
-                                  data-quantity={row.quantity}
-                                  data-case={caseItem.heading}
-                                  data-symbol-id={cell.symbolId}
-                                  data-value={cell.value}
-                                  data-applicability={
-                                    cell.applicability
-                                      ? 'not-applicable'
-                                      : undefined
-                                  }
-                                >
-                                  {shownCell(cell)}
-                                </td>
-                              );
-                            }),
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <table>
-                    <thead>
-                      <tr>
-                        <th scope="col">Quantity</th>
-                        {item.cases.map((caseItem) => (
-                          <th
-                            key={caseItem.invocationId}
-                            scope="col"
-                            data-case-heading={caseItem.heading}
-                          >
-                            {caseItem.heading}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {item.groups.map((group) => (
-                        <Fragment key={group.role}>
-                          <tr>
-                            <th
+                              key={group.role}
                               scope="colgroup"
-                              colSpan={item.cases.length + 1}
+                              colSpan={group.rows.length}
+                              data-comparison-columns={groupColumns(group)}
                             >
                               {group.label}
                             </th>
-                          </tr>
-                          {group.rows.map((row) => (
-                            <tr key={`${group.role}-${row.quantity}`}>
-                              <th scope="row" data-quantity={row.quantity}>
+                          ))}
+                        </tr>
+                        <tr>
+                          <th scope="col" data-comparison-label="">
+                            Quantity
+                          </th>
+                          {item.groups.flatMap((group) =>
+                            group.rows.map((row) => (
+                              <th
+                                key={`${group.role}-${row.quantity}`}
+                                scope="col"
+                                data-quantity={row.quantity}
+                                data-comparison-column={quantityColumn.get(
+                                  `${group.role}:${row.quantity}`,
+                                )}
+                              >
                                 {quantityHeading(row)}
                               </th>
-                              {row.cells.map((cell) => (
-                                <td
-                                  key={cell.invocationId}
-                                  data-quantity={row.quantity}
-                                  data-case={cell.heading}
-                                  data-symbol-id={cell.symbolId}
-                                  data-value={cell.value}
-                                  data-applicability={
-                                    cell.applicability
-                                      ? 'not-applicable'
-                                      : undefined
-                                  }
-                                >
-                                  {shownCell(cell)}
-                                </td>
-                              ))}
-                            </tr>
+                            )),
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {item.cases.map((caseItem) => (
+                          <tr key={caseItem.invocationId}>
+                            <th
+                              scope="row"
+                              data-comparison-label=""
+                              data-case-heading={caseItem.heading}
+                            >
+                              {caseItem.heading}
+                            </th>
+                            {item.groups.flatMap((group) =>
+                              group.rows.map((row) => {
+                                const cell = row.cells.find(
+                                  (candidate) =>
+                                    candidate.invocationId ===
+                                    caseItem.invocationId,
+                                );
+                                if (!cell) {
+                                  throw new Error(
+                                    `Missing ${row.quantity} for ${caseItem.heading}`,
+                                  );
+                                }
+                                return (
+                                  <td
+                                    key={`${caseItem.invocationId}-${row.quantity}`}
+                                    data-quantity={row.quantity}
+                                    data-case={caseItem.heading}
+                                    data-symbol-id={cell.symbolId}
+                                    data-value={cell.value}
+                                    data-comparison-column={quantityColumn.get(
+                                      `${group.role}:${row.quantity}`,
+                                    )}
+                                    data-applicability={
+                                      cell.applicability
+                                        ? 'not-applicable'
+                                        : undefined
+                                    }
+                                  >
+                                    {shownCell(cell)}
+                                  </td>
+                                );
+                              }),
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div
+                    className="cso-comparison-scroll"
+                    data-comparison-scroll=""
+                  >
+                    <table data-comparison-table="screen">
+                      <thead>
+                        <tr>
+                          <th scope="col" data-comparison-label="">
+                            Quantity
+                          </th>
+                          {item.cases.map((caseItem, index) => (
+                            <th
+                              key={caseItem.invocationId}
+                              scope="col"
+                              data-case-heading={caseItem.heading}
+                              data-comparison-column={index}
+                            >
+                              {caseItem.heading}
+                            </th>
                           ))}
-                        </Fragment>
-                      ))}
-                    </tbody>
-                  </table>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {item.groups.map((group) => (
+                          <Fragment key={group.role}>
+                            <tr>
+                              <th
+                                scope="colgroup"
+                                colSpan={item.cases.length + 1}
+                                data-comparison-banner=""
+                              >
+                                {group.label}
+                              </th>
+                            </tr>
+                            {group.rows.map((row) => (
+                              <tr key={`${group.role}-${row.quantity}`}>
+                                <th
+                                  scope="row"
+                                  data-quantity={row.quantity}
+                                  data-comparison-label=""
+                                >
+                                  {quantityHeading(row)}
+                                </th>
+                                {row.cells.map((cell, index) => (
+                                  <td
+                                    key={cell.invocationId}
+                                    data-quantity={row.quantity}
+                                    data-case={cell.heading}
+                                    data-symbol-id={cell.symbolId}
+                                    data-value={cell.value}
+                                    data-comparison-column={index}
+                                    data-applicability={
+                                      cell.applicability
+                                        ? 'not-applicable'
+                                        : undefined
+                                    }
+                                  >
+                                    {shownCell(cell)}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
                 <EngineeringMetadata entries={item.context} />
               </div>

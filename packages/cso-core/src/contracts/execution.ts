@@ -354,6 +354,7 @@ const LogicalTableSchema = z.strictObject({
   title: NonemptyStringSchema,
   methodId: IdentityStringSchema,
   casesAxis: z.enum(['columns', 'rows']),
+  columnCap: z.number().int().positive().optional(),
   inputs: z.array(NonemptyStringSchema),
   outputs: z.array(NonemptyStringSchema),
   cases: z.array(

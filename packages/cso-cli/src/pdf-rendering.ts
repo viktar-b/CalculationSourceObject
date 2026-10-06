@@ -1,4 +1,9 @@
 import type { Diagnostic, PreparedDocument } from '@cs-object/core';
+import {
+  measureComparisons,
+  planComparisonParts,
+  renderComparisonParts,
+} from '@cs-object/react';
 import { chromium, type Page } from 'playwright';
 import type { PresentationMapping } from './evidence.ts';
 import { buildPreparedHtml } from './prepared-html.ts';
@@ -268,6 +273,23 @@ function inspectLayoutInPage(media: 'screen' | 'print'): Diagnostic[] {
   }
   for (const math of sheet.querySelectorAll('math')) {
     const placement = math.closest('[data-source-placement]');
+    const scroll = math.closest('[data-comparison-scroll]');
+    if (scroll) {
+      const cell = math.closest('td, th') ?? scroll;
+      const cellBounds = cell.getBoundingClientRect();
+      for (const element of [math, ...math.querySelectorAll('*')]) {
+        recordOverflow({
+          element,
+          bounds: element.getBoundingClientRect(),
+          containerLeft: cellBounds.left,
+          containerRight: cellBounds.right,
+          placement,
+          fallback: cell,
+          message: 'Mathematical notation overflows its comparison cell',
+        });
+      }
+      continue;
+    }
     const row = math.closest('.cso-symbol-row') ?? sheet;
     const cell = math.closest('td') ?? row;
     const rowBounds = cell.getBoundingClientRect();
@@ -308,6 +330,23 @@ function inspectLayoutInPage(media: 'screen' | 'print'): Diagnostic[] {
       rectangles.push(...range.getClientRects());
     }
     for (const bounds of rectangles) {
+      const scroll = element.closest('[data-comparison-scroll]');
+      if (scroll) {
+        const cell = element.closest('td, th');
+        if (cell && cell !== element) {
+          const cellBounds = cell.getBoundingClientRect();
+          recordOverflow({
+            element,
+            bounds,
+            containerLeft: cellBounds.left,
+            containerRight: cellBounds.right,
+            placement: element.closest('[data-source-placement]'),
+            fallback: cell,
+            message: 'Comparison cell content overflows its cell',
+          });
+        }
+        continue;
+      }
       recordOverflow({
         element,
         bounds,
@@ -317,6 +356,36 @@ function inspectLayoutInPage(media: 'screen' | 'print'): Diagnostic[] {
         fallback: sheet,
         message: 'Document content exceeds printable sheet width',
       });
+    }
+  }
+  for (const scroll of sheet.querySelectorAll('[data-comparison-scroll]')) {
+    const bounds = scroll.getBoundingClientRect();
+    recordOverflow({
+      element: scroll,
+      bounds,
+      containerLeft: sheetBounds.left,
+      containerRight: sheetBounds.right,
+      placement: scroll.closest('[data-source-placement]'),
+      fallback: sheet,
+      message: 'Comparison scroll region exceeds the sheet',
+    });
+    if (media === 'screen') {
+      const contentLeft = bounds.left;
+      const contentRight = contentLeft + scroll.scrollWidth;
+      for (const cell of scroll.querySelectorAll(
+        '[data-comparison-column], [data-comparison-label]',
+      )) {
+        const cellBounds = cell.getBoundingClientRect();
+        recordOverflow({
+          element: cell,
+          bounds: cellBounds,
+          containerLeft: contentLeft,
+          containerRight: contentRight,
+          placement: scroll.closest('[data-source-placement]'),
+          fallback: scroll,
+          message: 'Comparison cell is outside its scroll region',
+        });
+      }
     }
   }
   return [...findings.values()];
@@ -345,11 +414,22 @@ async function withPreparedPage<T>(
     await page.evaluate(assertPassiveSvgAssetsInPage, document.assets);
     await page.setContent(html, { waitUntil: 'load', timeout: 15_000 });
     const diagnostics: Diagnostic[] = [];
+    let comparisonPlans: ReturnType<typeof planComparisonParts> = [];
     for (const media of ['screen', 'print'] satisfies Array<
       'screen' | 'print'
     >) {
       await page.emulateMedia({ media });
       await page.evaluate(waitForPrintAssetsInPage);
+      if (media === 'screen') {
+        comparisonPlans = planComparisonParts(
+          await page.evaluate(measureComparisons),
+        );
+      }
+      if (media === 'print') {
+        diagnostics.push(
+          ...(await page.evaluate(renderComparisonParts, comparisonPlans)),
+        );
+      }
       diagnostics.push(...(await page.evaluate(inspectLayoutInPage, media)));
     }
     if (requests.length)

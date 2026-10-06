@@ -610,7 +610,7 @@ def _place_table(planner, inv, call: ast.Call, section: Json, ids: set[str]) -> 
         planner,
         inv,
         found,
-        {"id", "method", "title", "cases", "inputs", "outputs", "cases_axis"},
+        {"id", "method", "title", "cases", "inputs", "outputs", "cases_axis", "column_cap"},
         {"id", "method", "title", "cases"},
     )
     local_id = _text(planner, inv, found["id"])
@@ -650,6 +650,8 @@ def _place_table(planner, inv, call: ast.Call, section: Json, ids: set[str]) -> 
         "cells": cells,
         "location": span(inv.module.id, call),
     }
+    if "column_cap" in found:
+        record["columnCap"] = _column_cap(planner, inv, found["column_cap"])
     ids.add(table_id)
     planner.tables.append(record)
     section["items"].append(
@@ -659,6 +661,18 @@ def _place_table(planner, inv, call: ast.Call, section: Json, ids: set[str]) -> 
             "metadata": planner.metadata(inv, local_id, call),
         }
     )
+
+
+def _column_cap(planner, inv, keyword: ast.keyword) -> int:
+    value = keyword.value
+    if (
+        not isinstance(value, ast.Constant)
+        or isinstance(value.value, bool)
+        or not isinstance(value.value, int)
+        or value.value < 1
+    ):
+        planner.error(inv, keyword, "INVALID_METHOD", "column_cap must be a positive integer")
+    return value.value
 
 
 def _names(planner, inv, keyword: ast.keyword, known: list[str]) -> list[str]:

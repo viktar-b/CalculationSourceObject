@@ -110,6 +110,32 @@ class MethodTableCaptureTest(unittest.TestCase):
         self.assertTrue(response["ok"], response)
         return response
 
+    def test_column_cap_limits_print_groups_without_changing_cells(self):
+        self.write_compare(
+            '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+    first_panel = rectangle(width=2.0, height=3.0)
+    second_panel = rectangle(width=1.0, height=6.0)
+    table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={"Case A": first_panel, "Case B": second_panel}, column_cap=1)
+'''
+        )
+        execution = self.execution()["execution"]
+        table = execution["tables"][0]
+        self.assertEqual(table["columnCap"], 1)
+        self.assertEqual(len(table["cells"]), 10)
+        self.assertNotIn("columnCap", execution["methods"][0])
+
+    def test_invalid_column_cap_is_rejected_before_execution(self):
+        self.write_compare(
+            '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+    first_panel = rectangle(width=2.0, height=3.0)
+    table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={"Case A": first_panel}, column_cap=0)
+'''
+        )
+        with patch.object(Execution, "run") as run:
+            response = execute(self.root / "compare.cso.py", "compare", {})
+            self.assertEqual(response["diagnostics"][0]["code"], "INVALID_METHOD")
+            run.assert_not_called()
+
     def test_column_table_binds_equal_areas_without_a_representative_method_case(self):
         self.write_compare(
             '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")

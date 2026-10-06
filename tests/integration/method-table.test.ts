@@ -314,6 +314,44 @@ beforeAll(() => {
   writeFileSync(join(directory, 'limited_margin.cso.py'), limitedMargin);
   writeFileSync(join(directory, 'limited_panel.cso.py'), limitedPanel);
   writeFileSync(join(directory, 'limited_compare.cso.py'), limitedCompare);
+  const wideRectangle = rectangle
+    .replace(
+      'from cso_python import CalculationResults, calculation, section, symbol',
+      'from cso_python import CalculationResults, applicable, calculation, check, section, symbol',
+    )
+    .replace(
+      'return {"area": area, "perimeter": perimeter}',
+      `applicable(id="area-limit", targets=("area",), explanation="Area exceeds the method limit.", predicate=area <= 10)
+    check(id="perimeter-check", targets=("perimeter",), explanation="Perimeter exceeds twelve metres.", predicate=perimeter <= 12)
+    return {"area": area, "perimeter": perimeter}`,
+    );
+  writeFileSync(join(directory, 'wide_checked.cso.py'), wideRectangle);
+  const wideCompare = compare
+    .replace(
+      'from _cso_bindings.rectangle import rectangle',
+      'from _cso_bindings.wide_checked import rectangle',
+    )
+    .replace(
+      'cases={"Case A": first_panel, "Case B": second_panel}',
+      'cases={"Case A north": first_panel, "Case B south": second_panel, "Case C east": extra_panel}, column_cap=1',
+    );
+  const wideRows = wideCompare.replace(
+    'column_cap=1)',
+    'column_cap=1, cases_axis="rows")',
+  );
+  writeFileSync(join(directory, 'wide_compare.cso.py'), wideCompare);
+  writeFileSync(join(directory, 'wide_rows.cso.py'), wideRows);
+  writeFileSync(
+    join(directory, 'wide_glyph.cso.py'),
+    rectangle.replace('glyph="w"', `glyph="${'W'.repeat(180)}"`),
+  );
+  writeFileSync(
+    join(directory, 'unfit_compare.cso.py'),
+    compare.replace(
+      'from _cso_bindings.rectangle import rectangle',
+      'from _cso_bindings.wide_glyph import rectangle',
+    ),
+  );
   const bindings = spawnSync(
     python,
     ['-I', '-m', 'cso_python', 'bindings', directory],
@@ -518,7 +556,9 @@ test('publishes one straight-line method and bound case columns', async () => {
   expect(rowHtml.status, rowHtml.stdout || rowHtml.stderr).toBe(0);
   const rowHtmlText = readFileSync(rowHtmlPath, 'utf8');
   expect(rowHtmlText).toContain('data-cases-axis="rows"');
-  expect(rowHtmlText).toContain('scope="row" data-case-heading="Case A"');
+  expect(rowHtmlText).toContain(
+    'scope="row" data-comparison-label="" data-case-heading="Case A"',
+  );
   expect(rowHtmlText).toContain('scope="col" data-quantity="area"');
   const rowPdfPath = join(directory, 'rows.pdf');
   const rowPdf = publish('pdf', 'rows_publish.cso.py', 'compare', rowPdfPath);
@@ -696,7 +736,9 @@ test('publishes verified conditional notes without rerunning dormant branches', 
   expect(htmlText).toContain('data-branch-note="Wide"');
   expect(htmlText).toContain('data-formula="h"');
   expect(htmlText.match(/otherwise\./g)).toHaveLength(4);
-  expect(htmlText).toContain('scope="row" data-case-heading="Narrow"');
+  expect(htmlText).toContain(
+    'scope="row" data-comparison-label="" data-case-heading="Narrow"',
+  );
   const pdfPath = join(directory, 'branch.pdf');
   const pdf = publish('pdf', 'branch_compare.cso.py', 'compare', pdfPath);
   expect(pdf.status, pdf.stdout || pdf.stderr).toBe(0);
@@ -973,4 +1015,55 @@ test('marks results outside their applicability without changing the number', as
   const info = spawnSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
   expect(info.status, info.stderr).toBe(0);
   expect(info.stdout).toMatch(/Pages:\s+[12]/);
+}, 180_000);
+
+test('continues a wide comparison across measured column groups', () => {
+  const execution = capture('wide_compare.cso.py', 'compare');
+  expect(execution.tables?.[0]?.columnCap).toBe(1);
+  expect(execution.tables?.[0]?.cells).toHaveLength(15);
+  const prepared = prepareExecutionDocument({ execution, assets: [] });
+  const table = prepared.sections
+    .flatMap((section) => section.items)
+    .find((item) => item.kind === 'table');
+  expect(table?.kind === 'table' ? table.columnCap : undefined).toBe(1);
+
+  const htmlPath = join(directory, 'wide.html');
+  const html = publish('html', 'wide_compare.cso.py', 'compare', htmlPath);
+  expect(html.status, html.stdout || html.stderr).toBe(0);
+  const htmlText = readFileSync(htmlPath, 'utf8');
+  expect(htmlText).toContain('data-comparison-scroll');
+  expect(htmlText).toContain('data-comparison-label');
+  expect(htmlText).toContain('data-column-cap="1"');
+
+  const pdfPath = join(directory, 'wide.pdf');
+  const pdf = publish('pdf', 'wide_compare.cso.py', 'compare', pdfPath);
+  expect(pdf.status, pdf.stdout || pdf.stderr).toBe(0);
+  const text = spawnSync('pdftotext', ['-layout', pdfPath, '-'], {
+    encoding: 'utf8',
+  });
+  expect(text.status, text.stderr).toBe(0);
+  expect(text.stdout).toContain('Part 1 of 3');
+  expect(text.stdout).toContain('Part 3 of 3');
+  expect(text.stdout).toContain('Not applicable');
+  expect(text.stdout).toContain('Perimeter exceeds twelve metres.');
+  expect(text.stdout).toContain('m2');
+  expect(text.stdout.match(/Width/g)?.length).toBeGreaterThan(1);
+
+  const rowsPdf = join(directory, 'wide-rows.pdf');
+  const rows = publish('pdf', 'wide_rows.cso.py', 'compare', rowsPdf);
+  expect(rows.status, rows.stdout || rows.stderr).toBe(0);
+  const rowsText = spawnSync('pdftotext', ['-layout', rowsPdf, '-'], {
+    encoding: 'utf8',
+  });
+  expect(rowsText.status, rowsText.stderr).toBe(0);
+  expect(rowsText.stdout).toContain('Part 1 of');
+  expect(rowsText.stdout).toContain('Not applicable');
+  expect(rowsText.stdout.match(/Case A/g)?.length).toBeGreaterThan(1);
+
+  const sentinel = join(directory, 'unfit-sentinel.pdf');
+  writeFileSync(sentinel, 'keep');
+  const unfit = publish('pdf', 'unfit_compare.cso.py', 'compare', sentinel);
+  expect(unfit.status).not.toBe(0);
+  expect(unfit.stdout).toContain('DOCUMENT_LAYOUT_OVERFLOW');
+  expect(readFileSync(sentinel, 'utf8')).toBe('keep');
 }, 180_000);
