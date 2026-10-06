@@ -198,6 +198,18 @@ to this pin through all required checks, including ESM/CJS builds, declarations,
 CLI/PDF acceptance and browser consumers. Remove the overrides when upstream
 ranges permit a patched version and fresh workspace/isolated installs confirm it.
 
+`@tailwindcss/cli@4.3.3` pins `@parcel/watcher` to `2.5.1`, which depends on
+`micromatch` and `braces@3.0.3`. `braces` through `3.0.3` is affected by
+GHSA-vfj7-8cjw-p6xm and has no patched release. `@parcel/watcher@2.6.0` replaces
+that chain with `picomatch` and keeps the CLI subscribe API. The workspace and
+`@cs-object/react` pin that watcher through npm overrides so isolated installs
+do not resolve `2.5.1`. Downgrading `@tailwindcss/cli` to `4.3.0` is unnecessary:
+its `^2.5.1` range already resolves to `2.6.0`, and the downgrade would drop the
+rest of Tailwind from `4.3.3`. Remove the overrides when `@tailwindcss/cli`
+depends on `@parcel/watcher@2.5.4` or newer. `source-map-js@1.2.2` fixes
+GHSA-68fv-2mgg-jv7q. Parent ranges already allow `^1.2.1`, so the lockfile
+records `1.2.2` without an override.
+
 Isolation, installed-package and Windows jobs retain logs and evidence for 14 days,
 including generated PDFs and their hashes. Passing automated PDF checks leaves
 visual inspection pending. Use the [rendering guide](rendering.md#choose-verification-by-change)

@@ -41,7 +41,10 @@
     "pretest": "npm run build"
   },
   "overrides": {
-    "esbuild": "0.28.2"
+    "esbuild": "0.28.2",
+    "@tailwindcss/cli": {
+      "@parcel/watcher": "2.6.0"
+    }
   },
   "devDependencies": {
     "typescript": "^5",
