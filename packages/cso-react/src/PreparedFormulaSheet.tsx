@@ -255,59 +255,141 @@ export const PreparedFormulaSheet = ({
             );
           }
           case 'table': {
+            const quantityHeading = (
+              quantity: (typeof item.groups)[number]['rows'][number],
+            ) => (
+              <>
+                <GlyphMathBlock glyph={quantity.glyph} /> {quantity.description}{' '}
+                {quantity.unit}
+              </>
+            );
+            const cellText = (value: number) =>
+              Object.is(value, -0) ? '-0' : value;
             return (
               <div
                 key={item.sourcePlacementId}
                 data-source-placement={item.sourcePlacementId}
                 data-comparison-id={item.id}
+                data-cases-axis={item.casesAxis}
                 className="cso-comparison"
               >
                 <h3>{item.title}</h3>
                 {item.emptyState ? (
                   <p className="cso-comparison-empty">{item.emptyState}</p>
                 ) : null}
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Quantity</th>
-                      {item.cases.map((caseItem) => (
-                        <th
-                          key={caseItem.invocationId}
-                          data-case-heading={caseItem.heading}
-                        >
-                          {caseItem.heading}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {item.groups.map((group) => (
-                      <Fragment key={group.role}>
-                        <tr>
-                          <th colSpan={item.cases.length + 1}>{group.label}</th>
-                        </tr>
-                        {group.rows.map((row) => (
-                          <tr key={`${group.role}-${row.quantity}`}>
-                            <th>
-                              <GlyphMathBlock glyph={row.glyph} />{' '}
-                              {row.description} {row.unit}
-                            </th>
-                            {row.cells.map((cell) => (
-                              <td
-                                key={cell.invocationId}
-                                data-quantity={row.quantity}
-                                data-case={cell.heading}
-                                data-symbol-id={cell.symbolId}
-                              >
-                                {Object.is(cell.value, -0) ? '-0' : cell.value}
-                              </td>
-                            ))}
-                          </tr>
+                {item.casesAxis === 'rows' ? (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th scope="col">Case</th>
+                        {item.groups.map((group) => (
+                          <th
+                            key={group.role}
+                            scope="colgroup"
+                            colSpan={group.rows.length}
+                          >
+                            {group.label}
+                          </th>
                         ))}
-                      </Fragment>
-                    ))}
-                  </tbody>
-                </table>
+                      </tr>
+                      <tr>
+                        <th scope="col">Quantity</th>
+                        {item.groups.flatMap((group) =>
+                          group.rows.map((row) => (
+                            <th
+                              key={`${group.role}-${row.quantity}`}
+                              scope="col"
+                              data-quantity={row.quantity}
+                            >
+                              {quantityHeading(row)}
+                            </th>
+                          )),
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {item.cases.map((caseItem) => (
+                        <tr key={caseItem.invocationId}>
+                          <th scope="row" data-case-heading={caseItem.heading}>
+                            {caseItem.heading}
+                          </th>
+                          {item.groups.flatMap((group) =>
+                            group.rows.map((row) => {
+                              const cell = row.cells.find(
+                                (candidate) =>
+                                  candidate.invocationId ===
+                                  caseItem.invocationId,
+                              );
+                              if (!cell) {
+                                throw new Error(
+                                  `Missing ${row.quantity} for ${caseItem.heading}`,
+                                );
+                              }
+                              return (
+                                <td
+                                  key={`${caseItem.invocationId}-${row.quantity}`}
+                                  data-quantity={row.quantity}
+                                  data-case={caseItem.heading}
+                                  data-symbol-id={cell.symbolId}
+                                >
+                                  {cellText(cell.value)}
+                                </td>
+                              );
+                            }),
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th scope="col">Quantity</th>
+                        {item.cases.map((caseItem) => (
+                          <th
+                            key={caseItem.invocationId}
+                            scope="col"
+                            data-case-heading={caseItem.heading}
+                          >
+                            {caseItem.heading}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {item.groups.map((group) => (
+                        <Fragment key={group.role}>
+                          <tr>
+                            <th
+                              scope="colgroup"
+                              colSpan={item.cases.length + 1}
+                            >
+                              {group.label}
+                            </th>
+                          </tr>
+                          {group.rows.map((row) => (
+                            <tr key={`${group.role}-${row.quantity}`}>
+                              <th scope="row" data-quantity={row.quantity}>
+                                {quantityHeading(row)}
+                              </th>
+                              {row.cells.map((cell) => (
+                                <td
+                                  key={cell.invocationId}
+                                  data-quantity={row.quantity}
+                                  data-case={cell.heading}
+                                  data-symbol-id={cell.symbolId}
+                                >
+                                  {cellText(cell.value)}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
                 <EngineeringMetadata entries={item.context} />
               </div>
             );

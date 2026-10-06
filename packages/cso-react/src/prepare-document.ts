@@ -652,7 +652,7 @@ const comparisonPlacement = (
     kind: 'table',
     id: item.id,
     title: table.title,
-    casesAxis: 'columns',
+    casesAxis: table.casesAxis,
     cases: table.cases.map(({ heading, invocationId }) => ({
       heading,
       invocationId,

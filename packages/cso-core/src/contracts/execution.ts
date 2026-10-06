@@ -318,7 +318,7 @@ const LogicalTableSchema = z.strictObject({
   invocationId: IdentityStringSchema,
   title: NonemptyStringSchema,
   methodId: IdentityStringSchema,
-  casesAxis: z.literal('columns'),
+  casesAxis: z.enum(['columns', 'rows']),
   inputs: z.array(NonemptyStringSchema),
   outputs: z.array(NonemptyStringSchema),
   cases: z.array(

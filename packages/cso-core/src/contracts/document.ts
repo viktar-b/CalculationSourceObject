@@ -354,7 +354,7 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
     kind: z.literal('table'),
     id: NonemptyStringSchema,
     title: NonemptyStringSchema,
-    casesAxis: z.literal('columns'),
+    casesAxis: z.enum(['columns', 'rows']),
     cases: z.array(
       z.strictObject({
         heading: NonemptyStringSchema,

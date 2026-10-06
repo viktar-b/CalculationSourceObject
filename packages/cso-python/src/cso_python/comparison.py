@@ -578,13 +578,6 @@ def _place_table(planner, inv, call: ast.Call, section: Json, ids: set[str]) -> 
         axis = _text(planner, inv, found["cases_axis"])
         if axis not in {"columns", "rows"}:
             planner.error(inv, found["cases_axis"], "INVALID_METHOD", "cases_axis must be columns or rows")
-        if axis == "rows":
-            planner.error(
-                inv,
-                found["cases_axis"],
-                "UNSUPPORTED_TABLE_AXIS",
-                "Row orientation is not available in this slice; use cases_axis='columns'",
-            )
     inputs = (
         _names(planner, inv, found["inputs"], method["parameterNames"])
         if "inputs" in found

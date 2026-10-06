@@ -65,9 +65,13 @@ const publication = compare.replace(
   '    extra_panel = rectangle(width=4.0, height=5.0)\n',
   '',
 );
-const rows = compare.replace(
+const invalidAxis = compare.replace(
   'cases={"Case A": first_panel, "Case B": second_panel}',
-  'cases={"Case A": first_panel}, cases_axis="rows"',
+  'cases={"Case A": first_panel}, cases_axis="diagonal"',
+);
+const rowPublication = publication.replace(
+  'cases={"Case A": first_panel, "Case B": second_panel}',
+  'cases={"Case A": first_panel, "Case B": second_panel}, cases_axis="rows"',
 );
 
 const png = Buffer.from(
@@ -152,7 +156,8 @@ beforeAll(() => {
   writeFileSync(join(directory, 'compare.cso.py'), compare);
   writeFileSync(join(directory, 'publish.cso.py'), publication);
   writeFileSync(join(directory, 'empty.cso.py'), empty);
-  writeFileSync(join(directory, 'rows.cso.py'), rows);
+  writeFileSync(join(directory, 'invalid_axis.cso.py'), invalidAxis);
+  writeFileSync(join(directory, 'rows_publish.cso.py'), rowPublication);
   writeFileSync(join(directory, 'sketch.png'), png);
   writeFileSync(join(directory, 'margin.cso.py'), margin);
   writeFileSync(join(directory, 'panel.cso.py'), panel);
@@ -319,7 +324,7 @@ test('publishes one straight-line method and bound case columns', async () => {
 
   const sentinelPath = join(directory, 'sentinel.pdf');
   writeFileSync(sentinelPath, Buffer.from('existing-output'));
-  const failed = publish('pdf', 'rows.cso.py', 'compare', sentinelPath);
+  const failed = publish('pdf', 'invalid_axis.cso.py', 'compare', sentinelPath);
   expect(failed.status).not.toBe(0);
   expect(readFileSync(sentinelPath, 'utf8')).toBe('existing-output');
 
@@ -332,6 +337,44 @@ test('publishes one straight-line method and bound case columns', async () => {
   expect(readdirSync(directory).some((name) => name.endsWith('.tmp'))).toBe(
     false,
   );
+
+  const rowExecution = capture('rows_publish.cso.py', 'compare');
+  expect(rowExecution.tables?.[0]?.casesAxis).toBe('rows');
+  expect(rowExecution.tables?.[0]?.cells).toHaveLength(10);
+  expect(verifyExecution({ execution: rowExecution }).ok).toBe(true);
+  const rowDocument = prepareExecutionDocument({
+    execution: rowExecution,
+    assets: [],
+  });
+  const rowTable = rowDocument.sections[0]?.items.find(
+    (item) => item.kind === 'table',
+  );
+  if (rowTable?.kind !== 'table') throw new Error('Missing row table');
+  expect(rowTable.casesAxis).toBe('rows');
+  expect(
+    rowTable.groups.flatMap((group) =>
+      group.rows.flatMap((row) => row.cells.map((cell) => cell.value)),
+    ),
+  ).toEqual([2, 1, 3, 6, 0, 0, 6, 6, 10, 14]);
+  const rowHtmlPath = join(directory, 'rows.html');
+  const rowHtml = publish(
+    'html',
+    'rows_publish.cso.py',
+    'compare',
+    rowHtmlPath,
+    ['--check-layout'],
+  );
+  expect(rowHtml.status, rowHtml.stdout || rowHtml.stderr).toBe(0);
+  const rowHtmlText = readFileSync(rowHtmlPath, 'utf8');
+  expect(rowHtmlText).toContain('data-cases-axis="rows"');
+  expect(rowHtmlText).toContain('scope="row" data-case-heading="Case A"');
+  expect(rowHtmlText).toContain('scope="col" data-quantity="area"');
+  const rowPdfPath = join(directory, 'rows.pdf');
+  const rowPdf = publish('pdf', 'rows_publish.cso.py', 'compare', rowPdfPath);
+  expect(rowPdf.status, rowPdf.stdout || rowPdf.stderr).toBe(0);
+  const rowInfo = spawnSync('pdfinfo', [rowPdfPath], { encoding: 'utf8' });
+  expect(rowInfo.status, rowInfo.stderr).toBe(0);
+  expect(rowInfo.stdout).toContain('Pages:           1');
 }, 180_000);
 
 test('publishes nested helper explanations without pruning authored context', async () => {

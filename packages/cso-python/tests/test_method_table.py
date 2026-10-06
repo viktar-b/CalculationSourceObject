@@ -199,12 +199,12 @@ def compare() -> CalculationResults:
 
     def test_later_slices_are_diagnosed_before_execution(self):
         cases = {
-            "rows": (
+            "invalid axis": (
                 '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
     first_panel = rectangle(width=2.0, height=3.0)
-    table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={"Case A": first_panel}, cases_axis="rows")
+    table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={"Case A": first_panel}, cases_axis="diagonal")
 ''',
-                "UNSUPPORTED_TABLE_AXIS",
+                "INVALID_METHOD",
             ),
             "duplicate heading": (
                 '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
@@ -516,3 +516,89 @@ def compare() -> CalculationResults:
         margin.write_text(margin.read_text().replace("length + 1.0", "length + 2.0"))
         after = self.execution()["execution"]["methods"][0]["helpers"][0]["sourceHash"]
         self.assertNotEqual(before, after)
+
+    def _orientation_source(self, axis: str, count: int) -> str:
+        names = (
+            "one",
+            "two",
+            "three",
+            "four",
+            "five",
+            "six",
+            "seven",
+            "eight",
+            "nine",
+            "ten",
+            "eleven",
+            "twelve",
+        )[:count]
+        calls = "\n".join(
+            f"    {name} = rectangle(width={index}.0, height=1.0)"
+            for index, name in enumerate(names, start=1)
+        )
+        mapping = ", ".join(f'"{name}": {name}' for name in names)
+        return f'''from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.rectangle import rectangle
+
+@calculation(id="compare", title="Rectangle comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+{calls}
+    table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={{{mapping}}}, inputs=("width",), outputs=("area", "perimeter"), cases_axis="{axis}")
+    ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
+    return {{"ready": ready}}
+'''
+
+    def test_row_orientation_keeps_the_same_cell_inventory(self):
+        (self.root / "compare.cso.py").write_text(self._orientation_source("columns", 12))
+        columns = self.execution()["execution"]
+        (self.root / "compare.cso.py").write_text(self._orientation_source("rows", 12))
+        rows = self.execution()["execution"]
+        self.assertEqual(columns["tables"][0]["casesAxis"], "columns")
+        self.assertEqual(rows["tables"][0]["casesAxis"], "rows")
+        self.assertEqual(rows["tables"][0]["cells"], columns["tables"][0]["cells"])
+        self.assertEqual(len(rows["tables"][0]["cells"]), 36)
+        self.assertEqual(
+            [item["function"] for item in rows["invocations"]],
+            [item["function"] for item in columns["invocations"]],
+        )
+        self.assertEqual(rows["methods"][0]["id"], columns["methods"][0]["id"])
+        area_cells = [cell for cell in rows["tables"][0]["cells"] if cell["quantity"] == "area"]
+        self.assertEqual(len({cell["symbolId"] for cell in area_cells}), 12)
+
+    def test_explicit_rows_selection_matches_columns(self):
+        body = '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+    first_panel = rectangle(width=2.0, height=3.0)
+    second_panel = rectangle(width=1.0, height=6.0)
+    table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={"Case A": first_panel, "Case B": second_panel}, inputs=(), outputs=("area",), cases_axis="AXIS")
+'''
+        self.write_compare(body.replace("AXIS", "columns"))
+        columns = self.execution()["execution"]["tables"][0]
+        self.write_compare(body.replace("AXIS", "rows"))
+        rows = self.execution()["execution"]["tables"][0]
+        self.assertEqual(rows["cells"], columns["cells"])
+        self.assertEqual([cell["quantity"] for cell in rows["cells"]], ["area", "area"])
+        self.assertNotEqual(rows["cells"][0]["symbolId"], rows["cells"][1]["symbolId"])
+
+    def test_empty_row_table_does_not_invent_cases(self):
+        (self.root / "compare.cso.py").write_text(
+            '''from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.rectangle import rectangle
+
+@calculation(id="compare", title="Rectangle comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+    table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={}, cases_axis="rows")
+    ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
+    return {"ready": ready}
+'''
+        )
+        execution = self.execution()["execution"]
+        self.assertEqual([item["function"] for item in execution["invocations"]], ["compare"])
+        self.assertEqual(execution["tables"][0]["casesAxis"], "rows")
+        self.assertEqual(execution["tables"][0]["cases"], [])
+        self.assertEqual(execution["tables"][0]["cells"], [])
