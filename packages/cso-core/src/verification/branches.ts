@@ -211,6 +211,73 @@ export function reproduceBranches(
   return visit(rootKey) ? branches : undefined;
 }
 
+export function reproducePredicate(
+  nodes: readonly FormulaNode[],
+  rootKey: string,
+  values: ReadonlyMap<string, number>,
+): { value: boolean; usedKeys: readonly string[] } | undefined {
+  const byKey = new Map(nodes.map((node) => [node.key, node]));
+  const used = new Set<string>();
+  const predicate = (key: string): boolean | undefined => {
+    const node = byKey.get(key);
+    const operation = node ? functionId(node) : undefined;
+    const keys = node ? argumentKeys(node) : [];
+    if (!operation || keys.length === 0) return undefined;
+    used.add(key);
+    if (operation === 'fg.and') {
+      for (const argument of keys) {
+        const value = predicate(argument);
+        if (value === undefined) return undefined;
+        if (!value) return false;
+      }
+      return true;
+    }
+    if (operation === 'fg.or') {
+      for (const argument of keys) {
+        const value = predicate(argument);
+        if (value === undefined) return undefined;
+        if (value) return true;
+      }
+      return false;
+    }
+    const compare = comparisons[operation];
+    if (!compare) return undefined;
+    const left = numberValue(keys[0] ?? '');
+    const right = numberValue(keys[1] ?? '');
+    if (left === undefined || right === undefined) return undefined;
+    return compare(left, right);
+  };
+  const numberValue = (key: string): number | undefined => {
+    const node = byKey.get(key);
+    if (!node?.mode) return undefined;
+    used.add(key);
+    if (node.mode === 'LITERAL') return literalNumber(node);
+    if (node.mode === 'SYMBOL') {
+      const name = reference(node).name;
+      return name === undefined ? undefined : values.get(name);
+    }
+    const operation = functionId(node);
+    const keys = argumentKeys(node);
+    if (operation === 'fg.uminus') {
+      const value = numberValue(keys[0] ?? '');
+      return value === undefined ? undefined : -value;
+    }
+    const left = numberValue(keys[0] ?? '');
+    const right = numberValue(keys[1] ?? '');
+    if (left === undefined || right === undefined) return undefined;
+    if (operation === 'fg.add') return left + right;
+    if (operation === 'fg.subtract') return left - right;
+    if (operation === 'fg.multiply') return left * right;
+    if (operation === 'fg.divide') return left / right;
+    if (operation === 'fg.pow') return left ** right;
+    return undefined;
+  };
+  const value = predicate(rootKey);
+  return value === undefined
+    ? undefined
+    : { value, usedKeys: [...used].sort() };
+}
+
 export function branchLabel(
   nodes: readonly FormulaNode[],
   glyphs: ReadonlyMap<string, string>,

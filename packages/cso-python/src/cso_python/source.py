@@ -22,6 +22,7 @@ HELPERS = {
     "load_calculation",
     "method",
     "table",
+    "check",
     "documented_result",
     "calculation_call",
     "text",

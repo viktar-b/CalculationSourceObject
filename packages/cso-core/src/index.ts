@@ -188,6 +188,7 @@ export {
   SymbolObservationSchema,
   type ExecutionPayload,
   type ExecutionResponse,
+  type EngineeringCheck,
   type MethodContentItem,
   type MethodHelperRecord,
   type GivenSource,

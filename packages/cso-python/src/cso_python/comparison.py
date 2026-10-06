@@ -114,7 +114,7 @@ def _place_method(planner, inv, call: ast.Call, section: Json, ids: set[str]) ->
         )
     plan = planner.ensure_plan(inv, target, function_name)
     quantities = _quantities(planner, inv, target, definition, plan, call)
-    content, helpers = _method_content(
+    content, helpers, checks = _method_content(
         planner,
         inv,
         target,
@@ -143,6 +143,8 @@ def _place_method(planner, inv, call: ast.Call, section: Json, ids: set[str]) ->
         "helpers": helpers,
         "location": span(inv.module.id, call),
     }
+    if checks:
+        record["checks"] = checks
     ids.add(method_id)
     planner.method_index[(inv.id, local_id)] = record
     planner.methods.append(record)
@@ -306,7 +308,7 @@ def _method_content(
     at: ast.AST,
     stack: set[tuple[str, str]],
     cache: dict[tuple[str, str], Json],
-) -> tuple[list[Json], list[Json]]:
+) -> tuple[list[Json], list[Json], list[Json]]:
     glyphs = {
         item["selectionName"] if item["role"] == "input" else item["variableName"]: item["glyph"]
         for item in quantities
@@ -319,6 +321,7 @@ def _method_content(
         if name not in definition.given_parameters
     ]
     helpers: list[Json] = []
+    checks: list[Json] = []
     _walk_steps(
         planner,
         inv,
@@ -332,6 +335,8 @@ def _method_content(
         stack,
         cache,
         at,
+        checks,
+        {item["variableName"] for item in quantities},
     )
     seen = _content_variables(content)
     if any(item["variableName"] not in seen for item in quantities):
@@ -341,7 +346,7 @@ def _method_content(
             "UNSUPPORTED_METHOD_CONTENT",
             "Method content must include every explained quantity",
         )
-    return content, helpers
+    return content, helpers, checks
 
 
 def _walk_steps(
@@ -357,6 +362,8 @@ def _walk_steps(
     stack: set[tuple[str, str]],
     cache: dict[tuple[str, str], Json],
     at: ast.AST,
+    checks: list[Json],
+    names: set[str],
 ) -> None:
     for step in steps:
         node = step.node
@@ -388,6 +395,8 @@ def _walk_steps(
                 stack,
                 cache,
                 at,
+                checks,
+                names,
             )
             content.append(
                 {
@@ -420,6 +429,13 @@ def _walk_steps(
             if name == "text":
                 data = kwargs(node.value, module.id, {"id", "content"}, {"id", "content"})
                 content.append({"kind": "text", "localId": data["id"], "content": data["content"]})
+                continue
+            if name == "check":
+                declared = _check_declaration(
+                    planner, inv, module, definition, glyphs, node.value, names, checks
+                )
+                checks.append(declared)
+                content.append({"kind": "check", "localId": declared["id"]})
                 continue
             if name == "figure":
                 data = kwargs(
@@ -491,7 +507,7 @@ def _helper(planner, inv, module, described: Json, owner_id: str, stack, cache, 
     helper_id = identity("method", owner_id, f"{loaded.id}::{function_name}")
     stack.add(key)
     quantities = _quantities(planner, inv, loaded, definition, plan, at)
-    content, nested = _method_content(
+    content, nested, helper_checks = _method_content(
         planner,
         inv,
         loaded,
@@ -515,6 +531,8 @@ def _helper(planner, inv, module, described: Json, owner_id: str, stack, cache, 
         "content": content,
         "helpers": nested,
     }
+    if helper_checks:
+        record["checks"] = helper_checks
     cache[key] = record
     stack.remove(key)
     return record
@@ -716,6 +734,153 @@ def _overlaps(owned: set[str], invocation_id: str) -> bool:
         or invocation_id.startswith(other + "/")
         for other in owned
     )
+
+
+def _check_declaration(planner, inv, module, definition, glyphs, call: ast.Call, names: set[str], checks: list[Json]) -> Json:
+    found = _keywords(planner, inv, call)
+    _require(
+        planner,
+        inv,
+        found,
+        {"id", "targets", "explanation", "predicate"},
+        {"id", "targets", "explanation", "predicate"},
+    )
+    local_id = _text(planner, inv, found["id"])
+    if any(item["id"] == local_id for item in checks):
+        planner.error(inv, found["id"], "DUPLICATE_IDENTITY", "Duplicate check identity")
+    targets = _string_tuple(planner, inv, found["targets"])
+    unknown = [name for name in targets if name not in names]
+    if unknown or len(targets) != len(set(targets)):
+        planner.error(inv, found["targets"], "UNKNOWN_QUANTITY", "Check targets must name known quantities")
+    explanation = _text(planner, inv, found["explanation"])
+    nodes = [
+        {key: value for key, value in node.items() if key != "_ast"}
+        for node in lower_expression(
+            module,
+            definition.function,
+            set(definition.parameters),
+            found["predicate"].value,
+            given=False,
+            condition=True,
+        )
+    ]
+    return {
+        "id": local_id,
+        "targets": targets,
+        "explanation": explanation,
+        "predicateText": _formula_text(nodes, glyphs),
+        "nodes": nodes,
+    }
+
+
+def _string_tuple(planner, inv, keyword: ast.keyword) -> list[str]:
+    value = keyword.value
+    if not isinstance(value, ast.Tuple) or not value.elts:
+        planner.error(inv, keyword, "INVALID_METHOD", "targets must be a nonempty tuple of quantity names")
+    names: list[str] = []
+    for item in value.elts:
+        if not isinstance(item, ast.Constant) or not isinstance(item.value, str) or not item.value:
+            planner.error(inv, item, "INVALID_METHOD", "targets must be a nonempty tuple of quantity names")
+        names.append(item.value)
+    return names
+
+
+def collect_check_outcomes(planner) -> list[Json]:
+    """Record engineering-check results from the single captured execution."""
+    outcomes: list[Json] = []
+    invocations = list(planner.invocations)
+
+    def walk(plan: Json) -> None:
+        for check in plan.get("checks") or []:
+            for invocation in invocations:
+                if invocation.function.name != plan["function"] or invocation.module.id != plan["moduleId"]:
+                    continue
+                value, used = _check_value(check["nodes"], _named_values(invocation))
+                outcomes.append(
+                    {
+                        "methodId": plan["id"],
+                        "invocationId": invocation.id,
+                        "checkId": check["id"],
+                        "value": value,
+                        "usedKeys": sorted(used),
+                    }
+                )
+        for helper in plan.get("helpers") or []:
+            walk(helper)
+
+    for method in planner.methods:
+        walk(method)
+    return outcomes
+
+
+def _named_values(invocation) -> dict[str, int | float]:
+    values: dict[str, int | float] = {}
+    for name, symbol in (*invocation.parameter_symbols.items(), *invocation.symbols.items()):
+        result = symbol.cso["valueTree"].get("result")
+        if isinstance(result, dict) and isinstance(result.get("value"), (int, float)):
+            values[name] = result["value"]
+    return values
+
+
+def _check_value(nodes: list[Json], values: dict[str, int | float]) -> tuple[bool, set[str]]:
+    by_key = {node["key"]: node for node in nodes}
+    used: set[str] = set()
+
+    def predicate(key: str) -> bool:
+        node = by_key[key]
+        used.add(key)
+        function_id = node["funcSpec"]["id"]
+        arguments = [argument["key"] for argument in node["funcArgs"]]
+        if function_id == "fg.and":
+            for argument in arguments:
+                if not predicate(argument):
+                    return False
+            return True
+        if function_id == "fg.or":
+            for argument in arguments:
+                if predicate(argument):
+                    return True
+            return False
+        left = number(arguments[0])
+        right = number(arguments[1])
+        return {
+            "fg.lt": left < right,
+            "fg.le": left <= right,
+            "fg.gt": left > right,
+            "fg.ge": left >= right,
+            "fg.eq": left == right,
+            "fg.ne": left != right,
+        }[function_id]
+
+    def number(key: str) -> int | float:
+        node = by_key[key]
+        used.add(key)
+        if node["mode"] == "LITERAL":
+            return node["literal"]["value"]
+        if node["mode"] == "SYMBOL":
+            name = (node.get("ref") or {}).get("name")
+            if name not in values:
+                raise SourceError("INVALID_CHECK", "Check evidence is missing a captured operand")
+            return values[name]
+        function_id = node["funcSpec"]["id"]
+        arguments = [argument["key"] for argument in node["funcArgs"]]
+        if function_id == "fg.uminus":
+            return -number(arguments[0])
+        left = number(arguments[0])
+        right = number(arguments[1])
+        if function_id == "fg.add":
+            return left + right
+        if function_id == "fg.subtract":
+            return left - right
+        if function_id == "fg.multiply":
+            return left * right
+        if function_id == "fg.divide":
+            return left / right
+        if function_id == "fg.pow":
+            return left**right
+        raise SourceError("INVALID_CHECK", "Check evidence uses an unsupported operand")
+
+    return predicate(nodes[0]["key"]), used
 
 
 def collect_branch_outcomes(planner) -> list[Json]:

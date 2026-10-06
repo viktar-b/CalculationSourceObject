@@ -21,7 +21,11 @@ import {
   VersionsSchema,
 } from './common.ts';
 import { scopedGlyph } from './glyphs.ts';
-import { branchLabel, reproduceBranches } from '../verification/branches.ts';
+import {
+  branchLabel,
+  reproduceBranches,
+  reproducePredicate,
+} from '../verification/branches.ts';
 import { NumericValueSchema } from './numbers.ts';
 
 const invalidUnicodePattern = /[\uD800-\uDFFF]/u;
@@ -223,7 +227,15 @@ export type MethodContentItem =
       localId: string;
       title: string;
       content: MethodContentItem[];
-    };
+    }
+  | { kind: 'check'; localId: string };
+export type EngineeringCheck = {
+  id: string;
+  targets: string[];
+  explanation: string;
+  predicateText: string;
+  nodes: z.infer<typeof SymbolicFormulaNodeSchema>[];
+};
 export type MethodHelperRecord = {
   id: string;
   moduleId: string;
@@ -235,6 +247,7 @@ export type MethodHelperRecord = {
   quantities: MethodQuantity[];
   content: MethodContentItem[];
   helpers: MethodHelperRecord[];
+  checks?: EngineeringCheck[];
 };
 const MethodContentSchema: z.ZodType<MethodContentItem> = z.lazy(() =>
   z.discriminatedUnion('kind', [
@@ -272,8 +285,19 @@ const MethodContentSchema: z.ZodType<MethodContentItem> = z.lazy(() =>
       title: NonemptyStringSchema,
       content: z.array(MethodContentSchema),
     }),
+    z.strictObject({
+      kind: z.literal('check'),
+      localId: NonemptyStringSchema,
+    }),
   ]),
 );
+const EngineeringCheckSchema = z.strictObject({
+  id: NonemptyStringSchema,
+  targets: z.array(PythonIdentifierSchema).min(1),
+  explanation: NonemptyStringSchema,
+  predicateText: NonemptyStringSchema,
+  nodes: z.array(SymbolicFormulaNodeSchema).min(1),
+});
 const MethodHelperSchema: z.ZodType<MethodHelperRecord> = z.lazy(() =>
   z.strictObject({
     id: IdentityStringSchema,
@@ -286,6 +310,7 @@ const MethodHelperSchema: z.ZodType<MethodHelperRecord> = z.lazy(() =>
     quantities: z.array(MethodQuantitySchema).min(1),
     content: z.array(MethodContentSchema).min(1),
     helpers: z.array(MethodHelperSchema),
+    checks: z.array(EngineeringCheckSchema).min(1).optional(),
   }),
 );
 const MethodPlanSchema = z.strictObject({
@@ -303,6 +328,7 @@ const MethodPlanSchema = z.strictObject({
   quantities: z.array(MethodQuantitySchema).min(1),
   content: z.array(MethodContentSchema).min(1),
   helpers: z.array(MethodHelperSchema),
+  checks: z.array(EngineeringCheckSchema).min(1).optional(),
   location: SourceSpanSchema,
 });
 const BoundCellSchema = z.strictObject({
@@ -340,6 +366,13 @@ const BranchOutcomeSchema = z.strictObject({
   usedKeys: z.array(NonemptyStringSchema).min(1),
   label: NonemptyStringSchema,
 });
+const CheckOutcomeSchema = z.strictObject({
+  methodId: IdentityStringSchema,
+  invocationId: IdentityStringSchema,
+  checkId: NonemptyStringSchema,
+  value: z.boolean(),
+  usedKeys: z.array(NonemptyStringSchema).min(1),
+});
 
 const ExecutionPayloadBaseSchema = z
   .object({
@@ -359,6 +392,7 @@ const ExecutionPayloadBaseSchema = z
     methods: z.array(MethodPlanSchema).min(1).optional(),
     tables: z.array(LogicalTableSchema).min(1).optional(),
     branchOutcomes: z.array(BranchOutcomeSchema).min(1).optional(),
+    checkOutcomes: z.array(CheckOutcomeSchema).min(1).optional(),
     assets: z.array(AssetRecordSchema),
     versions: VersionsSchema,
   })
@@ -1829,6 +1863,85 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
         'BRANCH_OUTCOME_MISMATCH',
         ['branchOutcomes'],
         'Branch outcomes must reproduce the captured predicate exactly',
+      );
+    }
+    const expectedChecks: {
+      methodId: string;
+      invocationId: string;
+      checkId: string;
+      value: boolean;
+      usedKeys: readonly string[];
+    }[] = [];
+    let checksReproduced = true;
+    const visitPlans = (plan: MethodHelperRecord): void => {
+      const seen = new Set<string>();
+      for (const check of plan.checks ?? []) {
+        if (seen.has(check.id)) checksReproduced = false;
+        seen.add(check.id);
+        for (const invocation of execution.invocations) {
+          if (
+            invocation.function !== plan.function ||
+            invocation.moduleId !== plan.moduleId
+          ) {
+            continue;
+          }
+          const values = new Map<string, number>();
+          for (const definition of invocation.symbols) {
+            const symbol = symbolsById.get(definition.symbolId);
+            const result = symbol?.valueTree.result;
+            if (result?.kind === 'number') {
+              values.set(definition.variableName, result.value);
+            }
+          }
+          const reproduced = reproducePredicate(
+            check.nodes,
+            check.nodes[0]?.key ?? '',
+            values,
+          );
+          if (!reproduced) {
+            checksReproduced = false;
+            continue;
+          }
+          expectedChecks.push({
+            methodId: plan.id,
+            invocationId: invocation.id,
+            checkId: check.id,
+            value: reproduced.value,
+            usedKeys: reproduced.usedKeys,
+          });
+        }
+      }
+      for (const helper of plan.helpers) visitPlans(helper);
+    };
+    for (const method of execution.methods ?? []) visitPlans(method);
+    const recordedChecks = execution.checkOutcomes ?? [];
+    const checkIdentity = (item: {
+      methodId: string;
+      invocationId: string;
+      checkId: string;
+      value: boolean;
+      usedKeys: readonly string[];
+    }) =>
+      JSON.stringify([
+        item.methodId,
+        item.invocationId,
+        item.checkId,
+        item.value,
+        item.usedKeys,
+      ]);
+    const recordedCheckIdentities = recordedChecks.map(checkIdentity).sort();
+    const expectedCheckIdentities = expectedChecks.map(checkIdentity).sort();
+    if (
+      !checksReproduced ||
+      recordedCheckIdentities.length !== expectedCheckIdentities.length ||
+      recordedCheckIdentities.some(
+        (item, index) => item !== expectedCheckIdentities[index],
+      )
+    ) {
+      issue(
+        'CHECK_OUTCOME_MISMATCH',
+        ['checkOutcomes'],
+        'Engineering checks must reproduce the captured predicate exactly',
       );
     }
     const ownedCases = new Set<string>();

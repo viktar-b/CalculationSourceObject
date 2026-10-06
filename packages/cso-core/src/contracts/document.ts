@@ -233,6 +233,12 @@ export type PreparedMethodContent =
       localId: string;
       title: string;
       content: PreparedMethodContent[];
+    }
+  | {
+      kind: 'check';
+      localId: string;
+      explanation: string;
+      predicateText: string;
     };
 export type PreparedMethodHelper = {
   id: string;
@@ -273,6 +279,12 @@ const PreparedMethodContentSchema: z.ZodType<PreparedMethodContent> = z.lazy(
         localId: NonemptyStringSchema,
         title: NonemptyStringSchema,
         content: z.array(PreparedMethodContentSchema),
+      }),
+      z.strictObject({
+        kind: z.literal('check'),
+        localId: NonemptyStringSchema,
+        explanation: NonemptyStringSchema,
+        predicateText: NonemptyStringSchema,
       }),
     ]),
 );
@@ -381,6 +393,25 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
       )
       .min(1)
       .optional(),
+    engineeringChecks: z
+      .array(
+        z.strictObject({
+          id: NonemptyStringSchema,
+          explanation: NonemptyStringSchema,
+          predicateText: NonemptyStringSchema,
+          results: z
+            .array(
+              z.strictObject({
+                heading: NonemptyStringSchema,
+                invocationId: NonemptyStringSchema,
+                value: z.boolean(),
+              }),
+            )
+            .min(1),
+        }),
+      )
+      .min(1)
+      .optional(),
     replacedSections: z.array(NonemptyStringSchema),
     contextSource: HistoricalJsonObjectSchema.optional(),
     ...placementFields,
@@ -391,6 +422,17 @@ export const PreparedDocumentSectionSchema = z.strictObject({
   id: NonemptyStringSchema,
   title: z.string(),
   metadata: HistoricalJsonObjectSchema.optional(),
+  engineeringChecks: z
+    .array(
+      z.strictObject({
+        id: NonemptyStringSchema,
+        explanation: NonemptyStringSchema,
+        predicateText: NonemptyStringSchema,
+        value: z.boolean(),
+      }),
+    )
+    .min(1)
+    .optional(),
   items: z.array(PreparedDocumentItemSchema),
   ...placementFields,
 });

@@ -118,6 +118,16 @@ def method(*, id: str, calculation: Any, title: str) -> None:
     """Record a reusable calculation without invoking it."""
 
 
+def check(
+    *,
+    id: str,
+    targets: tuple[str, ...],
+    explanation: str,
+    predicate: bool,
+) -> None:
+    """Record an engineering criterion without changing the numeric result."""
+
+
 def table(
     *,
     id: str,

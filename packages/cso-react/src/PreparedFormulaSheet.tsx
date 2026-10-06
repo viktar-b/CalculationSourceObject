@@ -90,6 +90,18 @@ export const PreparedFormulaSheet = ({
       items: readonly PreparedMethodContent[],
     ): ReactElement[] =>
       items.map((item, index) => {
+        if (item.kind === 'check') {
+          return (
+            <p
+              key={`check-${item.localId}-${index}`}
+              className="cso-branch-note"
+              data-check={item.localId}
+              data-formula={item.predicateText}
+            >
+              {item.explanation} {item.predicateText}
+            </p>
+          );
+        }
         if (item.kind === 'quantity') {
           return (
             <p
@@ -189,6 +201,17 @@ export const PreparedFormulaSheet = ({
         {section.title}
       </h2>
       <EngineeringMetadata entries={section.context} />
+      {section.engineeringChecks?.map((check) => (
+        <p
+          key={check.id}
+          className="cso-branch-note"
+          data-check={check.id}
+          data-check-result={check.value ? 'pass' : 'fail'}
+          data-formula={check.predicateText}
+        >
+          {check.explanation} {check.predicateText}
+        </p>
+      ))}
       {section.items.map((item) => {
         switch (item.kind) {
           case 'section': {
@@ -274,6 +297,20 @@ export const PreparedFormulaSheet = ({
                 className="cso-comparison"
               >
                 <h3>{item.title}</h3>
+                {item.engineeringChecks?.map((check) =>
+                  check.results.map((result) => (
+                    <p
+                      key={`${check.id}-${result.invocationId}`}
+                      className="cso-branch-note"
+                      data-check={check.id}
+                      data-check-result={result.value ? 'pass' : 'fail'}
+                      data-case={result.heading}
+                      data-formula={check.predicateText}
+                    >
+                      {result.heading}: {check.explanation}
+                    </p>
+                  )),
+                )}
                 {item.branchNotes?.map((note) => (
                   <p
                     key={`${note.invocationId}-${note.symbolId}-${note.nodeKey}`}

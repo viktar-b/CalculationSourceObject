@@ -460,6 +460,45 @@ const resolveExecutionPlacementProvenance = (
   };
 };
 
+const sectionChecks = (execution: ExecutionPayload, invocationId: unknown) => {
+  if (typeof invocationId !== 'string') return {};
+  type CheckPlan = {
+    id: string;
+    checks?: readonly {
+      id: string;
+      explanation: string;
+      predicateText: string;
+    }[];
+    helpers: readonly CheckPlan[];
+  };
+  const plans = (execution.methods ?? []).flatMap(function walk(
+    plan: CheckPlan,
+  ): CheckPlan[] {
+    return [plan, ...plan.helpers.flatMap(walk)];
+  });
+  const engineeringChecks = plans.flatMap((plan) =>
+    (plan.checks ?? []).flatMap((check) => {
+      const outcome = (execution.checkOutcomes ?? []).find(
+        (item) =>
+          item.methodId === plan.id &&
+          item.invocationId === invocationId &&
+          item.checkId === check.id,
+      );
+      return outcome
+        ? [
+            {
+              id: check.id,
+              explanation: check.explanation,
+              predicateText: check.predicateText,
+              value: outcome.value,
+            },
+          ]
+        : [];
+    }),
+  );
+  return engineeringChecks.length > 0 ? { engineeringChecks } : {};
+};
+
 const groupedInvocationIds = (execution: ExecutionPayload): Set<string> =>
   new Set(
     (execution.tables ?? []).flatMap((table) =>
@@ -526,8 +565,21 @@ type MethodRecord = NonNullable<ExecutionPayload['methods']>[number];
 const presentMethodContent = (
   quantities: MethodRecord['quantities'],
   content: MethodRecord['content'],
+  checks: NonNullable<MethodRecord['checks']> = [],
 ): PreparedMethodContent[] =>
   content.map((item) => {
+    if (item.kind === 'check') {
+      const check = checks.find((candidate) => candidate.id === item.localId);
+      if (!check) {
+        fail('UNKNOWN_QUANTITY', `Check '${item.localId}' is missing`);
+      }
+      return {
+        kind: 'check',
+        localId: item.localId,
+        explanation: check.explanation,
+        predicateText: check.predicateText,
+      };
+    }
     if (item.kind === 'quantity') {
       const quantity = quantities.find(
         (candidate) => candidate.variableName === item.variableName,
@@ -550,7 +602,7 @@ const presentMethodContent = (
         kind: 'section',
         localId: item.localId,
         title: item.title,
-        content: presentMethodContent(quantities, item.content),
+        content: presentMethodContent(quantities, item.content, checks),
       };
     }
     return item;
@@ -562,7 +614,11 @@ const presentMethodHelpers = (
   helpers.map((helper) => ({
     id: helper.id,
     function: helper.function,
-    content: presentMethodContent(helper.quantities, helper.content),
+    content: presentMethodContent(
+      helper.quantities,
+      helper.content,
+      helper.checks ?? [],
+    ),
     helpers: presentMethodHelpers(helper.helpers),
   }));
 
@@ -640,7 +696,11 @@ const comparisonPlacement = (
       id: item.id,
       title: method.title,
       quantities,
-      content: presentMethodContent(method.quantities, method.content),
+      content: presentMethodContent(
+        method.quantities,
+        method.content,
+        method.checks ?? [],
+      ),
       helpers: presentMethodHelpers(method.helpers),
       ...placement,
     };
@@ -684,12 +744,42 @@ const comparisonPlacement = (
       };
     });
   const branchNotes = presentedBranchNotes(execution, table);
+  const engineeringChecks = (method.checks ?? []).flatMap((check) => {
+    const results = table.cases.flatMap((caseItem) => {
+      const outcome = (execution.checkOutcomes ?? []).find(
+        (item) =>
+          item.methodId === method.id &&
+          item.invocationId === caseItem.invocationId &&
+          item.checkId === check.id,
+      );
+      return outcome
+        ? [
+            {
+              heading: caseItem.heading,
+              invocationId: caseItem.invocationId,
+              value: outcome.value,
+            },
+          ]
+        : [];
+    });
+    return results.length > 0
+      ? [
+          {
+            id: check.id,
+            explanation: check.explanation,
+            predicateText: check.predicateText,
+            results,
+          },
+        ]
+      : [];
+  });
   return {
     kind: 'table',
     id: item.id,
     title: table.title,
     casesAxis: table.casesAxis,
     ...(branchNotes.length > 0 ? { branchNotes } : {}),
+    ...(engineeringChecks.length > 0 ? { engineeringChecks } : {}),
     cases: table.cases.map(({ heading, invocationId }) => ({
       heading,
       invocationId,
@@ -779,6 +869,7 @@ export const prepareExecutionDocument = (
       invocationId: section.metadata?.invocationId,
       location: section.metadata?.location,
       metadata: retainedMetadata(section.metadata, true),
+      ...sectionChecks(execution, section.metadata?.invocationId),
       items: section.items.flatMap((item, index) => {
         if (item.kind === 'section') {
           const target = sectionsById.get(item.id);

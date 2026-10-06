@@ -309,6 +309,7 @@ def lower_expression(
     expr: ast.expr,
     *,
     given: bool,
+    condition: bool = False,
 ) -> list[Json]:
     nodes: list[Json] = []
 
@@ -514,5 +515,5 @@ def lower_expression(
             )
         return key
 
-    lower(expr)
+    lower(expr, condition=condition)
     return nodes

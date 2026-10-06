@@ -606,6 +606,59 @@ def compare() -> CalculationResults:
         self.assertEqual(execution["tables"][0]["cases"], [])
         self.assertEqual(execution["tables"][0]["cells"], [])
 
+    def test_failed_check_keeps_the_number(self):
+        self.write_checked()
+        execution = self.execution()["execution"]
+        check = execution["methods"][0]["checks"][0]
+        self.assertEqual(check["predicateText"], "A <= 20")
+        self.assertEqual(check["explanation"], "Area exceeds 20 square metres.")
+        outcomes = [item for item in execution["checkOutcomes"] if item["checkId"] == "area-limit"]
+        self.assertEqual([item["value"] for item in outcomes], [True, False])
+        self.assertEqual([symbol_result(execution, item["symbolId"]) for item in execution["tables"][0]["cells"] if item["quantity"] == "area"], [6, 24])
+
+    def test_hidden_quantity_keeps_the_check(self):
+        self.write_checked(outputs='outputs=()')
+        execution = self.execution()["execution"]
+        self.assertEqual(execution["tables"][0]["outputs"], [])
+        self.assertEqual(len(execution["checkOutcomes"]), 4)
+        self.assertEqual(
+            [item["id"] for item in execution["methods"][0]["checks"]],
+            ["area-limit", "perimeter-limit"],
+        )
+
+    def test_empty_cases_do_not_invent_check_outcomes(self):
+        self.write_checked(cases="{}")
+        execution = self.execution()["execution"]
+        self.assertEqual(execution["methods"][0]["checks"][0]["id"], "area-limit")
+        self.assertNotIn("checkOutcomes", execution)
+
+    def test_bare_check_predicate_is_diagnosed_before_execution(self):
+        self.write_checked()
+        path = self.root / "rectangle.cso.py"
+        path.write_text(path.read_text().replace("predicate=area <= 20", "predicate=area"))
+        generate(self.root)
+        with patch.object(Execution, "run") as run:
+            response = execute(self.root / "compare.cso.py", "compare", {})
+            self.assertEqual(response["diagnostics"][0]["code"], "UNSUPPORTED_SYNTAX")
+            run.assert_not_called()
+
+    def test_check_exception_stays_a_whole_run_failure(self):
+        self.write_checked()
+        path = self.root / "rectangle.cso.py"
+        path.write_text(path.read_text().replace("predicate=area <= 20", "predicate=1 / 0 <= area"))
+        generate(self.root)
+        response = execute(self.root / "compare.cso.py", "compare", {})
+        self.assertFalse(response["ok"])
+        self.assertNotIn("execution", response)
+        self.assertNotIn("checkOutcomes", response)
+
+    def test_unknown_check_target_is_diagnosed_before_execution(self):
+        self.write_checked(target="volume")
+        with patch.object(Execution, "run") as run:
+            response = execute(self.root / "compare.cso.py", "compare", {})
+            self.assertEqual(response["diagnostics"][0]["code"], "UNKNOWN_QUANTITY")
+            run.assert_not_called()
+
     def test_conditional_records_exact_selected_branch(self):
         self.write_choice()
         payload = self.execution()["execution"]
@@ -677,6 +730,42 @@ def compare() -> CalculationResults:
         response = execute(self.root / "compare.cso.py", "compare", {})
         self.assertFalse(response["ok"])
         self.assertNotIn("execution", response)
+
+    def write_checked(self, outputs="", cases=None, target="area"):
+        source = RECTANGLE.replace(
+            "from cso_python import CalculationResults, calculation, section, symbol",
+            "from cso_python import CalculationResults, calculation, check, section, symbol",
+        ).replace(
+            '    return {"area": area, "perimeter": perimeter}',
+            f'''    check(id="area-limit", targets=("{target}",), explanation="Area exceeds 20 square metres.", predicate=area <= 20)
+    check(id="perimeter-limit", targets=("perimeter",), explanation="Perimeter stays under 100 metres.", predicate=perimeter < 100)
+    return {{"area": area, "perimeter": perimeter}}''',
+        )
+        (self.root / "rectangle.cso.py").write_text(source)
+        if cases == "{}":
+            (self.root / "compare.cso.py").write_text(
+                '''from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.rectangle import rectangle
+
+@calculation(id="compare", title="Rectangle comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+    table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={})
+    ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
+    return {"ready": ready}
+'''
+            )
+        else:
+            suffix = f", {outputs}" if outputs else ""
+            self.write_compare(
+                f'''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+    first_panel = rectangle(width=2.0, height=3.0)
+    second_panel = rectangle(width=8.0, height=3.0)
+    table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={{"Case A": first_panel, "Case B": second_panel}}{suffix})'''
+            )
+        generate(self.root)
 
     def write_choice(self, cases=None):
         (self.root / "choice.cso.py").write_text(

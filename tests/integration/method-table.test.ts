@@ -104,6 +104,39 @@ def compare() -> CalculationResults:
     return {"compared": compared}
 `;
 
+const checkedRectangle = rectangle
+  .replace(
+    'from cso_python import CalculationResults, calculation, section, symbol',
+    'from cso_python import CalculationResults, calculation, check, section, symbol',
+  )
+  .replace(
+    '    return {"area": area, "perimeter": perimeter}',
+    `    check(id="area-limit", targets=("area",), explanation="Area exceeds 20 square metres.", predicate=area <= 20)
+    check(id="perimeter-limit", targets=("perimeter",), explanation="Perimeter stays under 100 metres.", predicate=perimeter < 100)
+    return {"area": area, "perimeter": perimeter}`,
+  );
+
+const checkedCompare = `from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.checked import rectangle
+
+@calculation(id="compare", title="Checked comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+    first_panel = rectangle(width=2.0, height=3.0)
+    second_panel = rectangle(width=8.0, height=3.0)
+    extra_panel = rectangle(width=4.0, height=6.0)
+    table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={"Case A": first_panel, "Case B": second_panel}, cases_axis="rows")
+    compared: Annotated[float, symbol(glyph="R", description="Compared area", unit="m^2")] = first_panel["area"]
+    return {"compared": compared}
+`;
+
+const checkedHidden = checkedCompare.replace(
+  'cases={"Case A": first_panel, "Case B": second_panel}, cases_axis="rows"',
+  'cases={"Case A": first_panel, "Case B": second_panel}, outputs=(), cases_axis="rows"',
+);
+
 const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
   'base64',
@@ -195,6 +228,9 @@ beforeAll(() => {
   writeFileSync(join(directory, 'panel_publish.cso.py'), panelCompare);
   writeFileSync(join(directory, 'route.cso.py'), route);
   writeFileSync(join(directory, 'branch_compare.cso.py'), branchCompare);
+  writeFileSync(join(directory, 'checked.cso.py'), checkedRectangle);
+  writeFileSync(join(directory, 'checked_compare.cso.py'), checkedCompare);
+  writeFileSync(join(directory, 'checked_hidden.cso.py'), checkedHidden);
   const bindings = spawnSync(
     python,
     ['-I', '-m', 'cso_python', 'bindings', directory],
@@ -584,4 +620,87 @@ test('publishes verified conditional notes without rerunning dormant branches', 
   const info = spawnSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
   expect(info.status, info.stderr).toBe(0);
   expect(info.stdout).toContain('Pages:           2');
+}, 180_000);
+
+test('keeps a failed engineering check beside the unchanged number', async () => {
+  const execution = capture('checked_compare.cso.py', 'compare');
+  expect(verifyExecution({ execution }).ok).toBe(true);
+  const areaLimit = (execution.checkOutcomes ?? []).filter(
+    (item) => item.checkId === 'area-limit',
+  );
+  expect(areaLimit.map((item) => item.value)).toEqual([true, false, false]);
+  const document = prepareExecutionDocument({ execution, assets: [] });
+  const table = document.sections[0]?.items.find(
+    (item) => item.kind === 'table',
+  );
+  if (table?.kind !== 'table') throw new Error('Missing table');
+  const area = table.groups
+    .flatMap((group) => group.rows)
+    .find((row) => row.quantity === 'area');
+  expect(area?.cells.map((cell) => cell.value)).toEqual([6, 24]);
+  expect(
+    table.engineeringChecks?.find((item) => item.id === 'area-limit')?.results,
+  ).toEqual([
+    { heading: 'Case A', invocationId: 'root/first_panel', value: true },
+    { heading: 'Case B', invocationId: 'root/second_panel', value: false },
+  ]);
+  const spare = document.sections.find(
+    (section) => section.invocationId === 'root/extra_panel',
+  );
+  expect(spare?.engineeringChecks?.map((item) => item.value)).toEqual([
+    false,
+    true,
+  ]);
+
+  const flipped = structuredClone(execution);
+  const failed = flipped.checkOutcomes?.find((item) => item.value === false);
+  if (!failed) throw new Error('Missing failed check');
+  failed.value = true;
+  expect(
+    verifyExecution({ execution: flipped }).diagnostics.some(
+      (item) => item.code === 'CHECK_OUTCOME_MISMATCH',
+    ),
+  ).toBe(true);
+
+  const hidden = capture('checked_hidden.cso.py', 'compare');
+  expect(verifyExecution({ execution: hidden }).ok).toBe(true);
+  const hiddenDocument = prepareExecutionDocument({
+    execution: hidden,
+    assets: [],
+  });
+  const hiddenTable = hiddenDocument.sections[0]?.items.find(
+    (item) => item.kind === 'table',
+  );
+  if (hiddenTable?.kind !== 'table') throw new Error('Missing hidden table');
+  expect(
+    hiddenTable.groups
+      .flatMap((group) => group.rows)
+      .some((row) => row.quantity === 'area'),
+  ).toBe(false);
+  expect(
+    hiddenTable.engineeringChecks?.some(
+      (item) =>
+        item.id === 'area-limit' &&
+        item.results.some((result) => result.value === false),
+    ),
+  ).toBe(true);
+
+  const htmlPath = join(directory, 'checked.html');
+  const html = publish('html', 'checked_compare.cso.py', 'compare', htmlPath, [
+    '--check-layout',
+  ]);
+  expect(html.status, html.stdout || html.stderr).toBe(0);
+  const htmlText = readFileSync(htmlPath, 'utf8');
+  expect(htmlText).toContain('data-cases-axis="rows"');
+  expect(htmlText).toContain('data-check="area-limit"');
+  expect(htmlText).toContain('data-check-result="fail"');
+  expect(htmlText).toContain('data-check-result="pass"');
+  expect(htmlText).toContain('Area exceeds 20 square metres.');
+  expect(htmlText).toContain('>24<');
+  const pdfPath = join(directory, 'checked.pdf');
+  const pdf = publish('pdf', 'checked_compare.cso.py', 'compare', pdfPath);
+  expect(pdf.status, pdf.stdout || pdf.stderr).toBe(0);
+  const info = spawnSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
+  expect(info.status, info.stderr).toBe(0);
+  expect(info.stdout).toMatch(/Pages:\s+[12]/);
 }, 180_000);
