@@ -74,7 +74,17 @@ def content_shape(content: list) -> list:
         elif item["kind"] == "quantity":
             shaped.append(("quantity", item["variableName"]))
         elif item["kind"] == "call":
-            shaped.append(("call", item["binding"], item["inputs"], item["outputs"]))
+            shaped.append(
+                (
+                    "call",
+                    item["binding"],
+                    [
+                        {"name": input["name"], "formulaText": input["formulaText"]}
+                        for input in item["inputs"]
+                    ],
+                    item["outputs"],
+                )
+            )
         else:
             shaped.append((item["kind"], item["localId"]))
     return shaped
@@ -423,6 +433,9 @@ def compare() -> CalculationResults:
             [item["helperId"] for item in method["content"] if item["kind"] == "call"],
             [helper["id"], helper["id"]],
         )
+        wider = next(item for item in method["content"] if item.get("binding") == "wider")
+        self.assertEqual(wider["inputs"][0]["nodes"][0]["mode"], "SYMBOL")
+        self.assertEqual(wider["inputs"][0]["nodes"][0]["ref"]["name"], "width")
         self.assertEqual(
             content_shape(helper["content"]),
             [

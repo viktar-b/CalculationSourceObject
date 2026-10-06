@@ -210,6 +210,7 @@ const PreparedMethodQuantitySchema = z.strictObject({
   description: NonemptyStringSchema,
   unit: z.string(),
   formulaText: z.string(),
+  symbolId: NonemptyStringSchema,
 });
 export type PreparedMethodContent =
   | ({ kind: 'quantity' } & z.infer<typeof PreparedMethodQuantitySchema>)
@@ -225,7 +226,7 @@ export type PreparedMethodContent =
       kind: 'call';
       binding: string;
       helperId: string;
-      inputs: { name: string; formulaText: string }[];
+      inputs: { name: string; formulaText: string; symbolId: string }[];
       outputs: string[];
     }
   | {
@@ -239,12 +240,14 @@ export type PreparedMethodContent =
       localId: string;
       explanation: string;
       predicateText: string;
+      predicateSymbolId: string;
     }
   | {
       kind: 'applicability';
       localId: string;
       explanation: string;
       predicateText: string;
+      predicateSymbolId: string;
     };
 export type PreparedMethodHelper = {
   id: string;
@@ -276,6 +279,7 @@ const PreparedMethodContentSchema: z.ZodType<PreparedMethodContent> = z.lazy(
           z.strictObject({
             name: NonemptyStringSchema,
             formulaText: z.string(),
+            symbolId: NonemptyStringSchema,
           }),
         ),
         outputs: z.array(NonemptyStringSchema).min(1),
@@ -291,12 +295,14 @@ const PreparedMethodContentSchema: z.ZodType<PreparedMethodContent> = z.lazy(
         localId: NonemptyStringSchema,
         explanation: NonemptyStringSchema,
         predicateText: NonemptyStringSchema,
+        predicateSymbolId: NonemptyStringSchema,
       }),
       z.strictObject({
         kind: z.literal('applicability'),
         localId: NonemptyStringSchema,
         explanation: NonemptyStringSchema,
         predicateText: NonemptyStringSchema,
+        predicateSymbolId: NonemptyStringSchema,
       }),
     ]),
 );
@@ -378,6 +384,7 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
     quantities: z.array(PreparedMethodQuantitySchema).min(1),
     content: z.array(PreparedMethodContentSchema).min(1),
     helpers: z.array(PreparedMethodHelperSchema),
+    symbols: z.array(CalculationSourceSymbolSchema).min(1),
     contextSource: HistoricalJsonObjectSchema.optional(),
     ...placementFields,
   }),
@@ -409,10 +416,15 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
           symbolId: NonemptyStringSchema,
           nodeKey: NonemptyStringSchema,
           label: NonemptyStringSchema,
+          conditionHolds: z.boolean(),
+          quantitySymbolId: NonemptyStringSchema,
+          branchSymbolId: NonemptyStringSchema,
+          conditionSymbolId: NonemptyStringSchema,
         }),
       )
       .min(1)
       .optional(),
+    symbols: z.array(CalculationSourceSymbolSchema).min(1).optional(),
     engineeringChecks: z
       .array(
         z.strictObject({
@@ -516,6 +528,7 @@ export const PreparedDocumentSchema = z
     validatePlacements(document, ctx);
     validateContentIds(document, ctx);
     validateAssets(document, ctx);
+    validateNotation(document, ctx);
     validateSectionTree(document, ctx);
     validateSymbols(document, ctx);
     validateContext(document, ctx);
@@ -747,6 +760,60 @@ const validateAssets = (document: PreparedDocument, ctx: z.RefinementCtx) => {
           itemIndex,
           'helpers',
         ]);
+      }
+    }
+  }
+};
+
+const methodNotationIds = (content: PreparedMethodContent[]): string[] =>
+  content.flatMap((item) => {
+    if (item.kind === 'quantity') return [item.symbolId];
+    if (item.kind === 'call') return item.inputs.map((input) => input.symbolId);
+    if (item.kind === 'check' || item.kind === 'applicability') {
+      return [item.predicateSymbolId];
+    }
+    if (item.kind === 'section') return methodNotationIds(item.content);
+    return [];
+  });
+const helperNotationIds = (helpers: PreparedMethodHelper[]): string[] =>
+  helpers.flatMap((helper) => [
+    ...methodNotationIds(helper.content),
+    ...helperNotationIds(helper.helpers),
+  ]);
+
+const validateNotation = (document: PreparedDocument, ctx: z.RefinementCtx) => {
+  for (const [sectionIndex, section] of document.sections.entries()) {
+    for (const [itemIndex, item] of section.items.entries()) {
+      if (item.kind !== 'method' && item.kind !== 'table') continue;
+      const ids =
+        item.kind === 'method'
+          ? [
+              ...item.quantities.map((quantity) => quantity.symbolId),
+              ...methodNotationIds(item.content),
+              ...helperNotationIds(item.helpers),
+            ]
+          : (item.branchNotes ?? []).flatMap((note) => [
+              note.quantitySymbolId,
+              note.branchSymbolId,
+              note.conditionSymbolId,
+            ]);
+      const declared = item.symbols ?? [];
+      const symbols = new Set(declared.map((symbol) => symbol.id));
+      if (symbols.size !== declared.length) {
+        addIssue(
+          ctx,
+          'DUPLICATE_NOTATION_SYMBOL',
+          'Method notation symbol IDs must be unique',
+          ['sections', sectionIndex, 'items', itemIndex, 'symbols'],
+        );
+      }
+      if (ids.some((id) => !symbols.has(id))) {
+        addIssue(
+          ctx,
+          'UNRESOLVED_NOTATION_SYMBOL',
+          'Method notation must resolve to the item symbols',
+          ['sections', sectionIndex, 'items', itemIndex, 'symbols'],
+        );
       }
     }
   }

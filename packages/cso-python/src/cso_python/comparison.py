@@ -479,20 +479,21 @@ def _call_formulas(module, definition, node: ast.Assign, glyphs: dict[str, str])
     for key, value in zip(mapping.keys, mapping.values):
         if not isinstance(key, ast.Constant) or not isinstance(key.value, str):
             continue
-        nodes = lower_expression(
-            module,
-            definition.function,
-            set(definition.parameters),
-            value,
-            given=False,
-        )
+        nodes = [
+            {item_key: item_value for item_key, item_value in item.items() if item_key != "_ast"}
+            for item in lower_expression(
+                module,
+                definition.function,
+                set(definition.parameters),
+                value,
+                given=False,
+            )
+        ]
         formulas.append(
             {
                 "name": key.value,
-                "formulaText": _formula_text(
-                    [{item_key: item_value for item_key, item_value in item.items() if item_key != "_ast"} for item in nodes],
-                    glyphs,
-                ),
+                "formulaText": _formula_text(nodes, glyphs),
+                "nodes": nodes,
             }
         )
     return formulas

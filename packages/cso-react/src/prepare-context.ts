@@ -113,8 +113,10 @@ const engineeringFields = (
 };
 
 // Internal to both preparation adapters. It never reads historical reviews.
+// Symbols in `explained` already have a method and table, so they are not operands.
 export const prepareDocumentContext = (
   document: PreparedDocument,
+  explained: ReadonlySet<string> = new Set(),
 ): PreparedDocument => {
   const definitions = new Map<
     string,
@@ -209,7 +211,7 @@ export const prepareDocumentContext = (
           ...item,
           context: [...symbolContext(id), ...context],
           operands: [...activeSymbolIds([id], symbols)]
-            .filter((id) => !placed.has(id))
+            .filter((id) => !placed.has(id) && !explained.has(id))
             .map(operandContext),
         };
       }),

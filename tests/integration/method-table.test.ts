@@ -14,7 +14,12 @@ import {
   ExecutionResponseSchema,
   verifyExecution,
 } from '@cs-object/core';
-import { prepareExecutionDocument } from '@cs-object/react';
+import {
+  PreparedFormulaSheet,
+  prepareExecutionDocument,
+} from '@cs-object/react';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 
 const repoRoot = join(import.meta.dirname, '../..');
@@ -369,17 +374,19 @@ beforeAll(() => {
     { length: 60 },
     (_, index) => `Authored method paragraph ${index + 1} remains visible.`,
   ).join(' ');
-  const tallRectangle = `${rectangle.replace(
-    'from cso_python import CalculationResults, calculation, section, symbol',
-    'from cso_python import CalculationResults, applicable, calculation, check, figure, section, symbol, text',
-  ).replace(
-    'return {"area": area, "perimeter": perimeter}',
-    `text(id="method-story", content="${tallStory}")
+  const tallRectangle = `${rectangle
+    .replace(
+      'from cso_python import CalculationResults, calculation, section, symbol',
+      'from cso_python import CalculationResults, applicable, calculation, check, figure, section, symbol, text',
+    )
+    .replace(
+      'return {"area": area, "perimeter": perimeter}',
+      `text(id="method-story", content="${tallStory}")
     figure(id="sketch", path="sketch.png", media_type="image/png", caption="Panel sketch", alt="A rectangle")
     applicable(id="area-limit", targets=("area",), explanation="Area exceeds the method limit.", predicate=area <= 20)
     check(id="perimeter-check", targets=("perimeter",), explanation="Perimeter exceeds twelve metres.", predicate=perimeter <= 12)
     return {"area": area, "perimeter": perimeter}`,
-  )}`;
+    )}`;
   writeFileSync(join(directory, 'tall_rectangle.cso.py'), tallRectangle);
   writeFileSync(
     join(directory, 'tall_rows.cso.py'),
@@ -434,9 +441,10 @@ def compare() -> CalculationResults:
     return {"ready": ready}
 `,
   );
-  const oversizedDescription = Array.from({ length: 140 }, () => 'oversized row').join(
-    '\n',
-  );
+  const oversizedDescription = Array.from(
+    { length: 140 },
+    () => 'oversized row',
+  ).join('\n');
   writeFileSync(
     join(directory, 'oversized_row.cso.py'),
     rectangle.replace(
@@ -474,6 +482,24 @@ function capture(source: string, name: string) {
   if (!response.ok) throw new Error(response.diagnostics[0]?.message);
   return response.execution;
 }
+
+function elementWith(html: string, marker: string): string {
+  const at = html.indexOf(marker);
+  if (at < 0) throw new Error(`Missing ${marker}`);
+  const start = html.lastIndexOf('<', at);
+  const tag = /^<([a-z0-9]+)/.exec(html.slice(start))?.[1];
+  if (!tag) throw new Error(`No element carries ${marker}`);
+  const tags = new RegExp(`<${tag}[\\s>]|</${tag}>`, 'g');
+  tags.lastIndex = start;
+  let depth = 0;
+  for (let match = tags.exec(html); match; match = tags.exec(html)) {
+    depth += match[0].startsWith('</') ? -1 : 1;
+    if (depth === 0) return html.slice(start, tags.lastIndex);
+  }
+  throw new Error(`Unclosed ${tag} carrying ${marker}`);
+}
+
+const visibleText = (html: string): string => html.replace(/<[^>]*>/g, ' ');
 
 function publish(
   command: 'html' | 'pdf',
@@ -667,6 +693,91 @@ test('publishes one straight-line method and bound case columns', async () => {
   expect(rowInfo.stdout).toContain('Pages:           1');
 }, 180_000);
 
+test('typesets methods, notes and table values like ordinary formula rows', () => {
+  const execution = capture('compare.cso.py', 'compare');
+  const document = prepareExecutionDocument({ execution, assets: [] });
+  const root = document.sections[0];
+  const method = root?.items.find((item) => item.kind === 'method');
+  if (method?.kind !== 'method') throw new Error('Missing method');
+  const area = method.content.find(
+    (item) => item.kind === 'quantity' && item.selectionName === 'area',
+  );
+  if (area?.kind !== 'quantity') throw new Error('Missing area');
+  const symbols = new Map(method.symbols.map((symbol) => [symbol.id, symbol]));
+  const areaSymbol = symbols.get(area.symbolId);
+  const product = areaSymbol?.valueTree.nodes.find(
+    (node) => node.key === areaSymbol.valueTree.rootKey,
+  );
+  expect(product?.funcSpec?.id).toBe('fg.multiply');
+  expect(
+    areaSymbol?.valueTree.nodes.flatMap((node) =>
+      node.symbol ? [symbols.get(node.symbol.id)?.glyph] : [],
+    ),
+  ).toEqual(['w', 'h']);
+  const compared = root?.items.find(
+    (item) => item.kind === 'symbol' && item.symbol.glyph === 'R',
+  );
+  if (compared?.kind !== 'symbol') throw new Error('Missing compared row');
+  expect(compared.operands).toEqual([]);
+
+  const html = renderToStaticMarkup(
+    createElement(PreparedFormulaSheet, { document }),
+  );
+  expect(visibleText(html)).not.toContain('(w * h)');
+  const areaRow = elementWith(html, 'data-quantity="area"');
+  expect(areaRow).toContain('<math');
+  expect(areaRow).toContain('<msup');
+  expect(html).toMatch(/data-quantity="area"[^>]*data-value="6"[^>]*>6\.00</);
+  expect(html).toMatch(/data-quantity="width"[^>]*data-value="2"[^>]*>2\.00</);
+  const areaHeading = elementWith(html, 'scope="row" data-quantity="area"');
+  expect(areaHeading).toContain('<msup');
+  expect(areaHeading).not.toContain('m^2');
+
+  const branchDocument = prepareExecutionDocument({
+    execution: capture('branch_compare.cso.py', 'compare'),
+    assets: [],
+  });
+  const branchHtml = renderToStaticMarkup(
+    createElement(PreparedFormulaSheet, { document: branchDocument }),
+  );
+  for (const heading of ['Narrow', 'Wide']) {
+    const note = elementWith(branchHtml, `data-branch-note="${heading}"`);
+    expect(note).toContain('<math');
+    expect(visibleText(note)).toContain('Chosen');
+    expect(visibleText(note)).not.toContain(' if ');
+  }
+
+  const panelExecution = capture('panel_compare.cso.py', 'compare');
+  const panelDocument = prepareExecutionDocument({
+    execution: panelExecution,
+    assets: panelExecution.assets.map((asset) => ({
+      asset,
+      dataUrl: `data:${asset.mediaType};base64,${png.toString('base64')}`,
+    })),
+  });
+  const panelHtml = renderToStaticMarkup(
+    createElement(PreparedFormulaSheet, { document: panelDocument }),
+  );
+  const call = elementWith(panelHtml, 'data-call="wider"');
+  expect(call).toContain('<math');
+  expect(visibleText(call)).not.toContain('length = w');
+  expect(visibleText(panelHtml)).not.toContain('wider.grown');
+
+  const checkedDocument = prepareExecutionDocument({
+    execution: capture('checked_compare.cso.py', 'compare'),
+    assets: [],
+  });
+  const checkedHtml = renderToStaticMarkup(
+    createElement(PreparedFormulaSheet, { document: checkedDocument }),
+  );
+  const check = elementWith(
+    checkedHtml,
+    'class="cso-branch-note" data-check="area-limit" data-formula',
+  );
+  expect(check).toContain('<math');
+  expect(visibleText(check)).not.toContain('&lt;=');
+}, 120_000);
+
 test('publishes nested helper explanations without pruning authored context', async () => {
   const execution = capture('panel_compare.cso.py', 'compare');
   expect(verifyExecution({ execution }).ok).toBe(true);
@@ -746,12 +857,18 @@ test('publishes nested helper explanations without pruning authored context', as
   expect(htmlText.match(/data-helper="margin"/g)).toHaveLength(1);
   expect(htmlText).toContain('data-call="wider"');
   expect(htmlText).toContain('data-call="taller"');
-  expect(htmlText).toContain('length = w');
-  expect(htmlText).toContain('length = h');
+  expect(elementWith(htmlText, 'data-call="wider"')).toContain(
+    '<span data-formula="w"><math',
+  );
+  expect(elementWith(htmlText, 'data-call="taller"')).toContain(
+    '<span data-formula="h"><math',
+  );
   expect(htmlText).toContain('The margin is one metre.');
   expect(htmlText).toContain('Panel sides are grown independently.');
   expect(htmlText).toContain('alt="A rectangle"');
-  expect(htmlText).toContain('(wider.grown * taller.grown)');
+  const product = elementWith(htmlText, 'data-quantity="product"');
+  expect(product).toContain('data-formula="(wider.grown * taller.grown)"');
+  expect(product.match(/<msub[\s>]/g)?.length).toBeGreaterThanOrEqual(2);
   expect(htmlText).toContain('Case A is the narrow panel');
   expect(htmlText.match(/The margin is one metre\./g)).toHaveLength(1);
 
@@ -760,7 +877,7 @@ test('publishes nested helper explanations without pruning authored context', as
   expect(pdf.status, pdf.stdout || pdf.stderr).toBe(0);
   const info = spawnSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
   expect(info.status, info.stderr).toBe(0);
-  expect(info.stdout).toContain('Pages:           2');
+  expect(info.stdout).toContain('Pages:           1');
 }, 180_000);
 
 test('publishes verified conditional notes without rerunning dormant branches', async () => {
@@ -777,7 +894,7 @@ test('publishes verified conditional notes without rerunning dormant branches', 
   expect(chosen?.formulaText).toBe('(w if w > h else h)');
   expect(guarded?.formulaText).toContain('else');
   const divide = guarded?.nodes.find(
-    (node) => node.mode === 'FUNCTION' && node.funcSpec.id === 'fg.divide',
+    (node) => node.mode === 'FUNCTION' && node.funcSpec?.id === 'fg.divide',
   );
   if (!divide) throw new Error('Missing dormant division');
   const outcomes = execution.branchOutcomes ?? [];
@@ -834,7 +951,7 @@ test('publishes verified conditional notes without rerunning dormant branches', 
   expect(htmlText).toContain('data-formula="w"');
   expect(htmlText).toContain('data-branch-note="Wide"');
   expect(htmlText).toContain('data-formula="h"');
-  expect(htmlText.match(/otherwise\./g)).toHaveLength(4);
+  expect(htmlText.match(/otherwise\./g)).toHaveLength(6);
   expect(htmlText).toContain(
     'scope="row" data-comparison-label="" data-case-heading="Narrow"',
   );
@@ -843,7 +960,7 @@ test('publishes verified conditional notes without rerunning dormant branches', 
   expect(pdf.status, pdf.stdout || pdf.stderr).toBe(0);
   const info = spawnSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
   expect(info.status, info.stderr).toBe(0);
-  expect(info.stdout).toContain('Pages:           2');
+  expect(info.stdout).toContain('Pages:           1');
 }, 180_000);
 
 test('keeps a failed engineering check beside the unchanged number', async () => {
@@ -920,7 +1037,8 @@ test('keeps a failed engineering check beside the unchanged number', async () =>
   expect(htmlText).toContain('data-check-result="fail"');
   expect(htmlText).toContain('data-check-result="pass"');
   expect(htmlText).toContain('Area exceeds 20 square metres.');
-  expect(htmlText).toContain('>24<');
+  expect(htmlText).toContain('data-value="24"');
+  expect(htmlText).toContain('>24.00<');
   const pdfPath = join(directory, 'checked.pdf');
   const pdf = publish('pdf', 'checked_compare.cso.py', 'compare', pdfPath);
   expect(pdf.status, pdf.stdout || pdf.stderr).toBe(0);
@@ -1191,7 +1309,9 @@ test('repeats comparison context across vertical page breaks', () => {
   expect(rowPages.length).toBeGreaterThan(1);
   expect(rowPages.join('\n')).toContain('Panel sketch');
   expect(rowPages.join('\n')).toContain('Authored method paragraph 60');
-  expect(rowPages.join('\n')).toContain('North elevation panel with a long wrapped heading');
+  expect(rowPages.join('\n')).toContain(
+    'North elevation panel with a long wrapped heading',
+  );
   expect(rowPages.some((page) => page.includes('Continued'))).toBe(true);
   for (const page of rowPages) {
     if (page.includes('Case ')) {
@@ -1201,11 +1321,18 @@ test('repeats comparison context across vertical page breaks', () => {
   expect(rowPages.at(-1)).toContain('Case 64');
   expect(rowPages.join('\n')).toContain('Not applicable');
   expect(rowPages.join('\n')).toContain('Perimeter exceeds twelve metres.');
-  const rowHash = createHash('sha256').update(readFileSync(rowsPdf)).digest('hex');
+  const rowHash = createHash('sha256')
+    .update(readFileSync(rowsPdf))
+    .digest('hex');
   expect(rowHash).toMatch(/^[a-f0-9]{64}$/);
 
   const columnsPdf = join(directory, 'tall-columns.pdf');
-  const columns = publish('pdf', 'tall_columns_compare.cso.py', 'compare', columnsPdf);
+  const columns = publish(
+    'pdf',
+    'tall_columns_compare.cso.py',
+    'compare',
+    columnsPdf,
+  );
   expect(columns.status, columns.stdout || columns.stderr).toBe(0);
   const columnPages = pdfPageTexts(columnsPdf);
   expect(columnPages.join('\n')).toContain('Part 1 of 2');
@@ -1221,7 +1348,12 @@ test('repeats comparison context across vertical page breaks', () => {
 
   const sentinel = join(directory, 'oversized-sentinel.pdf');
   writeFileSync(sentinel, 'keep');
-  const oversized = publish('pdf', 'oversized_compare.cso.py', 'compare', sentinel);
+  const oversized = publish(
+    'pdf',
+    'oversized_compare.cso.py',
+    'compare',
+    sentinel,
+  );
   expect(oversized.status).not.toBe(0);
   expect(oversized.stdout).toContain('cannot fit with its repeated headings');
   expect(oversized.stdout).toContain('DOCUMENT_LAYOUT_OVERFLOW');

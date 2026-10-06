@@ -1,6 +1,8 @@
 import {
   type CalculationSourceSectionItem,
+  type CalculationSourceSymbol,
   createSheetFromCalculationSourceObject,
+  formatNumerical,
   type PreparedDocument,
   PreparedDocumentSchema,
   type PreparedDocumentSection,
@@ -12,6 +14,8 @@ import { Fragment, type ReactElement } from 'react';
 import { EngineeringMetadata } from './EngineeringMetadata.tsx';
 import { FormulaSheetSymbolRow } from './formula-sheet/FormulaSheetSymbolRow.tsx';
 import { GlyphMathBlock } from './mathml/GlyphMathBlock.tsx';
+import { InlineFormulaMath } from './mathml/InlineFormulaMath.tsx';
+import { UnitMathBlock } from './mathml/UnitMathBlock.tsx';
 
 export interface PreparedFormulaSheetProps {
   readonly document: PreparedDocument;
@@ -59,6 +63,53 @@ const requiredItem = <T,>(items: ReadonlyMap<string, T>, id: string): T => {
   return item;
 };
 
+const notationSheet = (
+  id: string,
+  symbols: readonly CalculationSourceSymbol[],
+) => {
+  const sheet = createSheetFromCalculationSourceObject(
+    {
+      schemaVersion: '1.0.0',
+      title: id,
+      source: { id, metadata: {} },
+      rootSectionIds: [id],
+      sections: [
+        {
+          id,
+          title: id,
+          items: symbols.map((symbol) => ({ kind: 'symbol', symbol })),
+        },
+      ],
+      detachedItems: [],
+    },
+    { id, label: id },
+  ).sheet;
+  const byId = new Map(sheet.symbols.map((symbol) => [symbol.id, symbol]));
+  return {
+    description: (symbolId: string): string =>
+      requiredItem(byId, symbolId).description,
+    formula: (symbolId: string, showGlyph = true): ReactElement => (
+      <InlineFormulaMath
+        sheet={sheet}
+        symbol={requiredItem(byId, symbolId)}
+        showGlyph={showGlyph}
+      />
+    ),
+  };
+};
+type Notation = ReturnType<typeof notationSheet>;
+
+const unitText = (unit: string): ReactElement | null =>
+  unit ? (
+    <>
+      {' '}
+      [<UnitMathBlock unit={unit} />]
+    </>
+  ) : null;
+
+const numberText = (value: number): string =>
+  Object.is(value, -0) ? '-0' : formatNumerical(value);
+
 export const PreparedFormulaSheet = ({
   document: input,
   showSourceDetails = true,
@@ -76,6 +127,7 @@ export const PreparedFormulaSheet = ({
   const renderMethodContent = (
     content: readonly PreparedMethodContent[],
     helpers: readonly PreparedMethodHelper[],
+    notation: Notation,
     shown: Set<string>,
   ): ReactElement[] => {
     const helperById = new Map<string, PreparedMethodHelper>();
@@ -101,7 +153,8 @@ export const PreparedFormulaSheet = ({
               }
               data-formula={item.predicateText}
             >
-              {item.explanation} {item.predicateText}
+              {item.explanation}{' '}
+              {notation.formula(item.predicateSymbolId, false)}
             </p>
           );
         }
@@ -111,15 +164,13 @@ export const PreparedFormulaSheet = ({
               key={`quantity-${item.selectionName}-${index}`}
               className="cso-method-quantity"
               data-quantity={item.selectionName}
+              data-formula={item.formulaText || undefined}
             >
-              <GlyphMathBlock glyph={item.glyph} /> {item.description}{' '}
-              {item.unit}
-              {item.formulaText ? (
-                <span data-formula={item.formulaText}>
-                  {' '}
-                  = {item.formulaText}
-                </span>
-              ) : null}
+              {item.description} <GlyphMathBlock glyph={item.glyph} />
+              {unitText(item.unit)}
+              {item.role === 'input' ? null : (
+                <> = {notation.formula(item.symbolId, false)}</>
+              )}
             </p>
           );
         }
@@ -182,9 +233,14 @@ export const PreparedFormulaSheet = ({
             {explanation}
             <p>
               {item.binding}:{' '}
-              {item.inputs
-                .map((input) => `${input.name} = ${input.formulaText}`)
-                .join(', ')}
+              {item.inputs.map((input, inputIndex) => (
+                <Fragment key={input.name}>
+                  {inputIndex > 0 ? ', ' : null}
+                  <span data-formula={input.formulaText}>
+                    {notation.formula(input.symbolId)}
+                  </span>
+                </Fragment>
+              ))}
             </p>
           </div>
         );
@@ -279,7 +335,12 @@ export const PreparedFormulaSheet = ({
                 className="cso-method"
               >
                 <h3>{item.title}</h3>
-                {renderMethodContent(item.content, item.helpers, new Set())}
+                {renderMethodContent(
+                  item.content,
+                  item.helpers,
+                  notationSheet(item.id, item.symbols),
+                  new Set(),
+                )}
                 <EngineeringMetadata entries={item.context} />
               </section>
             );
@@ -289,15 +350,17 @@ export const PreparedFormulaSheet = ({
               quantity: (typeof item.groups)[number]['rows'][number],
             ) => (
               <>
-                <GlyphMathBlock glyph={quantity.glyph} /> {quantity.description}{' '}
-                {quantity.unit}
+                <GlyphMathBlock glyph={quantity.glyph} /> {quantity.description}
+                {unitText(quantity.unit)}
               </>
             );
-            const cellText = (value: number) =>
-              Object.is(value, -0) ? '-0' : value;
             const shownCell = (
               cell: (typeof item.groups)[number]['rows'][number]['cells'][number],
-            ) => (cell.applicability ? 'Not applicable' : cellText(cell.value));
+            ) =>
+              cell.applicability ? 'Not applicable' : numberText(cell.value);
+            const notation = item.symbols
+              ? notationSheet(item.id, item.symbols)
+              : undefined;
             const quantityColumn = new Map<string, number>();
             for (const group of item.groups) {
               for (const row of group.rows) {
@@ -374,7 +437,10 @@ export const PreparedFormulaSheet = ({
                     data-node-key={note.nodeKey}
                     data-formula={note.label}
                   >
-                    {note.heading}: {note.label}
+                    {note.heading}: {notation?.description(note.branchSymbolId)}{' '}
+                    {notation?.formula(note.branchSymbolId)}, because{' '}
+                    {notation?.formula(note.conditionSymbolId, false)}{' '}
+                    {note.conditionHolds ? 'holds' : 'does not hold'}.
                   </p>
                 ))}
                 {item.emptyState ? (

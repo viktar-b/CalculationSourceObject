@@ -219,7 +219,11 @@ export type MethodContentItem =
       kind: 'call';
       binding: string;
       helperId: string;
-      inputs: { name: string; formulaText: string }[];
+      inputs: {
+        name: string;
+        formulaText: string;
+        nodes: z.infer<typeof SymbolicFormulaNodeSchema>[];
+      }[];
       outputs: string[];
     }
   | {
@@ -277,6 +281,7 @@ const MethodContentSchema: z.ZodType<MethodContentItem> = z.lazy(() =>
         z.strictObject({
           name: PythonIdentifierSchema,
           formulaText: z.string(),
+          nodes: z.array(SymbolicFormulaNodeSchema).min(1),
         }),
       ),
       outputs: z.array(NonemptyStringSchema).min(1),
@@ -1949,7 +1954,8 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
       }
       const seenApplicability = new Set<string>();
       for (const condition of plan.applicability ?? []) {
-        if (seenApplicability.has(condition.id)) applicabilityReproduced = false;
+        if (seenApplicability.has(condition.id))
+          applicabilityReproduced = false;
         seenApplicability.add(condition.id);
         for (const invocation of execution.invocations) {
           if (

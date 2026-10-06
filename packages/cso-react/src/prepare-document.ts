@@ -26,6 +26,7 @@ import {
 } from '@cs-object/core';
 
 import { activeSymbolIds } from './active-symbols.ts';
+import { methodNotation } from './method-notation.ts';
 import { prepareDocumentContext } from './prepare-context.ts';
 
 export class DocumentPreparationError extends Error {
@@ -585,18 +586,36 @@ const presentedCell = (
 };
 
 type MethodRecord = NonNullable<ExecutionPayload['methods']>[number];
+type MethodOwner = MethodRecord | MethodRecord['helpers'][number];
+type MethodNotation = ReturnType<typeof methodNotation>;
+
+const notationFor = (method: MethodRecord): MethodNotation =>
+  methodNotation(method, (message) => fail('UNKNOWN_QUANTITY', message));
+
+const presentMethodQuantity = (
+  owner: MethodOwner,
+  quantity: MethodRecord['quantities'][number],
+  notation: MethodNotation,
+) => ({
+  selectionName: quantity.selectionName,
+  role: quantity.role,
+  glyph: quantity.glyph,
+  description: quantity.description,
+  unit: quantity.unit,
+  formulaText: quantity.formulaText,
+  symbolId: notation.quantityId(owner, quantity.variableName),
+});
 
 const presentMethodContent = (
-  quantities: MethodRecord['quantities'],
+  owner: MethodOwner,
   content: MethodRecord['content'],
-  checks: NonNullable<MethodRecord['checks']> = [],
-  applicability: NonNullable<MethodRecord['applicability']> = [],
+  notation: MethodNotation,
 ): PreparedMethodContent[] =>
   content.map((item) => {
     if (item.kind === 'check' || item.kind === 'applicability') {
-      const declared = (item.kind === 'check' ? checks : applicability).find(
-        (candidate) => candidate.id === item.localId,
-      );
+      const declared = (
+        (item.kind === 'check' ? owner.checks : owner.applicability) ?? []
+      ).find((candidate) => candidate.id === item.localId);
       if (!declared) {
         fail('UNKNOWN_QUANTITY', `Condition '${item.localId}' is missing`);
       }
@@ -605,10 +624,11 @@ const presentMethodContent = (
         localId: item.localId,
         explanation: declared.explanation,
         predicateText: declared.predicateText,
+        predicateSymbolId: notation.conditionId(owner, declared.id),
       };
     }
     if (item.kind === 'quantity') {
-      const quantity = quantities.find(
+      const quantity = owner.quantities.find(
         (candidate) => candidate.variableName === item.variableName,
       );
       if (!quantity) {
@@ -616,12 +636,7 @@ const presentMethodContent = (
       }
       return {
         kind: 'quantity',
-        selectionName: quantity.selectionName,
-        role: quantity.role,
-        glyph: quantity.glyph,
-        description: quantity.description,
-        unit: quantity.unit,
-        formulaText: quantity.formulaText,
+        ...presentMethodQuantity(owner, quantity, notation),
       };
     }
     if (item.kind === 'section') {
@@ -629,12 +644,17 @@ const presentMethodContent = (
         kind: 'section',
         localId: item.localId,
         title: item.title,
-        content: presentMethodContent(
-          quantities,
-          item.content,
-          checks,
-          applicability,
-        ),
+        content: presentMethodContent(owner, item.content, notation),
+      };
+    }
+    if (item.kind === 'call') {
+      return {
+        ...item,
+        inputs: item.inputs.map(({ name, formulaText }) => ({
+          name,
+          formulaText,
+          symbolId: notation.callInputId(owner, item.binding, name),
+        })),
       };
     }
     return item;
@@ -642,35 +662,55 @@ const presentMethodContent = (
 
 const presentMethodHelpers = (
   helpers: MethodRecord['helpers'],
+  notation: MethodNotation,
 ): PreparedMethodHelper[] =>
   helpers.map((helper) => ({
     id: helper.id,
     function: helper.function,
-    content: presentMethodContent(
-      helper.quantities,
-      helper.content,
-      helper.checks ?? [],
-      helper.applicability ?? [],
-    ),
-    helpers: presentMethodHelpers(helper.helpers),
+    content: presentMethodContent(helper, helper.content, notation),
+    helpers: presentMethodHelpers(helper.helpers, notation),
   }));
 
 const presentedBranchNotes = (
   execution: ExecutionPayload,
   table: NonNullable<ExecutionPayload['tables']>[number],
+  method: MethodRecord,
+  notation: MethodNotation,
 ) => {
   const outcomes = (execution.branchOutcomes ?? []).filter((outcome) =>
     table.cases.some((item) => item.invocationId === outcome.invocationId),
   );
   const labels = new Map<string, string[]>();
-  const groupKey = (outcome: (typeof outcomes)[number]) => {
-    const invocation = execution.invocations.find(
-      (item) => item.id === outcome.invocationId,
-    );
-    const variable = invocation?.symbols.find(
-      (item) => item.symbolId === outcome.symbolId,
-    )?.variableName;
-    return `${variable ?? ''}|${outcome.nodeKey}`;
+  const variableName = (outcome: (typeof outcomes)[number]) =>
+    execution.invocations
+      .find((item) => item.id === outcome.invocationId)
+      ?.symbols.find((item) => item.symbolId === outcome.symbolId)
+      ?.variableName ??
+    fail('UNKNOWN_QUANTITY', `Branch symbol '${outcome.symbolId}' is missing`);
+  const groupKey = (outcome: (typeof outcomes)[number]) =>
+    `${variableName(outcome)}|${outcome.nodeKey}`;
+  const chosenKey = (outcome: (typeof outcomes)[number]): string => {
+    const quantity =
+      method.quantities.find(
+        (item) => item.variableName === variableName(outcome),
+      ) ?? fail('UNKNOWN_QUANTITY', `Branch quantity is missing`);
+    const nodes = new Map(quantity.nodes.map((node) => [node.key, node]));
+    let key = outcome.nodeKey;
+    let holds = outcome.value;
+    for (;;) {
+      const arm = nodes.get(key)?.funcArgs?.[holds ? 1 : 2]?.key;
+      if (!arm) fail('UNKNOWN_QUANTITY', `Conditional '${key}' is incomplete`);
+      if (nodes.get(arm)?.funcSpec?.id !== 'fg.cnd') return arm;
+      const inner = outcomes.find(
+        (item) =>
+          item.invocationId === outcome.invocationId &&
+          item.symbolId === outcome.symbolId &&
+          item.nodeKey === arm,
+      );
+      if (!inner) return arm;
+      key = inner.nodeKey;
+      holds = inner.value;
+    }
   };
   for (const outcome of outcomes) {
     const key = groupKey(outcome);
@@ -686,6 +726,12 @@ const presentedBranchNotes = (
         symbolId: outcome.symbolId,
         nodeKey: outcome.nodeKey,
         label: outcome.label,
+        conditionHolds: outcome.value,
+        ...notation.branch(
+          variableName(outcome),
+          outcome.nodeKey,
+          chosenKey(outcome),
+        ),
       })),
   );
 };
@@ -716,26 +762,17 @@ const comparisonPlacement = (
   if (item.kind === 'method') {
     const method = execution.methods?.find((record) => record.id === item.id);
     if (!method) fail('UNKNOWN_METHOD', `Method '${item.id}' is missing`);
-    const quantities = method.quantities.map((quantity) => ({
-      selectionName: quantity.selectionName,
-      role: quantity.role,
-      glyph: quantity.glyph,
-      description: quantity.description,
-      unit: quantity.unit,
-      formulaText: quantity.formulaText,
-    }));
+    const notation = notationFor(method);
     return {
       kind: 'method',
       id: item.id,
       title: method.title,
-      quantities,
-      content: presentMethodContent(
-        method.quantities,
-        method.content,
-        method.checks ?? [],
-        method.applicability ?? [],
+      quantities: method.quantities.map((quantity) =>
+        presentMethodQuantity(method, quantity, notation),
       ),
-      helpers: presentMethodHelpers(method.helpers),
+      content: presentMethodContent(method, method.content, notation),
+      helpers: presentMethodHelpers(method.helpers, notation),
+      symbols: notation.symbols(),
       ...placement,
     };
   }
@@ -777,7 +814,8 @@ const comparisonPlacement = (
         }),
       };
     });
-  const branchNotes = presentedBranchNotes(execution, table);
+  const notation = notationFor(method);
+  const branchNotes = presentedBranchNotes(execution, table, method, notation);
   const engineeringChecks = (method.checks ?? []).flatMap((check) => {
     const results = table.cases.flatMap((caseItem) => {
       const outcome = (execution.checkOutcomes ?? []).find(
@@ -857,7 +895,9 @@ const comparisonPlacement = (
     title: table.title,
     casesAxis: table.casesAxis,
     ...(table.columnCap ? { columnCap: table.columnCap } : {}),
-    ...(branchNotes.length > 0 ? { branchNotes } : {}),
+    ...(branchNotes.length > 0
+      ? { branchNotes, symbols: notation.symbols() }
+      : {}),
     ...(engineeringChecks.length > 0 ? { engineeringChecks } : {}),
     ...(applicabilityNotes.length > 0 ? { applicabilityNotes } : {}),
     cases: table.cases.map(({ heading, invocationId }) => ({
@@ -1048,7 +1088,16 @@ export const prepareExecutionDocument = (
   });
   return parseContent(BoundPreparedDocumentSchema, {
     execution,
-    document: prepareDocumentContext(document),
+    document: prepareDocumentContext(
+      document,
+      new Set(
+        execution.invocations
+          .filter((invocation) => replacesInvocation(invocation.id, grouped))
+          .flatMap((invocation) =>
+            invocation.symbols.map((symbol) => symbol.symbolId),
+          ),
+      ),
+    ),
   }).document;
 };
 
