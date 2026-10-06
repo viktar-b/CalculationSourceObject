@@ -570,9 +570,9 @@ class Planner:
                     "value": source["literal"]["value"],
                 }
                 if "draft" in source:
-                    item.update(mode="LITERAL", draft=source["draft"], literal=literal_node)
-                else:
-                    item.update(mode="LITERAL", literal=literal_node)
+                    item["draft"] = source["draft"]
+                item["mode"] = "LITERAL"
+                item["literal"] = literal_node
             elif mode == "FUNCTION":
                 item.update(
                     mode="FUNCTION",
