@@ -201,16 +201,7 @@ def _quantities(planner, inv, module, definition, plan, at: ast.AST) -> list[Jso
     for quantity in plan.quantities:
         variable = quantity["variableName"]
         nodes = quantity["nodes"]
-        assignment = next(
-            (
-                step.node
-                for step in plan.steps
-                if isinstance(step.node, ast.AnnAssign)
-                and isinstance(step.node.target, ast.Name)
-                and step.node.target.id == variable
-            ),
-            None,
-        )
+        assignment = _declared_assignment(plan.steps, variable)
         if not isinstance(assignment, ast.AnnAssign):
             planner.error(inv, at, "UNSUPPORTED_METHOD_CONTENT", f"Missing declaration for {variable!r}")
         metadata = symbol_annotation(assignment, module.id, module.aliases).metadata
@@ -602,6 +593,21 @@ def _remember_figure(planner, module, data: Json, owner_id: str, node: ast.AST) 
         "sha256": hashlib.sha256(asset_bytes).hexdigest(),
     }
     return asset_id
+
+
+def _declared_assignment(steps, variable: str) -> ast.AnnAssign | None:
+    for step in steps:
+        node = step.node
+        if (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == variable
+        ):
+            return node
+        found = _declared_assignment(step.child_steps or [], variable)
+        if found is not None:
+            return found
+    return None
 
 
 def _place_table(planner, inv, call: ast.Call, section: Json, ids: set[str]) -> None:

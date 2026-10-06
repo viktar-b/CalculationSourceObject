@@ -154,7 +154,9 @@ export function planComparisonParts(
   });
 }
 
-export function measureComparisons(root?: ParentNode): ComparisonMeasurement[] {
+export function measureComparisons(
+  root?: ParentNode | void,
+): ComparisonMeasurement[] {
   const scope = root ?? document;
   const measurements: ComparisonMeasurement[] = [];
   for (const comparison of scope.querySelectorAll<HTMLElement>(

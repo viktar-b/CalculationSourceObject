@@ -89,12 +89,16 @@ property_ratios = compare_properties(
 )
 ```
 
-The parent returns the two areas and two ratios. All 91 calculated quantities
-from each tapered invocation remain in its report, including the plastic-modulus
-work that the parent does not return. The hot-formed report similarly retains
-all 38 quantities from each invocation. The shared comparison contributes two
-more formulas. Forwarded outputs retain their original symbols and units rather
-than becoming new independent input rows.
+The parent returns the two areas and two ratios. Each invocation keeps its own
+quantities in the execution. `compare_hot_formed` explains the hot-formed
+calculation once and compares the two depths in columns. `compare_tapered`
+explains the tapered calculation once and compares its two depths in rows.
+The tables show section depth and the two forwarded properties. The remaining
+authored formulas, including the tapered plastic-modulus work, stay in the
+method. The shared ratio calculation contributes two more formulas. Forwarded
+outputs retain their original symbols and units rather than becoming new
+independent input rows. Case-specific glyphs such as `bs` and `cs` remain in
+the execution.
 
 `baseline_section` and `candidate_section` qualify repeated result glyphs with
 `bs` and `cs`. The tapered calculation also retains its separate x-axis and

@@ -32,11 +32,25 @@ beforeAll(() => {
 afterAll(() => rmSync(directory, { recursive: true, force: true }));
 
 it.each([
-  { name: 'compare_hot_formed', depth: 1056, formulas: 78, unreturned: 'm_m' },
-  { name: 'compare_tapered', depth: 100, formulas: 184, unreturned: 'Z_x' },
+  {
+    name: 'compare_hot_formed',
+    depth: 1056,
+    formulas: 78,
+    unreturned: 'm_m',
+    selection: 'mass_per_metre_length',
+    axis: 'columns',
+  },
+  {
+    name: 'compare_tapered',
+    depth: 100,
+    formulas: 184,
+    unreturned: 'Z_x',
+    selection: 'plastic_section_modulus_about_x_axis',
+    axis: 'rows',
+  },
 ])(
   'preserves reused calculations and forwarding in $name',
-  ({ name, depth, formulas, unreturned }) => {
+  ({ name, depth, formulas, unreturned, selection, axis }) => {
     const response = ExecutionResponseSchema.parse(
       JSON.parse(
         execFileSync(
@@ -57,7 +71,9 @@ it.each([
       ),
     );
     if (!response.ok) throw new Error(JSON.stringify(response.diagnostics));
+    expect(response.protocolVersion).toBe('3');
     const execution = response.execution;
+    expect(execution.cso.schemaVersion).toBe('1.1.0');
     const report = verifyExecution({ execution });
     expect(report.ok, JSON.stringify(report.diagnostics)).toBe(true);
     expect(execution.invocations.map((invocation) => invocation.id)).toEqual([
@@ -85,24 +101,34 @@ it.each([
       parameters?.every((parameter) => parameter.origin.kind === 'output'),
     ).toBe(true);
     const document = prepareExecutionDocument({ execution, assets: [] });
-    const symbols = document.sections.flatMap((section) =>
-      section.items.flatMap((item) =>
-        item.kind === 'symbol' ? [item.symbol] : [],
+    expect(document.documentVersion).toBe('3');
+    const items = document.sections.flatMap((section) => section.items);
+    const methodItem = items.find((item) => item.kind === 'method');
+    const tableItem = items.find((item) => item.kind === 'table');
+    expect(methodItem?.kind).toBe('method');
+    expect(tableItem?.kind).toBe('table');
+    if (methodItem?.kind !== 'method' || tableItem?.kind !== 'table') return;
+    expect(tableItem.casesAxis).toBe(axis);
+    expect(
+      methodItem.quantities.some(
+        (quantity) => quantity.selectionName === selection,
       ),
-    );
-    expect(symbols).toHaveLength(execution.observations.length);
-    expect(new Set(symbols.map((symbol) => symbol.id))).toEqual(
-      new Set(
-        execution.observations.map((observation) => observation.symbolId),
-      ),
-    );
+    ).toBe(true);
+    expect(execution.tables?.[0]?.cells).toHaveLength(6);
+    expect(
+      new Set(execution.tables?.[0]?.cells.map((cell) => cell.caseInvocationId)),
+    ).toEqual(new Set(['root/baseline_section', 'root/candidate_section']));
     for (const invocation of ['baseline_section', 'candidate_section']) {
-      expect(symbols.map((symbol) => symbol.id)).toContain(
+      expect(execution.observations.map((observation) => observation.symbolId)).toContain(
         JSON.stringify(['symbol', `root/${invocation}`, unreturned]),
       );
     }
-    expect(symbols.some((symbol) => symbol.glyph.includes('bs'))).toBe(true);
-    expect(symbols.some((symbol) => symbol.glyph.includes('cs'))).toBe(true);
+    const sourceSymbols = [
+      ...execution.cso.sections.flatMap((section) => section.items),
+      ...(execution.cso.detachedItems ?? []),
+    ].flatMap((item) => (item.kind === 'symbol' ? [item.symbol.glyph] : []));
+    expect(sourceSymbols.some((glyph) => glyph.includes('bs'))).toBe(true);
+    expect(sourceSymbols.some((glyph) => glyph.includes('cs'))).toBe(true);
   },
 );
 

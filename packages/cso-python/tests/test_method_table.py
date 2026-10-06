@@ -136,6 +136,42 @@ class MethodTableCaptureTest(unittest.TestCase):
             self.assertEqual(response["diagnostics"][0]["code"], "INVALID_METHOD")
             run.assert_not_called()
 
+    def test_method_keeps_a_quantity_declared_inside_a_document_section(self):
+        (self.root / "grouped.cso.py").write_text(
+            '''from typing import Annotated, TypeAlias
+from cso_python import CalculationResults, calculation, document_section, section, symbol
+
+Width: TypeAlias = Annotated[float, symbol(glyph="w", description="Width", unit="m")]
+
+@calculation(id="grouped", title="Grouped geometry")
+@section(id="grouped-geometry", title="Grouped geometry")
+def grouped(width: Width) -> CalculationResults:
+    with document_section(id="inner", title="Inner"):
+        inner: Annotated[float, symbol(glyph="I", description="Inner", unit="m")] = width
+    return {"inner": inner}
+'''
+        )
+        (self.root / "grouped_compare.cso.py").write_text(
+            '''from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.grouped import grouped
+
+@calculation(id="compare", title="Grouped comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="grouped-method", calculation=grouped, title="How the grouped result is calculated")
+    case = grouped(width=2.0)
+    table(id="grouped-results", method="grouped-method", title="Grouped results", cases={"Case": case}, outputs=("inner",))
+    ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = case["inner"]
+    return {"ready": ready}
+'''
+        )
+        generate(self.root)
+        response = execute(self.root / "grouped_compare.cso.py", "compare", {})
+        self.assertTrue(response["ok"], response)
+        names = [item["selectionName"] for item in response["execution"]["methods"][0]["quantities"]]
+        self.assertIn("inner", names)
+
     def test_column_table_binds_equal_areas_without_a_representative_method_case(self):
         self.write_compare(
             '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")

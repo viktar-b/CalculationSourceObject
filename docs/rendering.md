@@ -63,7 +63,22 @@ Version 1 prepared JSON is rejected. Regenerate saved documents with
 `prepareLegacyDocument` from the original CSO, asset manifest and captured assets.
 Reattach historical reviews through the preparation options. Synthetic documents
 constructed directly must provide context arrays and symbol operand arrays.
-Update core and React together; source CSO and execution versions are unchanged.
+Update core and React together. A prepared document is version 3 only when it
+contains a method or table; otherwise it remains version 2. Source CSO schema
+`1.1.0` and execution protocol 3 follow the same rule. Rebuild that document
+from the captured execution rather than rewriting old evidence.
+
+A comparison is one logical table. On screen it scrolls horizontally and keeps
+the identifying column visible. Print divides the authored column axis into
+parts that fit the page width, then continues a tall part onto later pages.
+Each part repeats the identifying labels, group context and qualifications
+needed to read that part. A single column or row that cannot fit at report
+type size fails checked publication with `DOCUMENT_LAYOUT_OVERFLOW` and leaves
+an existing output file unchanged. Publication does not shrink type, clip a
+column, drop a case or switch orientation. Extracted page text is layout
+evidence. Inspect every delivered PDF page before treating the report as
+visually accepted. See [ADR 0009](adr/0009-shared-calculation-method-plan.md)
+and [ADR 0010](adr/0010-applicability-and-numerical-execution.md).
 
 The pure preparer receives captured data URLs and validates their binding to
 the execution. The [CLI](../packages/cso-cli/src/assets.ts) owns file containment,
