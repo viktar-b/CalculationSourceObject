@@ -239,6 +239,12 @@ export type PreparedMethodContent =
       localId: string;
       explanation: string;
       predicateText: string;
+    }
+  | {
+      kind: 'applicability';
+      localId: string;
+      explanation: string;
+      predicateText: string;
     };
 export type PreparedMethodHelper = {
   id: string;
@@ -286,6 +292,12 @@ const PreparedMethodContentSchema: z.ZodType<PreparedMethodContent> = z.lazy(
         explanation: NonemptyStringSchema,
         predicateText: NonemptyStringSchema,
       }),
+      z.strictObject({
+        kind: z.literal('applicability'),
+        localId: NonemptyStringSchema,
+        explanation: NonemptyStringSchema,
+        predicateText: NonemptyStringSchema,
+      }),
     ]),
 );
 const PreparedMethodHelperSchema: z.ZodType<PreparedMethodHelper> = z.lazy(() =>
@@ -296,12 +308,17 @@ const PreparedMethodHelperSchema: z.ZodType<PreparedMethodHelper> = z.lazy(() =>
     helpers: z.array(PreparedMethodHelperSchema),
   }),
 );
+const ApplicabilityNoteSchema = z.strictObject({
+  state: z.literal('not-applicable'),
+  reasons: z.array(NonemptyStringSchema).min(1),
+});
 const PreparedTableCellSchema = z.strictObject({
   heading: NonemptyStringSchema,
   invocationId: NonemptyStringSchema,
   symbolId: NonemptyStringSchema,
   value: z.number().finite(),
   numericKind: z.enum(['int', 'float']),
+  applicability: ApplicabilityNoteSchema.optional(),
 });
 const PreparedTableRowSchema = z.strictObject({
   quantity: NonemptyStringSchema,
@@ -323,6 +340,7 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
     kind: z.literal('symbol'),
     operands: OperandContextSchema,
     symbol: CalculationSourceSymbolSchema,
+    applicability: ApplicabilityNoteSchema.optional(),
     contextSource: HistoricalJsonObjectSchema.optional(),
     ...placementFields,
   }),
@@ -330,6 +348,7 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
     kind: z.literal('symbolRef'),
     operands: OperandContextSchema,
     id: NonemptyStringSchema,
+    applicability: ApplicabilityNoteSchema.optional(),
     contextSource: HistoricalJsonObjectSchema.optional(),
     ...placementFields,
   }),
@@ -405,6 +424,27 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
                 heading: NonemptyStringSchema,
                 invocationId: NonemptyStringSchema,
                 value: z.boolean(),
+                reasons: z.array(NonemptyStringSchema).min(1).optional(),
+              }),
+            )
+            .min(1),
+        }),
+      )
+      .min(1)
+      .optional(),
+    applicabilityNotes: z
+      .array(
+        z.strictObject({
+          id: NonemptyStringSchema,
+          explanation: NonemptyStringSchema,
+          predicateText: NonemptyStringSchema,
+          results: z
+            .array(
+              z.strictObject({
+                heading: NonemptyStringSchema,
+                invocationId: NonemptyStringSchema,
+                value: z.boolean(),
+                reasons: z.array(NonemptyStringSchema).min(1).optional(),
               }),
             )
             .min(1),
@@ -429,6 +469,7 @@ export const PreparedDocumentSectionSchema = z.strictObject({
         explanation: NonemptyStringSchema,
         predicateText: NonemptyStringSchema,
         value: z.boolean(),
+        reasons: z.array(NonemptyStringSchema).min(1).optional(),
       }),
     )
     .min(1)

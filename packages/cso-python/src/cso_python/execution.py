@@ -14,7 +14,11 @@ import types
 from pathlib import Path
 from typing import Any
 
-from .comparison import collect_branch_outcomes, collect_check_outcomes
+from .comparison import (
+    collect_applicability_outcomes,
+    collect_branch_outcomes,
+    collect_check_outcomes,
+)
 from .exporter import authored_output_to_stderr
 from .glyphs import qualify_glyphs
 from .planner import Planner
@@ -370,6 +374,9 @@ class Execution:
             check_outcomes = collect_check_outcomes(self.planner)
             if check_outcomes:
                 execution["checkOutcomes"] = check_outcomes
+            applicability_outcomes = collect_applicability_outcomes(self.planner)
+            if applicability_outcomes:
+                execution["applicabilityOutcomes"] = applicability_outcomes
         return {
             "protocolVersion": protocol,
             "ok": True,

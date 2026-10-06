@@ -723,6 +723,7 @@ def convert_annotated_python(
         "method",
         "table",
         "check",
+        "applicable",
     }
     legacy_authoring_imports = {
         "CalculationFunction", "CalculationResults", "CalculationSpec",

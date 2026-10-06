@@ -114,7 +114,7 @@ def _place_method(planner, inv, call: ast.Call, section: Json, ids: set[str]) ->
         )
     plan = planner.ensure_plan(inv, target, function_name)
     quantities = _quantities(planner, inv, target, definition, plan, call)
-    content, helpers, checks = _method_content(
+    content, helpers, checks, applicability = _method_content(
         planner,
         inv,
         target,
@@ -145,6 +145,8 @@ def _place_method(planner, inv, call: ast.Call, section: Json, ids: set[str]) ->
     }
     if checks:
         record["checks"] = checks
+    if applicability:
+        record["applicability"] = applicability
     ids.add(method_id)
     planner.method_index[(inv.id, local_id)] = record
     planner.methods.append(record)
@@ -308,7 +310,7 @@ def _method_content(
     at: ast.AST,
     stack: set[tuple[str, str]],
     cache: dict[tuple[str, str], Json],
-) -> tuple[list[Json], list[Json], list[Json]]:
+) -> tuple[list[Json], list[Json], list[Json], list[Json]]:
     glyphs = {
         item["selectionName"] if item["role"] == "input" else item["variableName"]: item["glyph"]
         for item in quantities
@@ -322,6 +324,7 @@ def _method_content(
     ]
     helpers: list[Json] = []
     checks: list[Json] = []
+    applicability: list[Json] = []
     _walk_steps(
         planner,
         inv,
@@ -336,6 +339,7 @@ def _method_content(
         cache,
         at,
         checks,
+        applicability,
         {item["variableName"] for item in quantities},
     )
     seen = _content_variables(content)
@@ -346,7 +350,7 @@ def _method_content(
             "UNSUPPORTED_METHOD_CONTENT",
             "Method content must include every explained quantity",
         )
-    return content, helpers, checks
+    return content, helpers, checks, applicability
 
 
 def _walk_steps(
@@ -363,6 +367,7 @@ def _walk_steps(
     cache: dict[tuple[str, str], Json],
     at: ast.AST,
     checks: list[Json],
+    applicability: list[Json],
     names: set[str],
 ) -> None:
     for step in steps:
@@ -396,6 +401,7 @@ def _walk_steps(
                 cache,
                 at,
                 checks,
+                applicability,
                 names,
             )
             content.append(
@@ -430,12 +436,23 @@ def _walk_steps(
                 data = kwargs(node.value, module.id, {"id", "content"}, {"id", "content"})
                 content.append({"kind": "text", "localId": data["id"], "content": data["content"]})
                 continue
-            if name == "check":
+            if name in {"check", "applicable"}:
                 declared = _check_declaration(
-                    planner, inv, module, definition, glyphs, node.value, names, checks
+                    planner,
+                    inv,
+                    module,
+                    definition,
+                    glyphs,
+                    node.value,
+                    names,
+                    checks if name == "check" else applicability,
                 )
-                checks.append(declared)
-                content.append({"kind": "check", "localId": declared["id"]})
+                if name == "check":
+                    checks.append(declared)
+                    content.append({"kind": "check", "localId": declared["id"]})
+                else:
+                    applicability.append(declared)
+                    content.append({"kind": "applicability", "localId": declared["id"]})
                 continue
             if name == "figure":
                 data = kwargs(
@@ -507,7 +524,7 @@ def _helper(planner, inv, module, described: Json, owner_id: str, stack, cache, 
     helper_id = identity("method", owner_id, f"{loaded.id}::{function_name}")
     stack.add(key)
     quantities = _quantities(planner, inv, loaded, definition, plan, at)
-    content, nested, helper_checks = _method_content(
+    content, nested, helper_checks, helper_applicability = _method_content(
         planner,
         inv,
         loaded,
@@ -533,6 +550,8 @@ def _helper(planner, inv, module, described: Json, owner_id: str, stack, cache, 
     }
     if helper_checks:
         record["checks"] = helper_checks
+    if helper_applicability:
+        record["applicability"] = helper_applicability
     cache[key] = record
     stack.remove(key)
     return record
@@ -783,6 +802,34 @@ def _string_tuple(planner, inv, keyword: ast.keyword) -> list[str]:
             planner.error(inv, item, "INVALID_METHOD", "targets must be a nonempty tuple of quantity names")
         names.append(item.value)
     return names
+
+
+def collect_applicability_outcomes(planner) -> list[Json]:
+    """Record applicability predicates from the single captured execution."""
+    outcomes: list[Json] = []
+    invocations = list(planner.invocations)
+
+    def walk(plan: Json) -> None:
+        for condition in plan.get("applicability") or []:
+            for invocation in invocations:
+                if invocation.function.name != plan["function"] or invocation.module.id != plan["moduleId"]:
+                    continue
+                value, used = _check_value(condition["nodes"], _named_values(invocation))
+                outcomes.append(
+                    {
+                        "methodId": plan["id"],
+                        "invocationId": invocation.id,
+                        "applicabilityId": condition["id"],
+                        "value": value,
+                        "usedKeys": sorted(used),
+                    }
+                )
+        for helper in plan.get("helpers") or []:
+            walk(helper)
+
+    for method in planner.methods:
+        walk(method)
+    return outcomes
 
 
 def collect_check_outcomes(planner) -> list[Json]:

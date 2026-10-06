@@ -894,6 +894,12 @@ class Planner:
             elif (
                 isinstance(node, ast.Expr)
                 and isinstance(node.value, ast.Call)
+                and authoring_name(node.value.func) == "applicable"
+            ):
+                continue
+            elif (
+                isinstance(node, ast.Expr)
+                and isinstance(node.value, ast.Call)
                 and authoring_name(node.value.func) in {"text", "figure"}
             ):
                 self.content(inv, node, section, ids)

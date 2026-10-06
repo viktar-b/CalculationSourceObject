@@ -278,6 +278,130 @@ export function reproducePredicate(
     : { value, usedKeys: [...used].sort() };
 }
 
+const usedDependencies = (
+  nodes: readonly FormulaNode[],
+  rootKey: string,
+  identify: (node: FormulaNode) => string | undefined,
+  measure: (node: FormulaNode) => number | undefined,
+): readonly string[] | undefined => {
+  const byKey = new Map(nodes.map((node) => [node.key, node]));
+  const dependencies = new Set<string>();
+  const predicate = (key: string): boolean | undefined => {
+    const node = byKey.get(key);
+    const operation = node ? functionId(node) : undefined;
+    const keys = node ? argumentKeys(node) : [];
+    if (!node || !operation || keys.length === 0) return undefined;
+    if (operation === 'fg.and') {
+      for (const argument of keys) {
+        const value = predicate(argument);
+        if (value === undefined) return undefined;
+        if (!value) return false;
+      }
+      return true;
+    }
+    if (operation === 'fg.or') {
+      for (const argument of keys) {
+        const value = predicate(argument);
+        if (value === undefined) return undefined;
+        if (value) return true;
+      }
+      return false;
+    }
+    const compare = comparisons[operation];
+    if (!compare) return undefined;
+    const left = numberValue(keys[0] ?? '');
+    const right = numberValue(keys[1] ?? '');
+    if (left === undefined || right === undefined) return undefined;
+    return compare(left, right);
+  };
+  const numberValue = (key: string): number | undefined => {
+    const node = byKey.get(key);
+    if (!node?.mode) return undefined;
+    if (node.mode === 'LITERAL') return literalNumber(node);
+    if (node.mode === 'SYMBOL') {
+      const identity = identify(node);
+      if (identity === undefined) return undefined;
+      dependencies.add(identity);
+      return measure(node);
+    }
+    const operation = functionId(node);
+    const keys = argumentKeys(node);
+    if (operation === 'fg.cnd') {
+      const selected = predicate(keys[0] ?? '');
+      if (selected === undefined) return undefined;
+      return numberValue(keys[selected ? 1 : 2] ?? '');
+    }
+    if (operation === 'fg.uminus') {
+      const value = numberValue(keys[0] ?? '');
+      return value === undefined ? undefined : -value;
+    }
+    if (!operation) return undefined;
+    const left = numberValue(keys[0] ?? '');
+    const right = numberValue(keys[1] ?? '');
+    if (left === undefined || right === undefined) return undefined;
+    if (operation === 'fg.add') return left + right;
+    if (operation === 'fg.subtract') return left - right;
+    if (operation === 'fg.multiply') return left * right;
+    if (operation === 'fg.divide') return left / right;
+    if (operation === 'fg.pow') return left ** right;
+    return keys.every((argument) => numberValue(argument) !== undefined)
+      ? 0
+      : undefined;
+  };
+  const visit = (key: string): boolean => {
+    const node = byKey.get(key);
+    if (!node?.mode) return false;
+    if (node.mode === 'LITERAL' || node.mode === 'GIVEN_PARAMETER') return true;
+    if (node.mode === 'SYMBOL') {
+      const identity = identify(node);
+      if (identity === undefined) return false;
+      dependencies.add(identity);
+      return true;
+    }
+    const operation = functionId(node);
+    const keys = argumentKeys(node);
+    if (operation === 'fg.cnd') {
+      const selected = predicate(keys[0] ?? '');
+      if (selected === undefined) return false;
+      return visit(keys[selected ? 1 : 2] ?? '');
+    }
+    return keys.every((argument) => visit(argument));
+  };
+  return visit(rootKey) ? [...dependencies] : undefined;
+};
+
+export function usedSymbolIds(
+  nodes: readonly FormulaNode[],
+  rootKey: string,
+  values: ReadonlyMap<string, number>,
+): readonly string[] | undefined {
+  return usedDependencies(
+    nodes,
+    rootKey,
+    (node) => symbolId(node),
+    (node) => {
+      const id = symbolId(node);
+      return id === undefined ? undefined : values.get(id);
+    },
+  );
+}
+
+export function usedReferenceNames(
+  nodes: readonly FormulaNode[],
+  rootKey: string,
+  values: ReadonlyMap<string, number>,
+): readonly string[] | undefined {
+  return usedDependencies(
+    nodes,
+    rootKey,
+    (node) => reference(node).name,
+    (node) => {
+      const name = reference(node).name;
+      return name === undefined ? undefined : values.get(name);
+    },
+  );
+}
+
 export function branchLabel(
   nodes: readonly FormulaNode[],
   glyphs: ReadonlyMap<string, string>,

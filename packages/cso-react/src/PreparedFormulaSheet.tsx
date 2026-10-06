@@ -90,12 +90,15 @@ export const PreparedFormulaSheet = ({
       items: readonly PreparedMethodContent[],
     ): ReactElement[] =>
       items.map((item, index) => {
-        if (item.kind === 'check') {
+        if (item.kind === 'check' || item.kind === 'applicability') {
           return (
             <p
-              key={`check-${item.localId}-${index}`}
+              key={`${item.kind}-${item.localId}-${index}`}
               className="cso-branch-note"
-              data-check={item.localId}
+              data-check={item.kind === 'check' ? item.localId : undefined}
+              data-applicability={
+                item.kind === 'applicability' ? item.localId : undefined
+              }
               data-formula={item.predicateText}
             >
               {item.explanation} {item.predicateText}
@@ -206,10 +209,14 @@ export const PreparedFormulaSheet = ({
           key={check.id}
           className="cso-branch-note"
           data-check={check.id}
-          data-check-result={check.value ? 'pass' : 'fail'}
+          data-check-result={
+            check.reasons ? 'not-applicable' : check.value ? 'pass' : 'fail'
+          }
           data-formula={check.predicateText}
         >
-          {check.explanation} {check.predicateText}
+          {check.reasons
+            ? `Not applicable. ${check.reasons.join(' ')}`
+            : `${check.explanation} ${check.predicateText}`}
         </p>
       ))}
       {section.items.map((item) => {
@@ -288,6 +295,9 @@ export const PreparedFormulaSheet = ({
             );
             const cellText = (value: number) =>
               Object.is(value, -0) ? '-0' : value;
+            const shownCell = (
+              cell: (typeof item.groups)[number]['rows'][number]['cells'][number],
+            ) => (cell.applicability ? 'Not applicable' : cellText(cell.value));
             return (
               <div
                 key={item.sourcePlacementId}
@@ -303,11 +313,39 @@ export const PreparedFormulaSheet = ({
                       key={`${check.id}-${result.invocationId}`}
                       className="cso-branch-note"
                       data-check={check.id}
-                      data-check-result={result.value ? 'pass' : 'fail'}
+                      data-check-result={
+                        result.reasons
+                          ? 'not-applicable'
+                          : result.value
+                            ? 'pass'
+                            : 'fail'
+                      }
                       data-case={result.heading}
                       data-formula={check.predicateText}
                     >
-                      {result.heading}: {check.explanation}
+                      {result.heading}:{' '}
+                      {result.reasons
+                        ? `Not applicable. ${result.reasons.join(' ')}`
+                        : check.explanation}
+                    </p>
+                  )),
+                )}
+                {item.applicabilityNotes?.map((condition) =>
+                  condition.results.map((result) => (
+                    <p
+                      key={`${condition.id}-${result.invocationId}`}
+                      className="cso-branch-note"
+                      data-applicability={condition.id}
+                      data-applicability-result={
+                        result.value ? 'applicable' : 'not-applicable'
+                      }
+                      data-case={result.heading}
+                      data-formula={condition.predicateText}
+                    >
+                      {result.heading}:{' '}
+                      {result.reasons
+                        ? `Not applicable. ${result.reasons.join(' ')}`
+                        : condition.explanation}
                     </p>
                   )),
                 )}
@@ -380,8 +418,14 @@ export const PreparedFormulaSheet = ({
                                   data-quantity={row.quantity}
                                   data-case={caseItem.heading}
                                   data-symbol-id={cell.symbolId}
+                                  data-value={cell.value}
+                                  data-applicability={
+                                    cell.applicability
+                                      ? 'not-applicable'
+                                      : undefined
+                                  }
                                 >
-                                  {cellText(cell.value)}
+                                  {shownCell(cell)}
                                 </td>
                               );
                             }),
@@ -428,8 +472,14 @@ export const PreparedFormulaSheet = ({
                                   data-quantity={row.quantity}
                                   data-case={cell.heading}
                                   data-symbol-id={cell.symbolId}
+                                  data-value={cell.value}
+                                  data-applicability={
+                                    cell.applicability
+                                      ? 'not-applicable'
+                                      : undefined
+                                  }
                                 >
-                                  {cellText(cell.value)}
+                                  {shownCell(cell)}
                                 </td>
                               ))}
                             </tr>
@@ -456,6 +506,15 @@ export const PreparedFormulaSheet = ({
                 className="cso-symbol-placement"
               >
                 <EngineeringMetadata entries={item.context} />
+                {'applicability' in item && item.applicability ? (
+                  <p
+                    className="cso-branch-note"
+                    data-applicability="not-applicable"
+                    data-symbol-id={symbolId}
+                  >
+                    Not applicable. {item.applicability.reasons.join(' ')}
+                  </p>
+                ) : null}
                 {item.operands.map(({ symbolId: id, context }) => (
                   <EngineeringMetadata
                     key={id}

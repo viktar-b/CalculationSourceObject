@@ -228,7 +228,8 @@ export type MethodContentItem =
       title: string;
       content: MethodContentItem[];
     }
-  | { kind: 'check'; localId: string };
+  | { kind: 'check'; localId: string }
+  | { kind: 'applicability'; localId: string };
 export type EngineeringCheck = {
   id: string;
   targets: string[];
@@ -248,6 +249,7 @@ export type MethodHelperRecord = {
   content: MethodContentItem[];
   helpers: MethodHelperRecord[];
   checks?: EngineeringCheck[];
+  applicability?: EngineeringCheck[];
 };
 const MethodContentSchema: z.ZodType<MethodContentItem> = z.lazy(() =>
   z.discriminatedUnion('kind', [
@@ -289,6 +291,10 @@ const MethodContentSchema: z.ZodType<MethodContentItem> = z.lazy(() =>
       kind: z.literal('check'),
       localId: NonemptyStringSchema,
     }),
+    z.strictObject({
+      kind: z.literal('applicability'),
+      localId: NonemptyStringSchema,
+    }),
   ]),
 );
 const EngineeringCheckSchema = z.strictObject({
@@ -311,6 +317,7 @@ const MethodHelperSchema: z.ZodType<MethodHelperRecord> = z.lazy(() =>
     content: z.array(MethodContentSchema).min(1),
     helpers: z.array(MethodHelperSchema),
     checks: z.array(EngineeringCheckSchema).min(1).optional(),
+    applicability: z.array(EngineeringCheckSchema).min(1).optional(),
   }),
 );
 const MethodPlanSchema = z.strictObject({
@@ -329,6 +336,7 @@ const MethodPlanSchema = z.strictObject({
   content: z.array(MethodContentSchema).min(1),
   helpers: z.array(MethodHelperSchema),
   checks: z.array(EngineeringCheckSchema).min(1).optional(),
+  applicability: z.array(EngineeringCheckSchema).min(1).optional(),
   location: SourceSpanSchema,
 });
 const BoundCellSchema = z.strictObject({
@@ -373,6 +381,13 @@ const CheckOutcomeSchema = z.strictObject({
   value: z.boolean(),
   usedKeys: z.array(NonemptyStringSchema).min(1),
 });
+const ApplicabilityOutcomeSchema = z.strictObject({
+  methodId: IdentityStringSchema,
+  invocationId: IdentityStringSchema,
+  applicabilityId: NonemptyStringSchema,
+  value: z.boolean(),
+  usedKeys: z.array(NonemptyStringSchema).min(1),
+});
 
 const ExecutionPayloadBaseSchema = z
   .object({
@@ -393,6 +408,10 @@ const ExecutionPayloadBaseSchema = z
     tables: z.array(LogicalTableSchema).min(1).optional(),
     branchOutcomes: z.array(BranchOutcomeSchema).min(1).optional(),
     checkOutcomes: z.array(CheckOutcomeSchema).min(1).optional(),
+    applicabilityOutcomes: z
+      .array(ApplicabilityOutcomeSchema)
+      .min(1)
+      .optional(),
     assets: z.array(AssetRecordSchema),
     versions: VersionsSchema,
   })
@@ -1873,6 +1892,30 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
       usedKeys: readonly string[];
     }[] = [];
     let checksReproduced = true;
+    const expectedApplicability: {
+      methodId: string;
+      invocationId: string;
+      applicabilityId: string;
+      value: boolean;
+      usedKeys: readonly string[];
+    }[] = [];
+    let applicabilityReproduced = true;
+    const namedValues = (
+      invocation: (typeof execution.invocations)[number],
+    ) => {
+      const values = new Map<string, number>();
+      for (const [name, value] of Object.entries(invocation.resolvedInputs)) {
+        if (typeof value === 'number') values.set(name, value);
+      }
+      for (const definition of invocation.symbols) {
+        const symbol = symbolsById.get(definition.symbolId);
+        const result = symbol?.valueTree.result;
+        if (result?.kind === 'number') {
+          values.set(definition.variableName, result.value);
+        }
+      }
+      return values;
+    };
     const visitPlans = (plan: MethodHelperRecord): void => {
       const seen = new Set<string>();
       for (const check of plan.checks ?? []) {
@@ -1885,18 +1928,10 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
           ) {
             continue;
           }
-          const values = new Map<string, number>();
-          for (const definition of invocation.symbols) {
-            const symbol = symbolsById.get(definition.symbolId);
-            const result = symbol?.valueTree.result;
-            if (result?.kind === 'number') {
-              values.set(definition.variableName, result.value);
-            }
-          }
           const reproduced = reproducePredicate(
             check.nodes,
             check.nodes[0]?.key ?? '',
-            values,
+            namedValues(invocation),
           );
           if (!reproduced) {
             checksReproduced = false;
@@ -1906,6 +1941,35 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
             methodId: plan.id,
             invocationId: invocation.id,
             checkId: check.id,
+            value: reproduced.value,
+            usedKeys: reproduced.usedKeys,
+          });
+        }
+      }
+      const seenApplicability = new Set<string>();
+      for (const condition of plan.applicability ?? []) {
+        if (seenApplicability.has(condition.id)) applicabilityReproduced = false;
+        seenApplicability.add(condition.id);
+        for (const invocation of execution.invocations) {
+          if (
+            invocation.function !== plan.function ||
+            invocation.moduleId !== plan.moduleId
+          ) {
+            continue;
+          }
+          const reproduced = reproducePredicate(
+            condition.nodes,
+            condition.nodes[0]?.key ?? '',
+            namedValues(invocation),
+          );
+          if (!reproduced) {
+            applicabilityReproduced = false;
+            continue;
+          }
+          expectedApplicability.push({
+            methodId: plan.id,
+            invocationId: invocation.id,
+            applicabilityId: condition.id,
             value: reproduced.value,
             usedKeys: reproduced.usedKeys,
           });
@@ -1942,6 +2006,41 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
         'CHECK_OUTCOME_MISMATCH',
         ['checkOutcomes'],
         'Engineering checks must reproduce the captured predicate exactly',
+      );
+    }
+    const recordedApplicability = execution.applicabilityOutcomes ?? [];
+    const applicabilityIdentity = (item: {
+      methodId: string;
+      invocationId: string;
+      applicabilityId: string;
+      value: boolean;
+      usedKeys: readonly string[];
+    }) =>
+      JSON.stringify([
+        item.methodId,
+        item.invocationId,
+        item.applicabilityId,
+        item.value,
+        item.usedKeys,
+      ]);
+    const recordedApplicabilityIdentities = recordedApplicability
+      .map(applicabilityIdentity)
+      .sort();
+    const expectedApplicabilityIdentities = expectedApplicability
+      .map(applicabilityIdentity)
+      .sort();
+    if (
+      !applicabilityReproduced ||
+      recordedApplicabilityIdentities.length !==
+        expectedApplicabilityIdentities.length ||
+      recordedApplicabilityIdentities.some(
+        (item, index) => item !== expectedApplicabilityIdentities[index],
+      )
+    ) {
+      issue(
+        'APPLICABILITY_OUTCOME_MISMATCH',
+        ['applicabilityOutcomes'],
+        'Applicability conditions must reproduce the captured predicate exactly',
       );
     }
     const ownedCases = new Set<string>();

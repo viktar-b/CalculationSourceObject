@@ -23,6 +23,7 @@ HELPERS = {
     "method",
     "table",
     "check",
+    "applicable",
     "documented_result",
     "calculation_call",
     "text",

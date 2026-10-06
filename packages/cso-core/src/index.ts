@@ -248,6 +248,7 @@ export {
   type ResolvedAsset,
 } from './contracts/document.ts';
 export { verifyExecution } from './verification/verify.ts';
+export { deriveApplicability } from './verification/applicability.ts';
 
 export {
   AuthoringEvidenceSchema,

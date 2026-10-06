@@ -6,6 +6,7 @@ import {
   type CalculationSourceSectionItem,
   contractIssuesToDiagnostics,
   type Diagnostic,
+  deriveApplicability,
   type ExecutionPayload,
   ExecutionPayloadSchema,
   executionBindingFrom,
@@ -460,8 +461,19 @@ const resolveExecutionPlacementProvenance = (
   };
 };
 
+const applicabilityField = (reasons: readonly string[] | undefined) =>
+  reasons && reasons.length > 0
+    ? {
+        applicability: {
+          state: 'not-applicable' as const,
+          reasons: [...reasons],
+        },
+      }
+    : {};
+
 const sectionChecks = (execution: ExecutionPayload, invocationId: unknown) => {
   if (typeof invocationId !== 'string') return {};
+  const derived = deriveApplicability(execution);
   type CheckPlan = {
     id: string;
     checks?: readonly {
@@ -491,6 +503,12 @@ const sectionChecks = (execution: ExecutionPayload, invocationId: unknown) => {
               explanation: check.explanation,
               predicateText: check.predicateText,
               value: outcome.value,
+              ...(() => {
+                const reasons = derived.reasonsByCheck.get(
+                  `${invocationId}|${check.id}`,
+                );
+                return reasons ? { reasons: [...reasons] } : {};
+              })(),
             },
           ]
         : [];
@@ -537,6 +555,9 @@ const presentedCell = (
       symbolId: cell.symbolId,
       value,
       numericKind: numericKind as 'int' | 'float',
+      ...applicabilityField(
+        deriveApplicability(execution).reasonsBySymbolId.get(cell.symbolId),
+      ),
     };
   }
   const output = execution.authoring?.outputs.find(
@@ -557,6 +578,9 @@ const presentedCell = (
     symbolId: cell.symbolId,
     value: output.value,
     numericKind: output.numericKind as 'int' | 'float',
+    ...applicabilityField(
+      deriveApplicability(execution).reasonsBySymbolId.get(cell.symbolId),
+    ),
   };
 };
 
@@ -566,18 +590,21 @@ const presentMethodContent = (
   quantities: MethodRecord['quantities'],
   content: MethodRecord['content'],
   checks: NonNullable<MethodRecord['checks']> = [],
+  applicability: NonNullable<MethodRecord['applicability']> = [],
 ): PreparedMethodContent[] =>
   content.map((item) => {
-    if (item.kind === 'check') {
-      const check = checks.find((candidate) => candidate.id === item.localId);
-      if (!check) {
-        fail('UNKNOWN_QUANTITY', `Check '${item.localId}' is missing`);
+    if (item.kind === 'check' || item.kind === 'applicability') {
+      const declared = (item.kind === 'check' ? checks : applicability).find(
+        (candidate) => candidate.id === item.localId,
+      );
+      if (!declared) {
+        fail('UNKNOWN_QUANTITY', `Condition '${item.localId}' is missing`);
       }
       return {
-        kind: 'check',
+        kind: item.kind,
         localId: item.localId,
-        explanation: check.explanation,
-        predicateText: check.predicateText,
+        explanation: declared.explanation,
+        predicateText: declared.predicateText,
       };
     }
     if (item.kind === 'quantity') {
@@ -602,7 +629,12 @@ const presentMethodContent = (
         kind: 'section',
         localId: item.localId,
         title: item.title,
-        content: presentMethodContent(quantities, item.content, checks),
+        content: presentMethodContent(
+          quantities,
+          item.content,
+          checks,
+          applicability,
+        ),
       };
     }
     return item;
@@ -618,6 +650,7 @@ const presentMethodHelpers = (
       helper.quantities,
       helper.content,
       helper.checks ?? [],
+      helper.applicability ?? [],
     ),
     helpers: presentMethodHelpers(helper.helpers),
   }));
@@ -700,6 +733,7 @@ const comparisonPlacement = (
         method.quantities,
         method.content,
         method.checks ?? [],
+        method.applicability ?? [],
       ),
       helpers: presentMethodHelpers(method.helpers),
       ...placement,
@@ -758,6 +792,12 @@ const comparisonPlacement = (
               heading: caseItem.heading,
               invocationId: caseItem.invocationId,
               value: outcome.value,
+              ...(() => {
+                const reasons = deriveApplicability(
+                  execution,
+                ).reasonsByCheck.get(`${caseItem.invocationId}|${check.id}`);
+                return reasons ? { reasons: [...reasons] } : {};
+              })(),
             },
           ]
         : [];
@@ -773,6 +813,44 @@ const comparisonPlacement = (
         ]
       : [];
   });
+  const applicabilityPlans = [
+    method,
+    ...method.helpers.flatMap(function walk(
+      helper: (typeof method.helpers)[number],
+    ): (typeof method.helpers)[number][] {
+      return [helper, ...helper.helpers.flatMap(walk)];
+    }),
+  ];
+  const applicabilityNotes = applicabilityPlans.flatMap((plan) =>
+    (plan.applicability ?? []).flatMap((condition) => {
+      const results = table.cases.flatMap((caseItem) =>
+        (execution.applicabilityOutcomes ?? [])
+          .filter(
+            (item) =>
+              item.methodId === plan.id &&
+              item.applicabilityId === condition.id &&
+              (item.invocationId === caseItem.invocationId ||
+                item.invocationId.startsWith(`${caseItem.invocationId}/`)),
+          )
+          .map((outcome) => ({
+            heading: caseItem.heading,
+            invocationId: outcome.invocationId,
+            value: outcome.value,
+            ...(outcome.value ? {} : { reasons: [condition.explanation] }),
+          })),
+      );
+      return results.length > 0
+        ? [
+            {
+              id: condition.id,
+              explanation: condition.explanation,
+              predicateText: condition.predicateText,
+              results,
+            },
+          ]
+        : [];
+    }),
+  );
   return {
     kind: 'table',
     id: item.id,
@@ -780,6 +858,7 @@ const comparisonPlacement = (
     casesAxis: table.casesAxis,
     ...(branchNotes.length > 0 ? { branchNotes } : {}),
     ...(engineeringChecks.length > 0 ? { engineeringChecks } : {}),
+    ...(applicabilityNotes.length > 0 ? { applicabilityNotes } : {}),
     cases: table.cases.map(({ heading, invocationId }) => ({
       heading,
       invocationId,
@@ -881,6 +960,13 @@ export const prepareExecutionDocument = (
         return [
           {
             ...itemFields(item),
+            ...applicabilityField(
+              item.kind === 'symbol' || item.kind === 'symbolRef'
+                ? deriveApplicability(execution).reasonsBySymbolId.get(
+                    item.kind === 'symbol' ? item.symbol.id : item.id,
+                  )
+                : undefined,
+            ),
             context: [],
             contextSource: retainItemContextSource(item, true),
             sourcePlacementId: placementId(section.id, index),

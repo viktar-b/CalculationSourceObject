@@ -128,6 +128,16 @@ def check(
     """Record an engineering criterion without changing the numeric result."""
 
 
+def applicable(
+    *,
+    id: str,
+    targets: tuple[str, ...],
+    explanation: str,
+    predicate: bool,
+) -> None:
+    """Record when a result may be used, without changing the numeric result."""
+
+
 def table(
     *,
     id: str,

@@ -659,6 +659,75 @@ def compare() -> CalculationResults:
             self.assertEqual(response["diagnostics"][0]["code"], "UNKNOWN_QUANTITY")
             run.assert_not_called()
 
+    def test_applicability_keeps_the_number(self):
+        self.write_applicable()
+        execution = self.execution()["execution"]
+        condition = execution["methods"][0]["applicability"][0]
+        self.assertEqual(condition["predicateText"], "A <= 20")
+        self.assertEqual(condition["explanation"], "Area exceeds the method limit.")
+        outcomes = execution["applicabilityOutcomes"]
+        self.assertEqual([item["value"] for item in outcomes], [True, False])
+        self.assertEqual(
+            [
+                symbol_result(execution, item["symbolId"])
+                for item in execution["tables"][0]["cells"]
+                if item["quantity"] == "area"
+            ],
+            [6, 24],
+        )
+
+    def test_failed_check_does_not_create_applicability(self):
+        self.write_checked()
+        self.assertNotIn("applicabilityOutcomes", self.execution()["execution"])
+
+    def test_hidden_quantity_keeps_applicability(self):
+        self.write_applicable(outputs="outputs=()")
+        execution = self.execution()["execution"]
+        self.assertEqual(execution["tables"][0]["outputs"], [])
+        self.assertEqual([item["value"] for item in execution["applicabilityOutcomes"]], [True, False])
+
+    def test_empty_cases_do_not_invent_applicability_outcomes(self):
+        self.write_applicable(cases="{}")
+        execution = self.execution()["execution"]
+        self.assertEqual(execution["methods"][0]["applicability"][0]["id"], "area-limit")
+        self.assertNotIn("applicabilityOutcomes", execution)
+
+    def test_repeated_execution_records_the_same_applicability(self):
+        self.write_applicable()
+        first = execute(self.root / "compare.cso.py", "compare", {})
+        second = execute(self.root / "compare.cso.py", "compare", {})
+        self.assertEqual(
+            first["execution"]["applicabilityOutcomes"],
+            second["execution"]["applicabilityOutcomes"],
+        )
+
+    def test_bare_applicability_predicate_is_diagnosed_before_execution(self):
+        self.write_applicable()
+        path = self.root / "rectangle.cso.py"
+        path.write_text(path.read_text().replace("predicate=area <= 20", "predicate=area"))
+        generate(self.root)
+        with patch.object(Execution, "run") as run:
+            response = execute(self.root / "compare.cso.py", "compare", {})
+            self.assertEqual(response["diagnostics"][0]["code"], "UNSUPPORTED_SYNTAX")
+            run.assert_not_called()
+
+    def test_applicability_exception_stays_a_whole_run_failure(self):
+        self.write_applicable()
+        path = self.root / "rectangle.cso.py"
+        path.write_text(path.read_text().replace("predicate=area <= 20", "predicate=1 / 0 <= area"))
+        generate(self.root)
+        response = execute(self.root / "compare.cso.py", "compare", {})
+        self.assertFalse(response["ok"])
+        self.assertNotIn("execution", response)
+        self.assertNotIn("applicabilityOutcomes", response)
+
+    def test_unknown_applicability_target_is_diagnosed_before_execution(self):
+        self.write_applicable(target="volume")
+        with patch.object(Execution, "run") as run:
+            response = execute(self.root / "compare.cso.py", "compare", {})
+            self.assertEqual(response["diagnostics"][0]["code"], "UNKNOWN_QUANTITY")
+            run.assert_not_called()
+
     def test_conditional_records_exact_selected_branch(self):
         self.write_choice()
         payload = self.execution()["execution"]
@@ -739,6 +808,41 @@ def compare() -> CalculationResults:
             '    return {"area": area, "perimeter": perimeter}',
             f'''    check(id="area-limit", targets=("{target}",), explanation="Area exceeds 20 square metres.", predicate=area <= 20)
     check(id="perimeter-limit", targets=("perimeter",), explanation="Perimeter stays under 100 metres.", predicate=perimeter < 100)
+    return {{"area": area, "perimeter": perimeter}}''',
+        )
+        (self.root / "rectangle.cso.py").write_text(source)
+        if cases == "{}":
+            (self.root / "compare.cso.py").write_text(
+                '''from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.rectangle import rectangle
+
+@calculation(id="compare", title="Rectangle comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+    table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={})
+    ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
+    return {"ready": ready}
+'''
+            )
+        else:
+            suffix = f", {outputs}" if outputs else ""
+            self.write_compare(
+                f'''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+    first_panel = rectangle(width=2.0, height=3.0)
+    second_panel = rectangle(width=8.0, height=3.0)
+    table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={{"Case A": first_panel, "Case B": second_panel}}{suffix})'''
+            )
+        generate(self.root)
+
+    def write_applicable(self, outputs="", cases=None, target="area"):
+        source = RECTANGLE.replace(
+            "from cso_python import CalculationResults, calculation, section, symbol",
+            "from cso_python import CalculationResults, applicable, calculation, section, symbol",
+        ).replace(
+            '    return {"area": area, "perimeter": perimeter}',
+            f'''    applicable(id="area-limit", targets=("{target}",), explanation="Area exceeds the method limit.", predicate=area <= 20)
     return {{"area": area, "perimeter": perimeter}}''',
         )
         (self.root / "rectangle.cso.py").write_text(source)

@@ -8,7 +8,11 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ExecutionResponseSchema, verifyExecution } from '@cs-object/core';
+import {
+  deriveApplicability,
+  ExecutionResponseSchema,
+  verifyExecution,
+} from '@cs-object/core';
 import { prepareExecutionDocument } from '@cs-object/react';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 
@@ -137,6 +141,48 @@ const checkedHidden = checkedCompare.replace(
   'cases={"Case A": first_panel, "Case B": second_panel}, outputs=(), cases_axis="rows"',
 );
 
+const box = `from typing import Annotated, TypeAlias
+from cso_python import CalculationResults, applicable, calculation, check, section, symbol
+
+Width: TypeAlias = Annotated[float, symbol(glyph="w", description="Width", unit="m")]
+Height: TypeAlias = Annotated[float, symbol(glyph="h", description="Height", unit="m")]
+Depth: TypeAlias = Annotated[float, symbol(glyph="d", description="Depth", unit="m")]
+
+@calculation(id="box", title="Box volume")
+@section(id="box-section", title="Box", root=True)
+def box(width: Width, height: Height, depth: Depth) -> CalculationResults:
+    area: Annotated[float, symbol(glyph="A", description="Area", unit="m^2")] = width * height
+    volume: Annotated[float, symbol(glyph="V", description="Volume", unit="m^3")] = area * depth
+    applicable(id="area-limit", targets=("area",), explanation="Area exceeds the method limit.", predicate=area <= 20)
+    applicable(id="second-limit", targets=("area",), explanation="Area also exceeds the second limit.", predicate=area <= 10)
+    applicable(id="passing-limit", targets=("area",), explanation="This passing condition does not clear the others.", predicate=area > 0)
+    check(id="volume-check", targets=("volume",), explanation="Volume exceeds 100 cubic metres.", predicate=volume <= 100)
+    chosen: Annotated[float, symbol(glyph="s", description="Chosen side", unit="m")] = width if width > 0 else area
+    guard: Annotated[float, symbol(glyph="g", description="Guard", unit="")] = 1 if width > 0 and area > 10 else 0
+    return {"area": area, "volume": volume, "chosen": chosen, "guard": guard}
+`;
+
+const limitCompare = `from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.box import box
+
+@calculation(id="compare", title="Box comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="box-method", calculation=box, title="How box results are calculated")
+    first_panel = box(width=2.0, height=3.0, depth=2.0)
+    second_panel = box(width=8.0, height=3.0, depth=2.0)
+    extra_panel = box(width=-8.0, height=-3.0, depth=2.0)
+    table(id="box-results", method="box-method", title="Box comparison", cases={"Case A": first_panel, "Case B": second_panel}, cases_axis="rows")
+    compared: Annotated[float, symbol(glyph="R", description="Compared volume", unit="m^3")] = first_panel["volume"]
+    return {"compared": compared}
+`;
+
+const limitHidden = limitCompare.replace(
+  'cases={"Case A": first_panel, "Case B": second_panel}, cases_axis="rows"',
+  'cases={"Case A": first_panel, "Case B": second_panel}, outputs=(), cases_axis="rows"',
+);
+
 const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
   'base64',
@@ -194,6 +240,37 @@ def compare() -> CalculationResults:
     return {"compared": compared}
 `;
 
+const limitedMargin = margin
+  .replace(
+    'from cso_python import CalculationResults, calculation, section, symbol, text',
+    'from cso_python import CalculationResults, applicable, calculation, section, symbol, text',
+  )
+  .replace(
+    '    text(id="assumption", content="The margin is one metre.")',
+    `    applicable(id="length-limit", targets=("length",), explanation="Length exceeds the margin limit.", predicate=length <= 5)
+    text(id="assumption", content="The margin is one metre.")`,
+  );
+
+const limitedPanel = panel.replace(
+  'from _cso_bindings.margin import margin',
+  'from _cso_bindings.limited_margin import margin',
+);
+
+const limitedCompare = `from typing import Annotated
+from cso_python import CalculationResults, calculation, method, section, symbol, table
+from _cso_bindings.limited_panel import panel
+
+@calculation(id="compare", title="Limited panel comparison")
+@section(id="comparison", title="Comparison", root=True)
+def compare() -> CalculationResults:
+    method(id="panel-method", calculation=panel, title="How panel area is calculated")
+    narrow = panel(width=2.0, height=3.0)
+    wide = panel(width=8.0, height=3.0)
+    table(id="panel-results", method="panel-method", title="Panel comparison", cases={"Narrow": narrow, "Wide": wide}, cases_axis="rows", inputs=(), outputs=("area",))
+    compared: Annotated[float, symbol(glyph="R", description="Compared area", unit="m^2")] = narrow["area"]
+    return {"compared": compared}
+`;
+
 beforeAll(() => {
   const created = spawnSync(
     '/opt/homebrew/bin/python3',
@@ -231,6 +308,12 @@ beforeAll(() => {
   writeFileSync(join(directory, 'checked.cso.py'), checkedRectangle);
   writeFileSync(join(directory, 'checked_compare.cso.py'), checkedCompare);
   writeFileSync(join(directory, 'checked_hidden.cso.py'), checkedHidden);
+  writeFileSync(join(directory, 'box.cso.py'), box);
+  writeFileSync(join(directory, 'limit_compare.cso.py'), limitCompare);
+  writeFileSync(join(directory, 'limit_hidden.cso.py'), limitHidden);
+  writeFileSync(join(directory, 'limited_margin.cso.py'), limitedMargin);
+  writeFileSync(join(directory, 'limited_panel.cso.py'), limitedPanel);
+  writeFileSync(join(directory, 'limited_compare.cso.py'), limitedCompare);
   const bindings = spawnSync(
     python,
     ['-I', '-m', 'cso_python', 'bindings', directory],
@@ -699,6 +782,193 @@ test('keeps a failed engineering check beside the unchanged number', async () =>
   expect(htmlText).toContain('>24<');
   const pdfPath = join(directory, 'checked.pdf');
   const pdf = publish('pdf', 'checked_compare.cso.py', 'compare', pdfPath);
+  expect(pdf.status, pdf.stdout || pdf.stderr).toBe(0);
+  const info = spawnSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
+  expect(info.status, info.stderr).toBe(0);
+  expect(info.stdout).toMatch(/Pages:\s+[12]/);
+}, 180_000);
+
+test('marks results outside their applicability without changing the number', async () => {
+  const execution = capture('limit_compare.cso.py', 'compare');
+  const again = capture('limit_compare.cso.py', 'compare');
+  expect(again.applicabilityOutcomes).toEqual(execution.applicabilityOutcomes);
+  expect(verifyExecution({ execution }).ok).toBe(true);
+  const areaOutcomes = (execution.applicabilityOutcomes ?? []).filter(
+    (item) => item.applicabilityId === 'area-limit',
+  );
+  expect(areaOutcomes.map((item) => item.value)).toEqual([true, false, false]);
+  const document = prepareExecutionDocument({ execution, assets: [] });
+  expect(prepareExecutionDocument({ execution, assets: [] })).toEqual(document);
+  const table = document.sections[0]?.items.find(
+    (item) => item.kind === 'table',
+  );
+  if (table?.kind !== 'table') throw new Error('Missing table');
+  const cell = (quantity: string, heading: string) => {
+    const row = table.groups
+      .flatMap((group) => group.rows)
+      .find((item) => item.quantity === quantity);
+    return row?.cells.find((item) => item.heading === heading);
+  };
+  expect(cell('area', 'Case A')?.value).toBe(6);
+  expect(cell('area', 'Case A')?.applicability).toBeUndefined();
+  expect(cell('area', 'Case B')).toMatchObject({
+    value: 24,
+    applicability: {
+      state: 'not-applicable',
+      reasons: [
+        'Area exceeds the method limit.',
+        'Area also exceeds the second limit.',
+      ],
+    },
+  });
+  expect(cell('volume', 'Case B')?.value).toBe(48);
+  expect(cell('volume', 'Case B')?.applicability?.reasons).toEqual([
+    'Area exceeds the method limit.',
+    'Area also exceeds the second limit.',
+  ]);
+  expect(cell('depth', 'Case B')?.applicability).toBeUndefined();
+  expect(cell('chosen', 'Case B')?.value).toBe(8);
+  expect(cell('chosen', 'Case B')?.applicability).toBeUndefined();
+  expect(cell('guard', 'Case B')?.applicability?.state).toBe('not-applicable');
+  expect(
+    table.engineeringChecks
+      ?.find((item) => item.id === 'volume-check')
+      ?.results.map((result) => ({
+        heading: result.heading,
+        value: result.value,
+        reasons: result.reasons,
+      })),
+  ).toEqual([
+    { heading: 'Case A', value: true, reasons: undefined },
+    {
+      heading: 'Case B',
+      value: true,
+      reasons: [
+        'Area exceeds the method limit.',
+        'Area also exceeds the second limit.',
+      ],
+    },
+  ]);
+  const extra = document.sections.find(
+    (section) => section.invocationId === 'root/extra_panel',
+  );
+  const extraSymbol = (description: string) =>
+    extra?.items.find(
+      (item) =>
+        item.kind === 'symbol' && item.symbol.description === description,
+    );
+  const chosen = extraSymbol('Chosen side');
+  const guard = extraSymbol('Guard');
+  if (chosen?.kind !== 'symbol' || guard?.kind !== 'symbol') {
+    throw new Error('Missing ordinary symbols');
+  }
+  expect(chosen.applicability?.state).toBe('not-applicable');
+  expect(guard.applicability).toBeUndefined();
+
+  const checked = capture('checked_compare.cso.py', 'compare');
+  expect(checked.applicabilityOutcomes).toBeUndefined();
+  const checkedDocument = prepareExecutionDocument({
+    execution: checked,
+    assets: [],
+  });
+  const checkedTable = checkedDocument.sections[0]?.items.find(
+    (item) => item.kind === 'table',
+  );
+  if (checkedTable?.kind !== 'table') throw new Error('Missing checked table');
+  expect(
+    checkedTable.groups
+      .flatMap((group) => group.rows)
+      .flatMap((row) => row.cells)
+      .every((item) => item.applicability === undefined),
+  ).toBe(true);
+
+  const flipped = structuredClone(execution);
+  const failed = flipped.applicabilityOutcomes?.find(
+    (item) => item.value === false,
+  );
+  if (!failed) throw new Error('Missing applicability outcome');
+  failed.value = true;
+  expect(
+    verifyExecution({ execution: flipped }).diagnostics.some(
+      (item) => item.code === 'APPLICABILITY_OUTCOME_MISMATCH',
+    ),
+  ).toBe(true);
+
+  const hidden = capture('limit_hidden.cso.py', 'compare');
+  const hiddenDocument = prepareExecutionDocument({
+    execution: hidden,
+    assets: [],
+  });
+  const hiddenTable = hiddenDocument.sections[0]?.items.find(
+    (item) => item.kind === 'table',
+  );
+  if (hiddenTable?.kind !== 'table') throw new Error('Missing hidden table');
+  expect(
+    hiddenTable.groups
+      .flatMap((group) => group.rows)
+      .some((row) => row.quantity === 'area'),
+  ).toBe(false);
+  expect(
+    hiddenTable.applicabilityNotes?.some(
+      (item) =>
+        item.id === 'area-limit' &&
+        item.results.some((result) => result.value === false),
+    ),
+  ).toBe(true);
+
+  const nested = capture('limited_compare.cso.py', 'compare');
+  expect(verifyExecution({ execution: nested }).ok).toBe(true);
+  const nestedAssets = nested.assets.map((asset) => ({
+    asset,
+    dataUrl: `data:${asset.mediaType};base64,${png.toString('base64')}`,
+  }));
+  const derived = deriveApplicability(nested);
+  const grownOutcomes = nested.invocations
+    .filter((item) => item.function === 'margin')
+    .flatMap((item) => {
+      const grown = item.symbols.find(
+        (symbol) => symbol.variableName === 'grown',
+      );
+      return grown && derived.reasonsBySymbolId.has(grown.symbolId)
+        ? [item.resolvedInputs.length]
+        : [];
+    });
+  expect(grownOutcomes).toEqual([8]);
+  const nestedDocument = prepareExecutionDocument({
+    execution: nested,
+    assets: nestedAssets,
+  });
+  const nestedTable = nestedDocument.sections[0]?.items.find(
+    (item) => item.kind === 'table',
+  );
+  if (nestedTable?.kind !== 'table') throw new Error('Missing nested table');
+  const areas = nestedTable.groups
+    .flatMap((group) => group.rows)
+    .find((row) => row.quantity === 'area');
+  expect(areas?.cells.map((item) => item.value)).toEqual([12, 36]);
+  expect(areas?.cells.map((item) => item.applicability?.state)).toEqual([
+    undefined,
+    'not-applicable',
+  ]);
+  expect(areas?.cells[1]?.applicability?.reasons).toEqual([
+    'Length exceeds the margin limit.',
+  ]);
+
+  const htmlPath = join(directory, 'applicability.html');
+  const html = publish('html', 'limit_compare.cso.py', 'compare', htmlPath, [
+    '--check-layout',
+  ]);
+  expect(html.status, html.stdout || html.stderr).toBe(0);
+  const htmlText = readFileSync(htmlPath, 'utf8');
+  expect(htmlText).toContain('data-cases-axis="rows"');
+  expect(htmlText).toContain('data-applicability="not-applicable"');
+  expect(htmlText).toContain('Not applicable');
+  expect(htmlText).toContain('data-value="24"');
+  expect(htmlText).toContain('data-check-result="not-applicable"');
+  expect(htmlText).toContain('data-check-result="pass"');
+  expect(htmlText).toContain('Area exceeds the method limit.');
+  const pdfPath = join(directory, 'applicability.pdf');
+  const pdf = publish('pdf', 'limit_compare.cso.py', 'compare', pdfPath);
   expect(pdf.status, pdf.stdout || pdf.stderr).toBe(0);
   const info = spawnSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
   expect(info.status, info.stderr).toBe(0);
