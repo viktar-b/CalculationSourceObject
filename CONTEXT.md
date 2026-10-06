@@ -40,6 +40,18 @@ A result outside its authored applicability conditions, or dependent on an
 inapplicable quantity actually used in its calculation. Retaining a computed
 number does not establish that the result is applicable.
 
+**External function declaration**:
+The reusable description of an ordinary Python function's numeric inputs,
+named numeric outputs and method, separate from its implementation.
+
+**External invocation**:
+One authored call to an external function, with its own supplied inputs and
+returned results. Separate calls retain distinct identities even with equal inputs.
+
+**External result**:
+A named numeric output of an external invocation, available to subsequent
+documented formulas. Capturing it does not independently verify the external algorithm.
+
 **CalculationSourceObject (CSO)**:
 The structured record of a calculation's formulas, symbols, results, units,
 explanations, document structure, and source metadata.
@@ -68,9 +80,11 @@ set, including assumptions, references, formulas, units and results. HTML and
 PDF can present the same report; the verification report is a separate record.
 
 **Source-to-document consistency**:
-Agreement between the authored calculation's runtime results and the values
-obtained by evaluating the documented formulas.
-_Avoid_: treating structural validation as numerical agreement.
+Agreement between captured execution and documented quantities. Formula
+quantities are checked by independent formula evaluation; external results are
+checked against their captured calls.
+_Avoid_: treating structural validation as numerical agreement or captured
+external results as independently verified algorithms.
 
 **Independent numerical reference case**:
 A case whose expected results have a separately established numerical basis.
