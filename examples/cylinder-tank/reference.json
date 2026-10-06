@@ -1,0 +1,967 @@
+{
+  "referenceVersion": "1",
+  "cases": [
+    {
+      "id": "cylinder-tank-defaults",
+      "revision": "hand-derived-binary64",
+      "basis": {
+        "method": "Python math and arithmetic evaluated independently of cso execution",
+        "derivation": "Default inside diameter 2 m, height 6 m, wall 8 mm, steel density 7850 kg/m^3, 4 courses, 12 bolts per course, fill ratio 0.5, liquid density 1000 kg/m^3, plan radius 5 m, and bearing 0 degrees. Radius is diameter/2. Area is pi*radius**2. Circumference is pi*diameter. Thickness in metres is thickness_mm/1000. Developed area is circumference*height. Shell volume is developed area*thickness. Shell mass is volume*density. Course height is height/course_count. Required courses are ceil(height/1.5). Bolt count is course_count*bolts_per_course. Shortfall is max(required-course_count, 0). Fill ratio 0.5 selects the partial branch, so liquid height is height*fill_ratio. Liquid volume is base area*liquid height and liquid mass is volume*density. Freeboard is max(height-liquid height, 0). Bearing radians are math.radians(bearing). East and north are radius*cos and radius*sin. Radial offset is hypot(east, north). Recovered bearing is degrees(atan2(north, east)).",
+        "sourceDescription": "Hand-derived expected values for the cylindrical tank sources. The numbers come from the stated formulas, not from a cso result. This binding does not assert human engineering approval of a generated document."
+      },
+      "binding": {
+        "entryModuleId": "estimate.cso.py",
+        "entrySourceHash": "76f8dfa0df37f739d05552bb4b72b85d5f36af69b39b0dbca5302b281c7c6b33",
+        "sourceClosureHash": "487dabf463d097fc954087ba32020a5590edd114013edc68e8d8ef9e1e001e49",
+        "function": "estimate",
+        "resolvedInputs": {
+          "diameter": 2.0,
+          "height": 6.0,
+          "thickness_mm": 8.0,
+          "density": 7850.0,
+          "course_count": 4,
+          "bolts_per_course": 12,
+          "fill_ratio": 0.5,
+          "liquid_density": 1000.0,
+          "plan_radius": 5.0,
+          "bearing_degrees": 0.0
+        }
+      },
+      "expected": [
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"developed_area\"]",
+          "value": 37.69911184307752,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"shell_volume\"]",
+          "value": 0.30159289474462014,
+          "unit": "m^3"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"shell_mass\"]",
+          "value": 2367.504223745268,
+          "unit": "kg"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"course_height\"]",
+          "value": 1.5,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/base_circle\",\"radius\"]",
+          "value": 1.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/base_circle\",\"area\"]",
+          "value": 3.141592653589793,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/base_circle\",\"circumference\"]",
+          "value": 6.283185307179586,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/wall_thickness\",\"thickness_m\"]",
+          "value": 0.008,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/course_bolts\",\"required_course_count\"]",
+          "value": 4,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/course_bolts\",\"bolt_count\"]",
+          "value": 48,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/course_bolts\",\"course_shortfall\"]",
+          "value": 0,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"liquid_height\"]",
+          "value": 3.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"liquid_volume\"]",
+          "value": 9.42477796076938,
+          "unit": "m^3"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"liquid_mass\"]",
+          "value": 9424.77796076938,
+          "unit": "kg"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"freeboard\"]",
+          "value": 3.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"bearing_radians\"]",
+          "value": 0.0,
+          "unit": "rad"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"east_offset\"]",
+          "value": 5.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"north_offset\"]",
+          "value": 0.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"radial_offset\"]",
+          "value": 5.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"recovered_bearing\"]",
+          "value": 0.0,
+          "unit": "deg"
+        }
+      ]
+    },
+    {
+      "id": "cylinder-tank-empty",
+      "revision": "hand-derived-binary64",
+      "basis": {
+        "method": "Python math and arithmetic evaluated independently of cso execution",
+        "derivation": "Same defaults except fill ratio 0. The comparison chain 0 < fill_ratio < 1 is false and fill_ratio >= 1 is false, so liquid height is the empty-branch literal 0. Liquid volume and mass are 0. Freeboard is the shell height. The unselected partial and full branches are not evaluated.",
+        "sourceDescription": "Hand-derived expected values for the cylindrical tank sources. The numbers come from the stated formulas, not from a cso result. This binding does not assert human engineering approval of a generated document."
+      },
+      "binding": {
+        "entryModuleId": "estimate.cso.py",
+        "entrySourceHash": "76f8dfa0df37f739d05552bb4b72b85d5f36af69b39b0dbca5302b281c7c6b33",
+        "sourceClosureHash": "487dabf463d097fc954087ba32020a5590edd114013edc68e8d8ef9e1e001e49",
+        "function": "estimate",
+        "resolvedInputs": {
+          "diameter": 2.0,
+          "height": 6.0,
+          "thickness_mm": 8.0,
+          "density": 7850.0,
+          "course_count": 4,
+          "bolts_per_course": 12,
+          "fill_ratio": 0,
+          "liquid_density": 1000.0,
+          "plan_radius": 5.0,
+          "bearing_degrees": 0.0
+        }
+      },
+      "expected": [
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"developed_area\"]",
+          "value": 37.69911184307752,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"shell_volume\"]",
+          "value": 0.30159289474462014,
+          "unit": "m^3"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"shell_mass\"]",
+          "value": 2367.504223745268,
+          "unit": "kg"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"course_height\"]",
+          "value": 1.5,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/base_circle\",\"radius\"]",
+          "value": 1.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/base_circle\",\"area\"]",
+          "value": 3.141592653589793,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/base_circle\",\"circumference\"]",
+          "value": 6.283185307179586,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/wall_thickness\",\"thickness_m\"]",
+          "value": 0.008,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/course_bolts\",\"required_course_count\"]",
+          "value": 4,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/course_bolts\",\"bolt_count\"]",
+          "value": 48,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/course_bolts\",\"course_shortfall\"]",
+          "value": 0,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"liquid_height\"]",
+          "value": 0.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"liquid_volume\"]",
+          "value": 0.0,
+          "unit": "m^3"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"liquid_mass\"]",
+          "value": 0.0,
+          "unit": "kg"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"freeboard\"]",
+          "value": 6.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"bearing_radians\"]",
+          "value": 0.0,
+          "unit": "rad"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"east_offset\"]",
+          "value": 5.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"north_offset\"]",
+          "value": 0.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"radial_offset\"]",
+          "value": 5.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"recovered_bearing\"]",
+          "value": 0.0,
+          "unit": "deg"
+        }
+      ]
+    },
+    {
+      "id": "cylinder-tank-full",
+      "revision": "hand-derived-binary64",
+      "basis": {
+        "method": "Python math and arithmetic evaluated independently of cso execution",
+        "derivation": "Same defaults except fill ratio 1. The partial-fill chain is false and fill_ratio >= 1 is true, so liquid height is the shell height. Freeboard is 0. Liquid volume is the full inside cylinder.",
+        "sourceDescription": "Hand-derived expected values for the cylindrical tank sources. The numbers come from the stated formulas, not from a cso result. This binding does not assert human engineering approval of a generated document."
+      },
+      "binding": {
+        "entryModuleId": "estimate.cso.py",
+        "entrySourceHash": "76f8dfa0df37f739d05552bb4b72b85d5f36af69b39b0dbca5302b281c7c6b33",
+        "sourceClosureHash": "487dabf463d097fc954087ba32020a5590edd114013edc68e8d8ef9e1e001e49",
+        "function": "estimate",
+        "resolvedInputs": {
+          "diameter": 2.0,
+          "height": 6.0,
+          "thickness_mm": 8.0,
+          "density": 7850.0,
+          "course_count": 4,
+          "bolts_per_course": 12,
+          "fill_ratio": 1,
+          "liquid_density": 1000.0,
+          "plan_radius": 5.0,
+          "bearing_degrees": 0.0
+        }
+      },
+      "expected": [
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"developed_area\"]",
+          "value": 37.69911184307752,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"shell_volume\"]",
+          "value": 0.30159289474462014,
+          "unit": "m^3"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"shell_mass\"]",
+          "value": 2367.504223745268,
+          "unit": "kg"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"course_height\"]",
+          "value": 1.5,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/base_circle\",\"radius\"]",
+          "value": 1.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/base_circle\",\"area\"]",
+          "value": 3.141592653589793,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/base_circle\",\"circumference\"]",
+          "value": 6.283185307179586,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/wall_thickness\",\"thickness_m\"]",
+          "value": 0.008,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/course_bolts\",\"required_course_count\"]",
+          "value": 4,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/course_bolts\",\"bolt_count\"]",
+          "value": 48,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/course_bolts\",\"course_shortfall\"]",
+          "value": 0,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"liquid_height\"]",
+          "value": 6.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"liquid_volume\"]",
+          "value": 18.84955592153876,
+          "unit": "m^3"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"liquid_mass\"]",
+          "value": 18849.55592153876,
+          "unit": "kg"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"freeboard\"]",
+          "value": 0.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"bearing_radians\"]",
+          "value": 0.0,
+          "unit": "rad"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"east_offset\"]",
+          "value": 5.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"north_offset\"]",
+          "value": 0.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"radial_offset\"]",
+          "value": 5.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"recovered_bearing\"]",
+          "value": 0.0,
+          "unit": "deg"
+        }
+      ]
+    },
+    {
+      "id": "cylinder-tank-bearing-90",
+      "revision": "hand-derived-binary64",
+      "basis": {
+        "method": "Python math and arithmetic evaluated independently of cso execution",
+        "derivation": "Same defaults except bearing 90 degrees. The radian conversion, cosine, sine, hypot, atan2, and degree conversion use Python math on that bearing. The other formulas keep the default inputs.",
+        "sourceDescription": "Hand-derived expected values for the cylindrical tank sources. The numbers come from the stated formulas, not from a cso result. This binding does not assert human engineering approval of a generated document."
+      },
+      "binding": {
+        "entryModuleId": "estimate.cso.py",
+        "entrySourceHash": "76f8dfa0df37f739d05552bb4b72b85d5f36af69b39b0dbca5302b281c7c6b33",
+        "sourceClosureHash": "487dabf463d097fc954087ba32020a5590edd114013edc68e8d8ef9e1e001e49",
+        "function": "estimate",
+        "resolvedInputs": {
+          "diameter": 2.0,
+          "height": 6.0,
+          "thickness_mm": 8.0,
+          "density": 7850.0,
+          "course_count": 4,
+          "bolts_per_course": 12,
+          "fill_ratio": 0.5,
+          "liquid_density": 1000.0,
+          "plan_radius": 5.0,
+          "bearing_degrees": 90
+        }
+      },
+      "expected": [
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"developed_area\"]",
+          "value": 37.69911184307752,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"shell_volume\"]",
+          "value": 0.30159289474462014,
+          "unit": "m^3"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"shell_mass\"]",
+          "value": 2367.504223745268,
+          "unit": "kg"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"course_height\"]",
+          "value": 1.5,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/base_circle\",\"radius\"]",
+          "value": 1.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/base_circle\",\"area\"]",
+          "value": 3.141592653589793,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/base_circle\",\"circumference\"]",
+          "value": 6.283185307179586,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/wall_thickness\",\"thickness_m\"]",
+          "value": 0.008,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/course_bolts\",\"required_course_count\"]",
+          "value": 4,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/course_bolts\",\"bolt_count\"]",
+          "value": 48,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/course_bolts\",\"course_shortfall\"]",
+          "value": 0,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"liquid_height\"]",
+          "value": 3.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"liquid_volume\"]",
+          "value": 9.42477796076938,
+          "unit": "m^3"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"liquid_mass\"]",
+          "value": 9424.77796076938,
+          "unit": "kg"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"freeboard\"]",
+          "value": 3.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"bearing_radians\"]",
+          "value": 1.5707963267948966,
+          "unit": "rad"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"east_offset\"]",
+          "value": 3.061616997868383e-16,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"north_offset\"]",
+          "value": 5.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"radial_offset\"]",
+          "value": 5.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"recovered_bearing\"]",
+          "value": 90.0,
+          "unit": "deg"
+        }
+      ]
+    },
+    {
+      "id": "cylinder-tank-three-courses",
+      "revision": "hand-derived-binary64",
+      "basis": {
+        "method": "Python math and arithmetic evaluated independently of cso execution",
+        "derivation": "Same defaults except 3 shell courses. Required courses remain ceil(6/1.5)=4, so the shortfall is max(4-3, 0)=1. Bolt count is 3*12=36. Course height is 6/3=2. Plate area, volume, and mass do not use the course count.",
+        "sourceDescription": "Hand-derived expected values for the cylindrical tank sources. The numbers come from the stated formulas, not from a cso result. This binding does not assert human engineering approval of a generated document."
+      },
+      "binding": {
+        "entryModuleId": "estimate.cso.py",
+        "entrySourceHash": "76f8dfa0df37f739d05552bb4b72b85d5f36af69b39b0dbca5302b281c7c6b33",
+        "sourceClosureHash": "487dabf463d097fc954087ba32020a5590edd114013edc68e8d8ef9e1e001e49",
+        "function": "estimate",
+        "resolvedInputs": {
+          "diameter": 2.0,
+          "height": 6.0,
+          "thickness_mm": 8.0,
+          "density": 7850.0,
+          "course_count": 3,
+          "bolts_per_course": 12,
+          "fill_ratio": 0.5,
+          "liquid_density": 1000.0,
+          "plan_radius": 5.0,
+          "bearing_degrees": 0.0
+        }
+      },
+      "expected": [
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"developed_area\"]",
+          "value": 37.69911184307752,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"shell_volume\"]",
+          "value": 0.30159289474462014,
+          "unit": "m^3"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"shell_mass\"]",
+          "value": 2367.504223745268,
+          "unit": "kg"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities\",\"course_height\"]",
+          "value": 2.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/base_circle\",\"radius\"]",
+          "value": 1.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/base_circle\",\"area\"]",
+          "value": 3.141592653589793,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/base_circle\",\"circumference\"]",
+          "value": 6.283185307179586,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/wall_thickness\",\"thickness_m\"]",
+          "value": 0.008,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/course_bolts\",\"required_course_count\"]",
+          "value": 4,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/course_bolts\",\"bolt_count\"]",
+          "value": 36,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/shell_quantities/course_bolts\",\"course_shortfall\"]",
+          "value": 1,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"liquid_height\"]",
+          "value": 3.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"liquid_volume\"]",
+          "value": 9.42477796076938,
+          "unit": "m^3"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"liquid_mass\"]",
+          "value": 9424.77796076938,
+          "unit": "kg"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/liquid\",\"freeboard\"]",
+          "value": 3.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"bearing_radians\"]",
+          "value": 0.0,
+          "unit": "rad"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"east_offset\"]",
+          "value": 5.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"north_offset\"]",
+          "value": 0.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"radial_offset\"]",
+          "value": 5.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/centre\",\"recovered_bearing\"]",
+          "value": 0.0,
+          "unit": "deg"
+        }
+      ]
+    },
+    {
+      "id": "compare-shells-defaults",
+      "revision": "hand-derived-binary64",
+      "basis": {
+        "method": "Python math and arithmetic evaluated independently of cso execution",
+        "derivation": "Baseline diameter 2 m and candidate diameter 2.5 m, with shared height 6 m, wall 8 mm, density 7850 kg/m^3, 4 courses, and 12 bolts per course. Each shell repeats the plate and course formulas. The mass ratio is the candidate shell mass divided by the baseline shell mass. Mass is proportional to diameter, so the ratio is the diameter ratio when the binary64 division agrees.",
+        "sourceDescription": "Hand-derived expected values for the cylindrical tank sources. The numbers come from the stated formulas, not from a cso result. This binding does not assert human engineering approval of a generated document."
+      },
+      "binding": {
+        "entryModuleId": "compare.cso.py",
+        "entrySourceHash": "2dd980a5020b27858fb0440191cae86ee3f41132bbb11fbd7174a1774ce49d9d",
+        "sourceClosureHash": "b2847df4c81df3eeb5e7c6b4298db9ab7d6041d2f852533c4ccae4d5b34c9f93",
+        "function": "compare_shells",
+        "resolvedInputs": {
+          "baseline_diameter": 2.0,
+          "candidate_diameter": 2.5,
+          "height": 6.0,
+          "thickness_mm": 8.0,
+          "density": 7850.0,
+          "course_count": 4,
+          "bolts_per_course": 12
+        }
+      },
+      "expected": [
+        {
+          "symbolId": "[\"symbol\",\"root\",\"mass_ratio\"]",
+          "value": 1.25,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell\",\"developed_area\"]",
+          "value": 37.69911184307752,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell\",\"shell_volume\"]",
+          "value": 0.30159289474462014,
+          "unit": "m^3"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell\",\"shell_mass\"]",
+          "value": 2367.504223745268,
+          "unit": "kg"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell\",\"course_height\"]",
+          "value": 1.5,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell/base_circle\",\"radius\"]",
+          "value": 1.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell/base_circle\",\"area\"]",
+          "value": 3.141592653589793,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell/base_circle\",\"circumference\"]",
+          "value": 6.283185307179586,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell/wall_thickness\",\"thickness_m\"]",
+          "value": 0.008,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell/course_bolts\",\"required_course_count\"]",
+          "value": 4,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell/course_bolts\",\"bolt_count\"]",
+          "value": 48,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell/course_bolts\",\"course_shortfall\"]",
+          "value": 0,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell\",\"developed_area\"]",
+          "value": 47.12388980384689,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell\",\"shell_volume\"]",
+          "value": 0.37699111843077515,
+          "unit": "m^3"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell\",\"shell_mass\"]",
+          "value": 2959.380279681585,
+          "unit": "kg"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell\",\"course_height\"]",
+          "value": 1.5,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell/base_circle\",\"radius\"]",
+          "value": 1.25,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell/base_circle\",\"area\"]",
+          "value": 4.908738521234052,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell/base_circle\",\"circumference\"]",
+          "value": 7.853981633974483,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell/wall_thickness\",\"thickness_m\"]",
+          "value": 0.008,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell/course_bolts\",\"required_course_count\"]",
+          "value": 4,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell/course_bolts\",\"bolt_count\"]",
+          "value": 48,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell/course_bolts\",\"course_shortfall\"]",
+          "value": 0,
+          "unit": ""
+        }
+      ]
+    },
+    {
+      "id": "compare-shells-equal-diameter",
+      "revision": "hand-derived-binary64",
+      "basis": {
+        "method": "Python math and arithmetic evaluated independently of cso execution",
+        "derivation": "Both diameters are 2 m and the other comparison inputs keep their defaults. The two shell masses are the same binary64 quantity, so their ratio is 1.",
+        "sourceDescription": "Hand-derived expected values for the cylindrical tank sources. The numbers come from the stated formulas, not from a cso result. This binding does not assert human engineering approval of a generated document."
+      },
+      "binding": {
+        "entryModuleId": "compare.cso.py",
+        "entrySourceHash": "2dd980a5020b27858fb0440191cae86ee3f41132bbb11fbd7174a1774ce49d9d",
+        "sourceClosureHash": "b2847df4c81df3eeb5e7c6b4298db9ab7d6041d2f852533c4ccae4d5b34c9f93",
+        "function": "compare_shells",
+        "resolvedInputs": {
+          "baseline_diameter": 2.0,
+          "candidate_diameter": 2,
+          "height": 6.0,
+          "thickness_mm": 8.0,
+          "density": 7850.0,
+          "course_count": 4,
+          "bolts_per_course": 12
+        }
+      },
+      "expected": [
+        {
+          "symbolId": "[\"symbol\",\"root\",\"mass_ratio\"]",
+          "value": 1.0,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell\",\"developed_area\"]",
+          "value": 37.69911184307752,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell\",\"shell_volume\"]",
+          "value": 0.30159289474462014,
+          "unit": "m^3"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell\",\"shell_mass\"]",
+          "value": 2367.504223745268,
+          "unit": "kg"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell\",\"course_height\"]",
+          "value": 1.5,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell/base_circle\",\"radius\"]",
+          "value": 1.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell/base_circle\",\"area\"]",
+          "value": 3.141592653589793,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell/base_circle\",\"circumference\"]",
+          "value": 6.283185307179586,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell/wall_thickness\",\"thickness_m\"]",
+          "value": 0.008,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell/course_bolts\",\"required_course_count\"]",
+          "value": 4,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell/course_bolts\",\"bolt_count\"]",
+          "value": 48,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/baseline_shell/course_bolts\",\"course_shortfall\"]",
+          "value": 0,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell\",\"developed_area\"]",
+          "value": 37.69911184307752,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell\",\"shell_volume\"]",
+          "value": 0.30159289474462014,
+          "unit": "m^3"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell\",\"shell_mass\"]",
+          "value": 2367.504223745268,
+          "unit": "kg"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell\",\"course_height\"]",
+          "value": 1.5,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell/base_circle\",\"radius\"]",
+          "value": 1.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell/base_circle\",\"area\"]",
+          "value": 3.141592653589793,
+          "unit": "m^2"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell/base_circle\",\"circumference\"]",
+          "value": 6.283185307179586,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell/wall_thickness\",\"thickness_m\"]",
+          "value": 0.008,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell/course_bolts\",\"required_course_count\"]",
+          "value": 4,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell/course_bolts\",\"bolt_count\"]",
+          "value": 48,
+          "unit": ""
+        },
+        {
+          "symbolId": "[\"symbol\",\"root/candidate_shell/course_bolts\",\"course_shortfall\"]",
+          "value": 0,
+          "unit": ""
+        }
+      ]
+    },
+    {
+      "id": "published-circle-diameter-2",
+      "revision": "hand-derived-binary64",
+      "basis": {
+        "method": "Python math and arithmetic evaluated independently of cso execution",
+        "derivation": "Diameter 2 m. Radius is diameter/2, circumference is pi*diameter, and area is pi*radius**2. Glyphs d, r, C, and A are the notation of https://en.wikipedia.org/wiki/Circle.",
+        "sourceDescription": "Hand-derived expected values for the cylindrical tank sources. The numbers come from the stated formulas, not from a cso result. This binding does not assert human engineering approval of a generated document."
+      },
+      "binding": {
+        "entryModuleId": "published_circle.cso.py",
+        "entrySourceHash": "195f7e0ec18283c1f68b0a77ba12bfca0a1719f9b3b5f7c1477b7408f568a36f",
+        "sourceClosureHash": "6218de27926e62d663bcbc5e6f66ba02a2e8b1fb7758bd35e43b98081db66add",
+        "function": "published_circle",
+        "resolvedInputs": {
+          "diameter": 2.0
+        }
+      },
+      "expected": [
+        {
+          "symbolId": "[\"symbol\",\"root\",\"radius\"]",
+          "value": 1.0,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root\",\"circumference\"]",
+          "value": 6.283185307179586,
+          "unit": "m"
+        },
+        {
+          "symbolId": "[\"symbol\",\"root\",\"area\"]",
+          "value": 3.141592653589793,
+          "unit": "m^2"
+        }
+      ]
+    }
+  ]
+}

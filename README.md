@@ -84,6 +84,9 @@ Generate `_cso_bindings` from the authored functions before importing them;
 define, generate, import and call workflow. The
 [section-property comparisons](examples/section-properties/README.md#reuse-in-a-comparison)
 apply it to larger calculations while retaining their documented intermediates.
+The [cylindrical tank estimate](examples/cylinder-tank/README.md) uses the same
+method for unit conversion, integer counts, conditional fill, plan offsets, and
+a repeated shell comparison.
 
 ## Use Python's scientific libraries
 

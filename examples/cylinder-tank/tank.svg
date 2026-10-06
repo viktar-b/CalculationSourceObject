@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="420" viewBox="0 0 720 420">
+  <rect width="720" height="420" fill="white"/>
+  <g fill="#dbeaf4" stroke="#244c68" stroke-width="2">
+    <ellipse cx="250" cy="78" rx="120" ry="28"/>
+    <path d="M130 78v230c0 16 54 30 120 30s120-14 120-30V78"/>
+    <ellipse cx="250" cy="308" rx="120" ry="28" fill="#9ec2db"/>
+    <path d="M370 78v230c0 16 8 28 16 28" fill="none"/>
+  </g>
+  <g fill="none" stroke="#667085" stroke-width="1">
+    <path d="M130 360v16m240-16v16M130 368h240"/>
+    <path d="M430 78h16m-16 230h16M438 78v230"/>
+    <path d="M392 200h36"/>
+  </g>
+  <g fill="#101828" font-family="Arial, sans-serif" font-size="20" text-anchor="middle">
+    <text x="250" y="400">D<tspan baseline-shift="sub" font-size="13">tank</tspan></text>
+    <text x="470" y="198">h<tspan baseline-shift="sub" font-size="13">tank</tspan></text>
+    <text x="430" y="188">t<tspan baseline-shift="sub" font-size="13">wall,mm</tspan></text>
+  </g>
+</svg>
