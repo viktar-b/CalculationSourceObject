@@ -36,7 +36,10 @@
     "tsup": {
       "esbuild": "0.28.2"
     },
-    "postcss": "8.5.28"
+    "postcss": "8.5.28",
+    "@tailwindcss/cli": {
+      "@parcel/watcher": "2.6.0"
+    }
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

@@ -198,6 +198,13 @@ to this pin through all required checks, including ESM/CJS builds, declarations,
 CLI/PDF acceptance and browser consumers. Remove the overrides when upstream
 ranges permit a patched version and fresh workspace/isolated installs confirm it.
 
+The workspace and React package override the Tailwind CLI's Parcel watcher to
+`2.6.0`. Tailwind CLI `4.3.3` pins watcher `2.5.1`, which depends on vulnerable
+`braces` through `micromatch`. Watcher `2.6.0` uses `picomatch` instead. Keep the
+package override for isolated builds. Remove these overrides when Tailwind's
+published dependency permits watcher `2.6.0` or later and fresh workspace and
+isolated installs pass the dependency audit and CSS build checks.
+
 Isolation, installed-package and Windows jobs retain logs and evidence for 14 days,
 including generated PDFs and their hashes. Passing automated PDF checks leaves
 visual inspection pending. Use the [rendering guide](rendering.md#choose-verification-by-change)
