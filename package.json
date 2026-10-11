@@ -36,10 +36,13 @@
     "tsup": {
       "esbuild": "0.28.2"
     },
-    "postcss": "8.5.28"
+    "postcss": "8.5.28",
+    "@tailwindcss/cli": {
+      "@parcel/watcher": "2.6.0"
+    }
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.14",
+    "@biomejs/biome": "2.5.15",
     "@types/node": "^26",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -48,7 +51,7 @@
     "react-dom": "^19.3.0",
     "tsx": "^4.23.15",
     "typescript": "^5",
-    "vitest": "^5.0.2",
+    "vitest": "^5.0.3",
     "@cs-object/core": "0.1.0",
     "@cs-object/react": "0.1.0",
     "yaml": "^2.9.1",
