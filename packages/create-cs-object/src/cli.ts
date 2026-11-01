@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -26,11 +26,14 @@ try {
     const target = resolve(name);
     mkdirSync(target); // Exclusive creation preserves existing destinations.
     destination = target;
-    cpSync(fileURLToPath(new URL('../template', import.meta.url)), target, {
-      recursive: true,
-      force: false,
-      errorOnExist: true,
-    });
+    const template = fileURLToPath(new URL('../template', import.meta.url));
+    for (const entry of readdirSync(template)) {
+      cpSync(join(template, entry), join(target, entry), {
+        recursive: true,
+        force: false,
+        errorOnExist: true,
+      });
+    }
     renameSync(join(target, 'gitignore'), join(target, '.gitignore'));
     writeFileSync(
       join(target, 'package.json'),
