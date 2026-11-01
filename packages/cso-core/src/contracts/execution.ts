@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { CalculationSourceObjectSchema } from '../calculation-source/object-schema.ts';
+import {
+  CalculationSourceObjectSchema,
+  CalculationSourceSectionSchema,
+} from '../calculation-source/object-schema.ts';
 import { AuthoringEvidenceSchema } from './authoring.ts';
 import {
   AssetRecordSchema,
@@ -27,6 +30,10 @@ import {
   reproducePredicate,
 } from '../verification/branches.ts';
 import { NumericValueSchema } from './numbers.ts';
+import {
+  methodInvocationBindings,
+  validateMethodBindings,
+} from '../verification/method-bindings.ts';
 
 const invalidUnicodePattern = /[\uD800-\uDFFF]/u;
 const IdentityStringSchema = NonemptyStringSchema.refine(
@@ -230,6 +237,7 @@ export type MethodContentItem =
       kind: 'section';
       localId: string;
       title: string;
+      metadata?: Record<string, unknown>;
       content: MethodContentItem[];
     }
   | { kind: 'check'; localId: string }
@@ -252,6 +260,7 @@ export type MethodHelperRecord = {
   quantities: MethodQuantity[];
   content: MethodContentItem[];
   helpers: MethodHelperRecord[];
+  metadata?: Record<string, unknown>;
   checks?: EngineeringCheck[];
   applicability?: EngineeringCheck[];
 };
@@ -290,6 +299,7 @@ const MethodContentSchema: z.ZodType<MethodContentItem> = z.lazy(() =>
       kind: z.literal('section'),
       localId: NonemptyStringSchema,
       title: NonemptyStringSchema,
+      metadata: CalculationSourceSectionSchema.shape.metadata,
       content: z.array(MethodContentSchema),
     }),
     z.strictObject({
@@ -321,6 +331,7 @@ const MethodHelperSchema: z.ZodType<MethodHelperRecord> = z.lazy(() =>
     quantities: z.array(MethodQuantitySchema).min(1),
     content: z.array(MethodContentSchema).min(1),
     helpers: z.array(MethodHelperSchema),
+    metadata: CalculationSourceSectionSchema.shape.metadata,
     checks: z.array(EngineeringCheckSchema).min(1).optional(),
     applicability: z.array(EngineeringCheckSchema).min(1).optional(),
   }),
@@ -340,6 +351,7 @@ const MethodPlanSchema = z.strictObject({
   quantities: z.array(MethodQuantitySchema).min(1),
   content: z.array(MethodContentSchema).min(1),
   helpers: z.array(MethodHelperSchema),
+  metadata: CalculationSourceSectionSchema.shape.metadata,
   checks: z.array(EngineeringCheckSchema).min(1).optional(),
   applicability: z.array(EngineeringCheckSchema).min(1).optional(),
   location: SourceSpanSchema,
@@ -1791,6 +1803,7 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
         helpers,
       );
     }
+    validateMethodBindings(execution, issue);
     const symbolResults = new Map<string, number>();
     for (const symbol of symbolsById.values()) {
       const result = symbol.valueTree.result;
@@ -1810,50 +1823,54 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
     for (const table of execution.tables ?? []) {
       const method = methodRecords.get(table.methodId)?.method;
       if (!method) continue;
-      const glyphs = new Map<string, string>();
-      for (const quantity of method.quantities) {
-        glyphs.set(quantity.variableName, quantity.glyph);
-        glyphs.set(quantity.selectionName, quantity.glyph);
-      }
       for (const caseItem of table.cases) {
-        const invocation = invocations.get(caseItem.invocationId);
-        if (!invocation) continue;
-        for (const quantity of method.quantities) {
-          if (quantity.role === 'input') continue;
-          const definition = invocation.symbols.find(
-            (item) => item.variableName === quantity.variableName,
-          );
-          const symbol = definition
-            ? symbolsById.get(definition.symbolId)
-            : undefined;
-          if (!definition || !symbol) continue;
-          const reproduced = reproduceBranches(
-            symbol.valueTree.nodes,
-            symbol.valueTree.rootKey,
-            symbolResults,
-          );
-          if (!reproduced) {
-            branchesReproduced = false;
-            continue;
+        for (const { plan, invocation } of methodInvocationBindings(
+          execution,
+          method,
+          caseItem.invocationId,
+        )) {
+          const glyphs = new Map<string, string>();
+          for (const quantity of plan.quantities) {
+            glyphs.set(quantity.variableName, quantity.glyph);
+            glyphs.set(quantity.selectionName, quantity.glyph);
           }
-          for (const branch of reproduced) {
-            const label = branchLabel(
-              quantity.nodes,
-              glyphs,
-              branch.selectedKey,
+          for (const quantity of plan.quantities) {
+            if (quantity.role === 'input') continue;
+            const definition = invocation.symbols.find(
+              (item) => item.variableName === quantity.variableName,
             );
-            if (!label) {
+            const symbol = definition
+              ? symbolsById.get(definition.symbolId)
+              : undefined;
+            if (!definition || !symbol) continue;
+            const reproduced = reproduceBranches(
+              symbol.valueTree.nodes,
+              symbol.valueTree.rootKey,
+              symbolResults,
+            );
+            if (!reproduced) {
               branchesReproduced = false;
               continue;
             }
-            expectedBranches.push({
-              invocationId: caseItem.invocationId,
-              symbolId: definition.symbolId,
-              nodeKey: branch.nodeKey,
-              value: branch.value,
-              usedKeys: branch.usedKeys,
-              label,
-            });
+            for (const branch of reproduced) {
+              const label = branchLabel(
+                quantity.nodes,
+                glyphs,
+                branch.selectedKey,
+              );
+              if (!label) {
+                branchesReproduced = false;
+                continue;
+              }
+              expectedBranches.push({
+                invocationId: invocation.id,
+                symbolId: definition.symbolId,
+                nodeKey: branch.nodeKey,
+                value: branch.value,
+                usedKeys: branch.usedKeys,
+                label,
+              });
+            }
           }
         }
       }

@@ -400,6 +400,28 @@ def compare() -> CalculationResults:
         )
         generate(self.root)
 
+    def test_forwarded_helper_outputs_bind_to_each_case(self):
+        self.write_composed('''    method(id="panel-method", calculation=panel, title="Panel")
+    first_panel = panel(width=2.0, height=3.0)
+    second_panel = panel(width=4.0, height=5.0)
+    table(id="panels", method="panel-method", title="Panels", cases={"First": first_panel, "Second": second_panel})
+''')
+        path = self.root / "panel.cso.py"
+        path.write_text(PANEL.replace('return {"area": area}', 'return {"area": wider["grown"]}'))
+        compare = self.root / "compare.cso.py"
+        compare.write_text(compare.read_text().replace('unit="m^2"', 'unit="m"'))
+        generate(self.root)
+        response = self.execution()
+        execution = response["execution"]
+        cells = [cell for cell in execution["tables"][0]["cells"] if cell["role"] == "output"]
+        self.assertEqual(len(cells), 2)
+        self.assertNotEqual(cells[0]["symbolId"], cells[1]["symbolId"])
+        outputs = execution["authoring"]["outputs"]
+        for cell in cells:
+            returned = next(output for output in outputs if output["invocationId"] == cell["caseInvocationId"] and output["name"] == "area")
+            self.assertEqual(cell["symbolId"], returned["symbolId"])
+            self.assertEqual(cell["unit"], "m")
+
     def test_nested_helpers_keep_distinct_call_mappings(self):
         self.write_composed(
             '''    method(id="panel-method", calculation=panel, title="How panel area is calculated")

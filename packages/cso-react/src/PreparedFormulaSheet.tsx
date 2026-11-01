@@ -86,6 +86,14 @@ const notationSheet = (
   ).sheet;
   const byId = new Map(sheet.symbols.map((symbol) => [symbol.id, symbol]));
   return {
+    row: (symbolId: string, index: number): ReactElement => (
+      <FormulaSheetSymbolRow
+        sheet={sheet}
+        item={requiredItem(byId, symbolId)}
+        sheetItemIndex={index}
+        symbolicOnly={true}
+      />
+    ),
     description: (symbolId: string): string =>
       requiredItem(byId, symbolId).description,
     formula: (symbolId: string, showGlyph = true): ReactElement => (
@@ -98,14 +106,6 @@ const notationSheet = (
   };
 };
 type Notation = ReturnType<typeof notationSheet>;
-
-const unitText = (unit: string): ReactElement | null =>
-  unit ? (
-    <>
-      {' '}
-      [<UnitMathBlock unit={unit} />]
-    </>
-  ) : null;
 
 const numberText = (value: number): string =>
   Object.is(value, -0) ? '-0' : formatNumerical(value);
@@ -160,18 +160,14 @@ export const PreparedFormulaSheet = ({
         }
         if (item.kind === 'quantity') {
           return (
-            <p
+            <div
               key={`quantity-${item.selectionName}-${index}`}
               className="cso-method-quantity"
               data-quantity={item.selectionName}
               data-formula={item.formulaText || undefined}
             >
-              {item.description} <GlyphMathBlock glyph={item.glyph} />
-              {unitText(item.unit)}
-              {item.role === 'input' ? null : (
-                <> = {notation.formula(item.symbolId, false)}</>
-              )}
-            </p>
+              {notation.row(item.symbolId, symbolIndex++)}
+            </div>
           );
         }
         if (item.kind === 'text') {
@@ -209,6 +205,7 @@ export const PreparedFormulaSheet = ({
               data-method-section={item.localId}
             >
               <h4>{item.title}</h4>
+              <EngineeringMetadata entries={item.context ?? []} />
               {renderItems(item.content)}
             </section>
           );
@@ -220,6 +217,7 @@ export const PreparedFormulaSheet = ({
           explanation = (
             <div className="cso-method-helper" data-helper={helper.function}>
               <h4>{helper.function}</h4>
+              <EngineeringMetadata entries={helper.context ?? []} />
               {renderItems(helper.content)}
             </div>
           );
@@ -272,7 +270,7 @@ export const PreparedFormulaSheet = ({
         >
           {check.reasons
             ? `Not applicable. ${check.reasons.join(' ')}`
-            : `${check.explanation} ${check.predicateText}`}
+            : `${check.value ? 'Pass' : 'Fail'}. ${check.explanation} ${check.predicateText}`}
         </p>
       ))}
       {section.items.map((item) => {
@@ -335,13 +333,13 @@ export const PreparedFormulaSheet = ({
                 className="cso-method"
               >
                 <h3>{item.title}</h3>
+                <EngineeringMetadata entries={item.context} />
                 {renderMethodContent(
                   item.content,
                   item.helpers,
                   notationSheet(item.id, item.symbols),
                   new Set(),
                 )}
-                <EngineeringMetadata entries={item.context} />
               </section>
             );
           }
@@ -349,10 +347,19 @@ export const PreparedFormulaSheet = ({
             const quantityHeading = (
               quantity: (typeof item.groups)[number]['rows'][number],
             ) => (
-              <>
-                <GlyphMathBlock glyph={quantity.glyph} /> {quantity.description}
-                {unitText(quantity.unit)}
-              </>
+              <span className="cso-comparison-quantity">
+                <span className="cso-comparison-description">
+                  {quantity.description}
+                </span>
+                <span className="cso-comparison-notation">
+                  <GlyphMathBlock glyph={quantity.glyph} />
+                  {quantity.unit ? (
+                    <span className="cso-comparison-unit">
+                      <UnitMathBlock unit={quantity.unit} />
+                    </span>
+                  ) : null}
+                </span>
+              </span>
             );
             const shownCell = (
               cell: (typeof item.groups)[number]['rows'][number]['cells'][number],
@@ -402,10 +409,11 @@ export const PreparedFormulaSheet = ({
                       data-case={result.heading}
                       data-formula={check.predicateText}
                     >
-                      {result.heading}:{' '}
+                      {result.heading}
+                      {result.callPath ? ` / ${result.callPath}` : ''}:{' '}
                       {result.reasons
                         ? `Not applicable. ${result.reasons.join(' ')}`
-                        : check.explanation}
+                        : `${result.value ? 'Pass' : 'Fail'}. ${check.explanation}`}
                     </p>
                   )),
                 )}
@@ -421,7 +429,8 @@ export const PreparedFormulaSheet = ({
                       data-case={result.heading}
                       data-formula={condition.predicateText}
                     >
-                      {result.heading}:{' '}
+                      {result.heading}
+                      {result.callPath ? ` / ${result.callPath}` : ''}:{' '}
                       {result.reasons
                         ? `Not applicable. ${result.reasons.join(' ')}`
                         : condition.explanation}
@@ -433,11 +442,14 @@ export const PreparedFormulaSheet = ({
                     key={`${note.invocationId}-${note.symbolId}-${note.nodeKey}`}
                     className="cso-branch-note"
                     data-branch-note={note.heading}
+                    data-case={note.heading}
                     data-symbol-id={note.symbolId}
                     data-node-key={note.nodeKey}
                     data-formula={note.label}
                   >
-                    {note.heading}: {notation?.description(note.branchSymbolId)}{' '}
+                    {note.heading}
+                    {note.callPath ? ` / ${note.callPath}` : ''}:{' '}
+                    {notation?.description(note.branchSymbolId)}{' '}
                     {notation?.formula(note.branchSymbolId)}, because{' '}
                     {notation?.formula(note.conditionSymbolId, false)}{' '}
                     {note.conditionHolds ? 'holds' : 'does not hold'}.

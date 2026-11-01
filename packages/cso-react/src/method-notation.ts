@@ -230,28 +230,33 @@ export const methodNotation = (
     conditionId: (owner: Owner, id: string): string =>
       notationId(owner.id, 'condition', id),
     /** The branch a conditional chose and the test that chose it. */
-    branch: (variableName: string, nodeKey: string, chosenKey: string) => {
-      const quantity = ownerQuantity(method, variableName);
+    branch: (
+      owner: Owner,
+      variableName: string,
+      nodeKey: string,
+      chosenKey: string,
+    ) => {
+      const quantity = ownerQuantity(owner, variableName);
       const conditional =
         quantity.nodes.find((node) => node.key === nodeKey) ??
         fail(`Conditional '${nodeKey}' is missing from '${variableName}'`);
       const test = conditional.funcArgs?.[0];
       if (!test) fail(`Conditional '${nodeKey}' is incomplete`);
-      const base = quantitySymbolId(method, variableName);
+      const base = quantitySymbolId(owner, variableName);
       return {
         quantitySymbolId: base,
         branchSymbolId: add(
           symbolFor(
-            notationId(method.id, variableName, nodeKey, 'branch', chosenKey),
+            notationId(owner.id, variableName, nodeKey, 'branch', chosenKey),
             quantity,
-            tree(method, quantity.nodes, chosenKey),
+            tree(owner, quantity.nodes, chosenKey),
           ),
         ),
         conditionSymbolId: add(
           symbolFor(
-            notationId(method.id, variableName, nodeKey, 'condition'),
+            notationId(owner.id, variableName, nodeKey, 'condition'),
             quantity,
-            tree(method, quantity.nodes, test.key),
+            tree(owner, quantity.nodes, test.key),
           ),
         ),
       };

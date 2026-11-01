@@ -5,11 +5,15 @@ from typing import Annotated
 from cso_python import (
     CalculationResults,
     calculation,
+    load_calculation,
     section,
     symbol,
     document_section,
     text,
 )
+
+
+area_inertia = load_calculation("area_inertia.cso.py", function="calculate")
 
 
 @calculation(
@@ -79,9 +83,16 @@ def calculate(
         section_depth - outer_bot_flange_thickness - outer_top_flange_thickness
     )
 
-    web_depth: Annotated[
-        float, symbol(id="L_t", glyph="L_{t}", description="Web depth", unit="mm")
-    ] = (section_depth - inner_bot_flange_thickness - inner_top_flange_thickness)
+    area_properties = area_inertia(
+        section_depth=section_depth,
+        web_thickness=web_thickness,
+        width_of_top_flange=width_of_top_flange,
+        outer_top_flange_thickness=outer_top_flange_thickness,
+        inner_top_flange_thickness=inner_top_flange_thickness,
+        width_of_bot_flange=width_of_bot_flange,
+        outer_bot_flange_thickness=outer_bot_flange_thickness,
+        inner_bot_flange_thickness=inner_bot_flange_thickness,
+    )
 
     tapered_top_flange_segment_horizontal_length: Annotated[
         float,
@@ -103,101 +114,13 @@ def calculate(
         ),
     ] = 0.5 * (width_of_bot_flange - web_thickness)
 
-    tapered_top_flange_segment_vertical_length: Annotated[
-        float,
-        symbol(
-            id="a_v_top",
-            glyph="a_{v,top}",
-            description="Tapered top flange segment vertical length",
-            unit="mm",
-        ),
-    ] = (
-        inner_top_flange_thickness - outer_top_flange_thickness
-    )
 
-    tapered_bot_flange_segment_vertical_length: Annotated[
-        float,
-        symbol(
-            id="a_v_bot",
-            glyph="a_{v,bot}",
-            description="Tapered bot flange segment vertical length",
-            unit="mm",
-        ),
-    ] = (
-        inner_bot_flange_thickness - outer_bot_flange_thickness
-    )
 
-    top_flange_area: Annotated[
-        float,
-        symbol(
-            id="A_top_flange",
-            glyph="A_{top,flange}",
-            description="Top flange area",
-            unit="mm^2",
-        ),
-    ] = (
-        width_of_top_flange * outer_top_flange_thickness
-    )
 
-    top_trapezoid_area: Annotated[
-        float,
-        symbol(
-            id="A_top_trapz",
-            glyph="A_{top,trapz}",
-            description="Top trapezoid area",
-            unit="mm^2",
-        ),
-    ] = (
-        0.5
-        * (width_of_top_flange + web_thickness)
-        * tapered_top_flange_segment_vertical_length
-    )
 
-    web_area: Annotated[
-        float, symbol(id="A_web", glyph="A_{web}", description="Web area", unit="mm^2")
-    ] = (web_thickness * web_depth)
 
-    bottom_trapezoid_area: Annotated[
-        float,
-        symbol(
-            id="A_bot_trapz",
-            glyph="A_{bot,trapz}",
-            description="Bottom trapezoid area",
-            unit="mm^2",
-        ),
-    ] = (
-        0.5
-        * (width_of_bot_flange + web_thickness)
-        * tapered_bot_flange_segment_vertical_length
-    )
 
-    bottom_flange_area: Annotated[
-        float,
-        symbol(
-            id="A_bot_flange",
-            glyph="A_{bot,flange}",
-            description="Bottom flange area",
-            unit="mm^2",
-        ),
-    ] = (
-        width_of_bot_flange * outer_bot_flange_thickness
-    )
 
-    total_area_of_the_section: Annotated[
-        float,
-        symbol(
-            id="A_t",
-            glyph="A_{t}",
-            description="Total area of the section",
-            unit="mm^2",
-        ),
-    ] = (
-        bottom_flange_area
-        + bottom_trapezoid_area
-        + web_area
-        + top_trapezoid_area
-        + top_flange_area
-    )
 
     perimeter: Annotated[
         float, symbol(id="P_t", glyph="P_{t}", description="Perimeter", unit="mm")
@@ -208,13 +131,13 @@ def calculate(
         * (
             outer_bot_flange_thickness
             + outer_top_flange_thickness
-            + web_depth
+            + area_properties["web_depth"]
             + math.sqrt(
-                tapered_bot_flange_segment_vertical_length**2
+                area_properties["tapered_bot_flange_segment_vertical_length"]**2
                 + tapered_bottom_flange_segment_horizontal_length**2
             )
             + math.sqrt(
-                tapered_top_flange_segment_vertical_length**2
+                area_properties["tapered_top_flange_segment_vertical_length"]**2
                 + tapered_top_flange_segment_horizontal_length**2
             )
         )
@@ -232,199 +155,17 @@ def calculate(
         max(width_of_bot_flange, width_of_top_flange) / 2
     )
 
-    top_flange_centroid: Annotated[
-        float,
-        symbol(
-            id="y_top_flange",
-            glyph="y_{top,flange}",
-            description="Top flange centroid distance from the lower section boundary",
-            unit="mm",
-        ),
-    ] = (
-        section_depth - 0.5 * outer_top_flange_thickness
-    )
 
-    top_trapezoid_centroid: Annotated[
-        float,
-        symbol(
-            id="y_top_trapz",
-            glyph="y_{top,trapz}",
-            description="Top trapezoid centroid distance from the lower section boundary",
-            unit="mm",
-        ),
-    ] = (
-        section_depth
-        - outer_top_flange_thickness
-        - tapered_top_flange_segment_vertical_length
-        / 3
-        * (
-            (2 * web_thickness + width_of_top_flange)
-            / (web_thickness + width_of_top_flange)
-        )
-    )
 
-    web_centroid: Annotated[
-        float,
-        symbol(id="y_web", glyph="y_{web}", description="Web centroid distance from the lower section boundary", unit="mm"),
-    ] = (
-        section_depth - inner_top_flange_thickness - 0.5 * web_depth
-    )
 
-    bottom_trapezoid_centroid: Annotated[
-        float,
-        symbol(
-            id="y_bot_trapz",
-            glyph="y_{bot,trapz}",
-            description="Bottom trapezoid centroid distance from the lower section boundary",
-            unit="mm",
-        ),
-    ] = outer_bot_flange_thickness + tapered_bot_flange_segment_vertical_length * (
-        2 * web_thickness + width_of_bot_flange
-    ) / (
-        web_thickness + width_of_bot_flange
-    ) * (
-        1 / 3
-    )
 
-    bottom_flange_centroid: Annotated[
-        float,
-        symbol(
-            id="y_bot_flange",
-            glyph="y_{bot,flange}",
-            description="Bottom flange centroid distance from the lower section boundary",
-            unit="mm",
-        ),
-    ] = (
-        0.5 * outer_bot_flange_thickness
-    )
 
-    distance_to_centroid_y_axis_from_the_bottom_of_the_section: Annotated[
-        float,
-        symbol(
-            id="C_y_2",
-            glyph="C_{y}",
-            description="Distance to centroid (y-axis) from the bottom of the section",
-            unit="mm",
-        ),
-    ] = (
-        bottom_flange_area * bottom_flange_centroid
-        + bottom_trapezoid_area * bottom_trapezoid_centroid
-        + web_area * web_centroid
-        + top_trapezoid_area * top_trapezoid_centroid
-        + top_flange_area * top_flange_centroid
-    ) / total_area_of_the_section
 
-    second_moment_of_area_about_x_axis_for_the_top_flange: Annotated[
-        float,
-        symbol(
-            id="I_xx_top_flange",
-            glyph="I_{xx,top,flange}",
-            description="Second moment of area about x axis for the top flange",
-            unit="mm^4",
-        ),
-    ] = (
-        top_flange_area * outer_top_flange_thickness**2 / 12
-        + top_flange_area
-        * (
-            top_flange_centroid
-            - distance_to_centroid_y_axis_from_the_bottom_of_the_section
-        )
-        ** 2
-    )
 
-    second_moment_of_area_about_the_x_axis_for_the_top_tapered_sections: Annotated[
-        float,
-        symbol(
-            id="I_xx_top_trapz",
-            glyph="I_{xx,top,trapz}",
-            description="Second moment of area about the x-axis for the top tapered sections",
-            unit="mm^4",
-        ),
-    ] = (
-        tapered_top_flange_segment_vertical_length**3
-        * (
-            web_thickness**2
-            + 4 * web_thickness * width_of_top_flange
-            + width_of_top_flange**2
-        )
-        / (36 * (web_thickness + width_of_top_flange))
-        + top_trapezoid_area
-        * (
-            top_trapezoid_centroid
-            - distance_to_centroid_y_axis_from_the_bottom_of_the_section
-        )
-        ** 2
-    )
 
-    second_moment_of_area_about_x_axis_for_the_web: Annotated[
-        float,
-        symbol(
-            id="I_xx_web",
-            glyph="I_{xx,web}",
-            description="Second moment of area about x axis for the web",
-            unit="mm^4",
-        ),
-    ] = web_area * web_depth**2 / 12 + web_area * (
-        web_centroid - distance_to_centroid_y_axis_from_the_bottom_of_the_section
-    ) ** 2
 
-    second_moment_of_area_about_the_x_axis_for_the_bottom_tapered_sections: Annotated[
-        float,
-        symbol(
-            id="I_xx_bot_trapz",
-            glyph="I_{xx,bot,trapz}",
-            description="Second moment of area about the x-axis for the bottom tapered sections",
-            unit="mm^4",
-        ),
-    ] = (
-        tapered_bot_flange_segment_vertical_length**3
-        * (
-            web_thickness**2
-            + 4 * web_thickness * width_of_bot_flange
-            + width_of_bot_flange**2
-        )
-        / (36 * (web_thickness + width_of_bot_flange))
-        + bottom_trapezoid_area
-        * (
-            bottom_trapezoid_centroid
-            - distance_to_centroid_y_axis_from_the_bottom_of_the_section
-        )
-        ** 2
-    )
 
-    second_moment_of_area_about_x_axis_for_the_bot_flange: Annotated[
-        float,
-        symbol(
-            id="I_xx_bot_flange",
-            glyph="I_{xx,bot,flange}",
-            description="Second moment of area about x-axis for the bot flange",
-            unit="mm^4",
-        ),
-    ] = (
-        bottom_flange_area * outer_bot_flange_thickness**2 / 12
-        + bottom_flange_area
-        * (
-            bottom_flange_centroid
-            - distance_to_centroid_y_axis_from_the_bottom_of_the_section
-        )
-        ** 2
-    )
 
-    second_moment_of_area_about_x_axis: Annotated[
-        float,
-        symbol(
-            id="I_x_x",
-            glyph="I_{xx}",
-            description="Second moment of area about x-axis",
-            unit="mm^4",
-        ),
-    ] = (
-        second_moment_of_area_about_x_axis_for_the_top_flange
-        + second_moment_of_area_about_x_axis_for_the_bot_flange
-        + second_moment_of_area_about_x_axis_for_the_web
-        + second_moment_of_area_about_the_x_axis_for_the_top_tapered_sections
-        + second_moment_of_area_about_the_x_axis_for_the_bottom_tapered_sections
-    )
 
     second_moment_of_area_about_the_x1_axis: Annotated[
         float,
@@ -435,9 +176,9 @@ def calculate(
             unit="mm^4",
         ),
     ] = (
-        second_moment_of_area_about_x_axis
-        + total_area_of_the_section
-        * distance_to_centroid_y_axis_from_the_bottom_of_the_section**2
+        area_properties["second_moment_of_area_about_x_axis"]
+        + area_properties["total_area_of_the_section"]
+        * area_properties["distance_to_centroid_y_axis_from_the_bottom_of_the_section"]**2
     )
 
     second_moment_of_area_about_the_y_axis_for_the_major_flange: Annotated[
@@ -473,7 +214,7 @@ def calculate(
             unit="mm^4",
         ),
     ] = (
-        1 / 12 * web_depth * web_thickness**3
+        1 / 12 * area_properties["web_depth"] * web_thickness**3
     )
 
     second_moment_of_area_about_the_y_axis_for_the_top_tapered_section: Annotated[
@@ -540,7 +281,7 @@ def calculate(
         ),
     ] = (
         second_moment_of_area_about_y_axis
-        + total_area_of_the_section * distance_to_centroid_x_axis**2
+        + area_properties["total_area_of_the_section"] * distance_to_centroid_x_axis**2
     )
 
     polar_second_moment_of_area_about_the_z_axis: Annotated[
@@ -552,7 +293,7 @@ def calculate(
             unit="mm^4",
         ),
     ] = (
-        second_moment_of_area_about_x_axis + second_moment_of_area_about_y_axis
+        area_properties["second_moment_of_area_about_x_axis"] + second_moment_of_area_about_y_axis
     )
 
     polar_second_moment_of_area_about_the_z1_axis: Annotated[
@@ -576,7 +317,7 @@ def calculate(
             description="Radius of gyration about x-axis",
             unit="mm",
         ),
-    ] = math.sqrt(second_moment_of_area_about_x_axis / total_area_of_the_section)
+    ] = math.sqrt(area_properties["second_moment_of_area_about_x_axis"] / area_properties["total_area_of_the_section"])
 
     radius_of_gyration_about_y_axis: Annotated[
         float,
@@ -586,7 +327,7 @@ def calculate(
             description="Radius of gyration about y-axis",
             unit="mm",
         ),
-    ] = math.sqrt(second_moment_of_area_about_y_axis / total_area_of_the_section)
+    ] = math.sqrt(second_moment_of_area_about_y_axis / area_properties["total_area_of_the_section"])
 
     radius_of_gyration_about_the_z_axis: Annotated[
         float,
@@ -608,7 +349,7 @@ def calculate(
             description="Radius of gyration about the x1-axis",
             unit="mm",
         ),
-    ] = math.sqrt(second_moment_of_area_about_the_x1_axis / total_area_of_the_section)
+    ] = math.sqrt(second_moment_of_area_about_the_x1_axis / area_properties["total_area_of_the_section"])
 
     radius_of_gyration_about_the_y1_axis: Annotated[
         float,
@@ -618,7 +359,7 @@ def calculate(
             description="Radius of gyration about the y1-axis",
             unit="mm",
         ),
-    ] = math.sqrt(second_moment_of_area_about_the_y1_axis / total_area_of_the_section)
+    ] = math.sqrt(second_moment_of_area_about_the_y1_axis / area_properties["total_area_of_the_section"])
 
     radius_of_gyration_about_the_z1_axis: Annotated[
         float,
@@ -642,10 +383,10 @@ def calculate(
             unit="mm^3",
         ),
     ] = (
-        second_moment_of_area_about_x_axis
+        area_properties["second_moment_of_area_about_x_axis"]
         / max(
-            distance_to_centroid_y_axis_from_the_bottom_of_the_section,
-            section_depth - distance_to_centroid_y_axis_from_the_bottom_of_the_section,
+            area_properties["distance_to_centroid_y_axis_from_the_bottom_of_the_section"],
+            section_depth - area_properties["distance_to_centroid_y_axis_from_the_bottom_of_the_section"],
         )
     )
 
@@ -671,7 +412,7 @@ def calculate(
                 unit="mm^2",
             ),
         ] = (
-            total_area_of_the_section / 2
+            area_properties["total_area_of_the_section"] / 2
         )
 
         lower_trapezoid_flange_boundary: Annotated[
@@ -733,7 +474,7 @@ def calculate(
                 description="Area boundary bottom flange",
                 unit="mm^2",
             ),
-        ] = bottom_flange_area
+        ] = area_properties["bottom_flange_area"]
 
         area_boundary_bottom_trapezoid: Annotated[
             float,
@@ -744,7 +485,7 @@ def calculate(
                 unit="mm^2",
             ),
         ] = (
-            area_boundary_bottom_flange + bottom_trapezoid_area
+            area_boundary_bottom_flange + area_properties["bottom_trapezoid_area"]
         )
 
         area_boundary_web: Annotated[
@@ -753,7 +494,7 @@ def calculate(
                 id="A_L3", glyph="A_{L3}", description="Area boundary web", unit="mm^2"
             ),
         ] = (
-            area_boundary_bottom_trapezoid + web_area
+            area_boundary_bottom_trapezoid + area_properties["web_area"]
         )
 
         area_boundary_top_trapezoid: Annotated[
@@ -765,7 +506,7 @@ def calculate(
                 unit="mm^2",
             ),
         ] = (
-            area_boundary_web + top_trapezoid_area
+            area_boundary_web + area_properties["top_trapezoid_area"]
         )
 
         area_boundary_top_flange: Annotated[
@@ -777,7 +518,7 @@ def calculate(
                 unit="mm^2",
             ),
         ] = (
-            area_boundary_top_trapezoid + top_flange_area
+            area_boundary_top_trapezoid + area_properties["top_flange_area"]
         )
 
         bottom_trapezoid_gradient: Annotated[
@@ -790,7 +531,7 @@ def calculate(
             ),
         ] = (
             web_thickness - width_of_bot_flange
-        ) / tapered_bot_flange_segment_vertical_length
+        ) / area_properties["tapered_bot_flange_segment_vertical_length"]
 
         top_trapezoid_gradient: Annotated[
             float,
@@ -802,7 +543,7 @@ def calculate(
             ),
         ] = (
             width_of_top_flange - web_thickness
-        ) / tapered_top_flange_segment_vertical_length
+        ) / area_properties["tapered_top_flange_segment_vertical_length"]
 
         bottom_quadratic_discriminant: Annotated[
             float,
@@ -949,7 +690,7 @@ def calculate(
                 + (outer_bot_flange_thickness - distance_to_plastic_neutral_axis_from_lower_boundary) ** 2
             )
             if distance_to_plastic_neutral_axis_from_lower_boundary < outer_bot_flange_thickness
-            else bottom_flange_area
+            else area_properties["bottom_flange_area"]
             * (distance_to_plastic_neutral_axis_from_lower_boundary - outer_bot_flange_thickness / 2)
         )
 
@@ -1076,12 +817,12 @@ def calculate(
                 unit="mm^3",
             ),
         ] = (
-            bottom_trapezoid_area
-            * (distance_to_plastic_neutral_axis_from_lower_boundary - bottom_trapezoid_centroid)
+            area_properties["bottom_trapezoid_area"]
+            * (distance_to_plastic_neutral_axis_from_lower_boundary - area_properties["bottom_trapezoid_centroid"])
             if distance_to_plastic_neutral_axis_from_lower_boundary > inner_bot_flange_thickness
             else (
-                bottom_trapezoid_area
-                * (bottom_trapezoid_centroid - distance_to_plastic_neutral_axis_from_lower_boundary)
+                area_properties["bottom_trapezoid_area"]
+                * (area_properties["bottom_trapezoid_centroid"] - distance_to_plastic_neutral_axis_from_lower_boundary)
                 if distance_to_plastic_neutral_axis_from_lower_boundary < outer_bot_flange_thickness
                 else bottom_wedge_term + top_wedge_term
             )
@@ -1097,11 +838,11 @@ def calculate(
                 notation_scope="x-axis",
             ),
         ] = (
-            web_area * (distance_to_plastic_neutral_axis_from_lower_boundary - web_centroid)
+            area_properties["web_area"] * (distance_to_plastic_neutral_axis_from_lower_boundary - area_properties["web_centroid"])
             if distance_to_plastic_neutral_axis_from_lower_boundary
             > section_depth - inner_top_flange_thickness
             else (
-                web_area * (web_centroid - distance_to_plastic_neutral_axis_from_lower_boundary)
+                area_properties["web_area"] * (area_properties["web_centroid"] - distance_to_plastic_neutral_axis_from_lower_boundary)
                 if distance_to_plastic_neutral_axis_from_lower_boundary < inner_bot_flange_thickness
                 else web_thickness
                 / 2
@@ -1130,7 +871,7 @@ def calculate(
                 distance_to_plastic_neutral_axis_from_lower_boundary
                 - (section_depth - inner_top_flange_thickness)
             )
-            / tapered_top_flange_segment_vertical_length
+            / area_properties["tapered_top_flange_segment_vertical_length"]
         )
 
         area_bottom_wedge_component_a_bw_top_trapz: Annotated[
@@ -1255,13 +996,13 @@ def calculate(
                 unit="mm^3",
             ),
         ] = (
-            top_trapezoid_area
-            * (distance_to_plastic_neutral_axis_from_lower_boundary - top_trapezoid_centroid)
+            area_properties["top_trapezoid_area"]
+            * (distance_to_plastic_neutral_axis_from_lower_boundary - area_properties["top_trapezoid_centroid"])
             if distance_to_plastic_neutral_axis_from_lower_boundary
             > section_depth - outer_top_flange_thickness
             else (
-                top_trapezoid_area
-                * (top_trapezoid_centroid - distance_to_plastic_neutral_axis_from_lower_boundary)
+                area_properties["top_trapezoid_area"]
+                * (area_properties["top_trapezoid_centroid"] - distance_to_plastic_neutral_axis_from_lower_boundary)
                 if distance_to_plastic_neutral_axis_from_lower_boundary
                 < section_depth - inner_top_flange_thickness
                 else bottom_wedge_term_component_z_bw_top_trapz
@@ -1278,7 +1019,7 @@ def calculate(
                 unit="mm^3",
             ),
         ] = (
-            top_flange_area * (top_flange_centroid - distance_to_plastic_neutral_axis_from_lower_boundary)
+            area_properties["top_flange_area"] * (area_properties["top_flange_centroid"] - distance_to_plastic_neutral_axis_from_lower_boundary)
             if distance_to_plastic_neutral_axis_from_lower_boundary
             < section_depth - outer_top_flange_thickness
             else width_of_top_flange
@@ -1349,7 +1090,7 @@ def calculate(
             2
             * (
                 0.5
-                * tapered_top_flange_segment_vertical_length
+                * area_properties["tapered_top_flange_segment_vertical_length"]
                 * tapered_top_flange_segment_horizontal_length
             )
             * (web_thickness / 2 + tapered_top_flange_segment_horizontal_length / 3)
@@ -1368,7 +1109,7 @@ def calculate(
             * (
                 0.5
                 * tapered_bottom_flange_segment_horizontal_length
-                * tapered_bot_flange_segment_vertical_length
+                * area_properties["tapered_bot_flange_segment_vertical_length"]
             )
             * (web_thickness / 2 + tapered_bottom_flange_segment_horizontal_length / 3)
         )
@@ -1390,31 +1131,31 @@ def calculate(
 
     return {
         "outer_flange_to_flange_depth": outer_flange_to_flange_depth,
-        "web_depth": web_depth,
+        "web_depth": area_properties["web_depth"],
         "tapered_top_flange_segment_horizontal_length": tapered_top_flange_segment_horizontal_length,
         "tapered_bottom_flange_segment_horizontal_length": tapered_bottom_flange_segment_horizontal_length,
-        "tapered_top_flange_segment_vertical_length": tapered_top_flange_segment_vertical_length,
-        "tapered_bot_flange_segment_vertical_length": tapered_bot_flange_segment_vertical_length,
-        "top_flange_area": top_flange_area,
-        "top_trapezoid_area": top_trapezoid_area,
-        "web_area": web_area,
-        "bottom_trapezoid_area": bottom_trapezoid_area,
-        "bottom_flange_area": bottom_flange_area,
-        "total_area_of_the_section": total_area_of_the_section,
+        "tapered_top_flange_segment_vertical_length": area_properties["tapered_top_flange_segment_vertical_length"],
+        "tapered_bot_flange_segment_vertical_length": area_properties["tapered_bot_flange_segment_vertical_length"],
+        "top_flange_area": area_properties["top_flange_area"],
+        "top_trapezoid_area": area_properties["top_trapezoid_area"],
+        "web_area": area_properties["web_area"],
+        "bottom_trapezoid_area": area_properties["bottom_trapezoid_area"],
+        "bottom_flange_area": area_properties["bottom_flange_area"],
+        "total_area_of_the_section": area_properties["total_area_of_the_section"],
         "perimeter": perimeter,
         "distance_to_centroid_x_axis": distance_to_centroid_x_axis,
-        "top_flange_centroid": top_flange_centroid,
-        "top_trapezoid_centroid": top_trapezoid_centroid,
-        "web_centroid": web_centroid,
-        "bottom_trapezoid_centroid": bottom_trapezoid_centroid,
-        "bottom_flange_centroid": bottom_flange_centroid,
-        "distance_to_centroid_y_axis_from_the_bottom_of_the_section": distance_to_centroid_y_axis_from_the_bottom_of_the_section,
-        "second_moment_of_area_about_x_axis_for_the_top_flange": second_moment_of_area_about_x_axis_for_the_top_flange,
-        "second_moment_of_area_about_the_x_axis_for_the_top_tapered_sections": second_moment_of_area_about_the_x_axis_for_the_top_tapered_sections,
-        "second_moment_of_area_about_x_axis_for_the_web": second_moment_of_area_about_x_axis_for_the_web,
-        "second_moment_of_area_about_the_x_axis_for_the_bottom_tapered_sections": second_moment_of_area_about_the_x_axis_for_the_bottom_tapered_sections,
-        "second_moment_of_area_about_x_axis_for_the_bot_flange": second_moment_of_area_about_x_axis_for_the_bot_flange,
-        "second_moment_of_area_about_x_axis": second_moment_of_area_about_x_axis,
+        "top_flange_centroid": area_properties["top_flange_centroid"],
+        "top_trapezoid_centroid": area_properties["top_trapezoid_centroid"],
+        "web_centroid": area_properties["web_centroid"],
+        "bottom_trapezoid_centroid": area_properties["bottom_trapezoid_centroid"],
+        "bottom_flange_centroid": area_properties["bottom_flange_centroid"],
+        "distance_to_centroid_y_axis_from_the_bottom_of_the_section": area_properties["distance_to_centroid_y_axis_from_the_bottom_of_the_section"],
+        "second_moment_of_area_about_x_axis_for_the_top_flange": area_properties["second_moment_of_area_about_x_axis_for_the_top_flange"],
+        "second_moment_of_area_about_the_x_axis_for_the_top_tapered_sections": area_properties["second_moment_of_area_about_the_x_axis_for_the_top_tapered_sections"],
+        "second_moment_of_area_about_x_axis_for_the_web": area_properties["second_moment_of_area_about_x_axis_for_the_web"],
+        "second_moment_of_area_about_the_x_axis_for_the_bottom_tapered_sections": area_properties["second_moment_of_area_about_the_x_axis_for_the_bottom_tapered_sections"],
+        "second_moment_of_area_about_x_axis_for_the_bot_flange": area_properties["second_moment_of_area_about_x_axis_for_the_bot_flange"],
+        "second_moment_of_area_about_x_axis": area_properties["second_moment_of_area_about_x_axis"],
         "second_moment_of_area_about_the_x1_axis": second_moment_of_area_about_the_x1_axis,
         "second_moment_of_area_about_the_y_axis_for_the_major_flange": second_moment_of_area_about_the_y_axis_for_the_major_flange,
         "second_moment_of_area_about_the_y_axis_for_the_minor_flange": second_moment_of_area_about_the_y_axis_for_the_minor_flange,

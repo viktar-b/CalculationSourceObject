@@ -260,3 +260,5 @@ export {
   type CalculationDefinition,
   type CalculationDefinitionResponse,
 } from './contracts/definition.ts';
+
+export { methodInvocationBindings } from './verification/method-bindings.ts';

@@ -1,5 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+  cpSync,
+  mkdtempSync,
+  rmSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { ExecutionResponseSchema, verifyExecution } from '@cs-object/core';
@@ -18,6 +24,11 @@ beforeAll(() => {
       filter: (path) =>
         !['_cso_bindings', '__pycache__'].includes(basename(path)),
     },
+  );
+  const source = readFileSync(join(directory, 'compare.cso.py'), 'utf8');
+  writeFileSync(
+    join(directory, 'ungrouped.cso.py'),
+    source.replace(/^ {4}(?:method|table)\([\s\S]*?^ {4}\)\n/gm, ''),
   );
   execFileSync(python, ['-I', '-m', 'cso_python', 'bindings', directory]);
   execFileSync(python, [
@@ -39,18 +50,20 @@ it.each([
     unreturned: 'm_m',
     selection: 'mass_per_metre_length',
     axis: 'columns',
+    cells: 6,
   },
   {
     name: 'compare_tapered',
     depth: 100,
-    formulas: 184,
-    unreturned: 'Z_x',
-    selection: 'plastic_section_modulus_about_x_axis',
-    axis: 'rows',
+    formulas: 44,
+    unreturned: 'A_top_flange',
+    selection: 'top_flange_area',
+    axis: 'columns',
+    cells: 20,
   },
 ])(
   'preserves reused calculations and forwarding in $name',
-  ({ name, depth, formulas, unreturned, selection, axis }) => {
+  ({ name, depth, formulas, unreturned, selection, axis, cells }) => {
     const response = ExecutionResponseSchema.parse(
       JSON.parse(
         execFileSync(
@@ -114,14 +127,16 @@ it.each([
         (quantity) => quantity.selectionName === selection,
       ),
     ).toBe(true);
-    expect(execution.tables?.[0]?.cells).toHaveLength(6);
+    expect(execution.tables?.[0]?.cells).toHaveLength(cells);
     expect(
-      new Set(execution.tables?.[0]?.cells.map((cell) => cell.caseInvocationId)),
+      new Set(
+        execution.tables?.[0]?.cells.map((cell) => cell.caseInvocationId),
+      ),
     ).toEqual(new Set(['root/baseline_section', 'root/candidate_section']));
     for (const invocation of ['baseline_section', 'candidate_section']) {
-      expect(execution.observations.map((observation) => observation.symbolId)).toContain(
-        JSON.stringify(['symbol', `root/${invocation}`, unreturned]),
-      );
+      expect(
+        execution.observations.map((observation) => observation.symbolId),
+      ).toContain(JSON.stringify(['symbol', `root/${invocation}`, unreturned]));
     }
     const sourceSymbols = [
       ...execution.cso.sections.flatMap((section) => section.items),
@@ -148,4 +163,64 @@ it('imports a generated parent from an external working directory', () => {
     { cwd: directory, encoding: 'utf8' },
   );
   expect(result.trim()).toBe('passed');
+});
+
+it('tapered grouping preserves every numerical observation and public output', () => {
+  const captures = ['compare.cso.py', 'ungrouped.cso.py'].map((source) => {
+    const response = ExecutionResponseSchema.parse(
+      JSON.parse(
+        execFileSync(
+          python,
+          [
+            '-I',
+            '-m',
+            'cso_python',
+            'execute',
+            join(directory, source),
+            '--function',
+            'compare_tapered',
+          ],
+          { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
+        ),
+      ),
+    );
+    if (!response.ok) throw new Error(JSON.stringify(response.diagnostics));
+    expect(verifyExecution({ execution: response.execution }).ok).toBe(true);
+    return response.execution;
+  });
+  const observedValues = (execution: (typeof captures)[number]) =>
+    execution.observations.map(({ symbolId, value, kind }) => ({
+      symbolId,
+      value,
+      kind,
+    }));
+  expect(observedValues(captures[0])).toEqual(observedValues(captures[1]));
+  expect(
+    captures[0].authoring?.outputs.map(
+      ({ invocationId, name, symbolId, value }) => ({
+        invocationId,
+        name,
+        symbolId,
+        value,
+      }),
+    ),
+  ).toEqual(
+    captures[1].authoring?.outputs.map(
+      ({ invocationId, name, symbolId, value }) => ({
+        invocationId,
+        name,
+        symbolId,
+        value,
+      }),
+    ),
+  );
+  const method = captures[0].methods?.[0];
+  expect(
+    method?.quantities.some((quantity) =>
+      quantity.selectionName.includes('plastic'),
+    ),
+  ).toBe(false);
+  expect(
+    method?.quantities.filter((quantity) => quantity.role !== 'input'),
+  ).toHaveLength(21);
 });

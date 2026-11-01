@@ -40,7 +40,7 @@ check selected default values against the external export.
 
 [compare.cso.py](compare.cso.py) contains two parent calculations:
 `compare_hot_formed` calls the hot-formed reference twice, and `compare_tapered`
-calls the tapered reference twice. Both vary section depth while retaining the
+calls the shared [area and x-axis inertia calculation](unequal_tapered_i_beam/area_inertia.cso.py) twice. The full tapered reference also calls this calculation and forwards its public outputs; its remaining elastic and plastic calculations retain their formulas. Both vary section depth while retaining the
 other reference defaults. Each passes area and centroidal second moment to
 [comparison.cso.py](comparison.cso.py), which computes candidate-to-baseline
 ratios. Ratios describe geometry; they do not establish capacity or compliance.
@@ -52,7 +52,7 @@ affected cases and the required geometry checks.
 
 Generate from this directory's common root so the imports mirror the source
 paths. The Python-compatible directory names differ from the external reference
-URL slugs; the reference calculation files retain their original bytes.
+URL slugs.
 
 ```sh
 "$PYTHON" -m cso_python bindings examples/section-properties
@@ -163,3 +163,9 @@ Plastic modulus follows from the clipped first moments. Cases place the PNA in
 each flange, each taper and the web, with zero, positive and negative origins.
 They check area, centroid, inertia, PNA, plastic modulus and dependent quantities
 without using captured calculation outputs as expected values.
+
+The tapered comparison table retains all eight dimension inputs, including the
+shared defaults, and selects area and x-axis inertia as its outputs. With two cases and ten quantities,
+it places cases in columns. Use `cases_axis="rows"` to transpose. Its method
+uses the ordinary formula rows without case substitutions. Plastic-section
+formulas belong to the full calculation and are not executed by this comparison.

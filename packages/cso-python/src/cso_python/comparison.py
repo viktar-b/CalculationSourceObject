@@ -139,6 +139,7 @@ def _place_method(planner, inv, call: ast.Call, section: Json, ids: set[str]) ->
         "parameterNames": list(definition.parameters),
         "outputNames": list(definition.outputs),
         "quantities": quantities,
+        "metadata": _section_metadata(target, definition.function),
         "content": content,
         "helpers": helpers,
         "location": span(inv.module.id, call),
@@ -157,6 +158,14 @@ def _place_method(planner, inv, call: ast.Call, section: Json, ids: set[str]) ->
             "metadata": planner.metadata(inv, local_id, call),
         }
     )
+
+
+def _section_metadata(module, function: ast.FunctionDef) -> Json:
+    for decorator in function.decorator_list:
+        if isinstance(decorator, ast.Call) and authoring_name(decorator.func) == "section":
+            config = kwargs(decorator, module.id, {"id", "title", "root", "metadata"}, {"title"})
+            return config.get("metadata", {})
+    return {}
 
 
 def _reject_deferred_content(planner, inv, module, function_name: str, at: ast.AST) -> None:
@@ -189,7 +198,6 @@ def _quantities(planner, inv, module, definition, plan, at: ast.AST) -> list[Jso
         for key, output in definition.outputs.items()
         if isinstance(output.selection, ast.Name)
     }
-    planned = {quantity["variableName"]: quantity for quantity in plan.quantities}
     for name, spec in definition.parameters.items():
         if name in definition.given_parameters:
             continue
@@ -221,7 +229,28 @@ def _quantities(planner, inv, module, definition, plan, at: ast.AST) -> list[Jso
         quantities.append(
             _quantity(variable, selection, quantity["kind"], role, metadata, nodes, glyphs)
         )
-    del planned
+    # A public return can forward a parameter or a child output without a
+    # local assignment. Describe that selection, but keep the table bound to
+    # the original captured symbol through child.outputs.
+    represented = {item["selectionName"] for item in quantities if item["role"] == "output"}
+    occupied = {item["variableName"] for item in quantities}
+    for index, (name, output) in enumerate(definition.outputs.items()):
+        if name in represented:
+            continue
+        variable = f"__return_{index}"
+        while variable in occupied:
+            variable += "_"
+        occupied.add(variable)
+        nodes = [
+            {key: value for key, value in node.items() if key != "_ast"}
+            for node in lower_expression(
+                module, definition.function, set(definition.parameters), output.selection, given=False,
+            )
+        ]
+        metadata = output.annotation.metadata
+        if metadata is None:
+            planner.error(inv, at, "INVALID_METHOD", f"Output {name!r} needs symbol metadata")
+        quantities.append(_quantity(variable, name, "formula", "output", metadata, nodes, glyphs))
     inputs = {item["selectionName"] for item in quantities if item["role"] == "input"}
     outputs = {item["selectionName"] for item in quantities if item["role"] == "output"}
     if inputs != set(definition.parameters) or outputs != set(definition.outputs):
@@ -334,6 +363,13 @@ def _method_content(
         {item["variableName"] for item in quantities},
     )
     seen = _content_variables(content)
+    # Forwarded returns have no assignment placement in the source plan.
+    content.extend(
+        {"kind": "quantity", "variableName": item["variableName"]}
+        for item in quantities
+        if item["role"] == "output" and item["variableName"] not in seen
+    )
+    seen = _content_variables(content)
     if any(item["variableName"] not in seen for item in quantities):
         planner.error(
             inv,
@@ -400,6 +436,7 @@ def _walk_steps(
                     "kind": "section",
                     "localId": config["id"],
                     "title": config["title"],
+                    "metadata": config.get("metadata", {}),
                     "content": nested,
                 }
             )
@@ -537,6 +574,7 @@ def _helper(planner, inv, module, described: Json, owner_id: str, stack, cache, 
         "parameterNames": list(definition.parameters),
         "outputNames": list(definition.outputs),
         "quantities": quantities,
+        "metadata": _section_metadata(loaded, definition.function),
         "content": content,
         "helpers": nested,
     }
@@ -956,31 +994,38 @@ def collect_branch_outcomes(planner) -> list[Json]:
     invocations = {invocation.id: invocation for invocation in planner.invocations}
     values = _symbol_values(planner)
     outcomes: list[Json] = []
+    def calls(content):
+        for item in content:
+            if item["kind"] == "call":
+                yield item
+            elif item["kind"] == "section":
+                yield from calls(item["content"])
+
+    def helpers(plan):
+        yield plan
+        for helper in plan["helpers"]:
+            yield from helpers(helper)
+
+    def visit(plan, child, plans):
+        glyphs = {quantity["variableName"]: quantity["glyph"] for quantity in plan["quantities"]}
+        for quantity in plan["quantities"]:
+            glyphs.setdefault(quantity["selectionName"], quantity["glyph"])
+        for quantity in plan["quantities"]:
+            if quantity["role"] == "input":
+                continue
+            symbol = child.symbols.get(quantity["variableName"])
+            if symbol is None:
+                continue
+            nodes = {node["key"]: node for node in symbol.cso["valueTree"]["nodes"]}
+            _visit_formula(child, quantity, glyphs, nodes, values, symbol.cso["valueTree"]["rootKey"], outcomes)
+        for call in calls(plan["content"]):
+            visit(plans[call["helperId"]], child.calls[call["binding"]], plans)
+
     for table in planner.tables:
         method = next(item for item in planner.methods if item["id"] == table["methodId"])
-        glyphs = {
-            quantity["variableName"]: quantity["glyph"] for quantity in method["quantities"]
-        }
-        for quantity in method["quantities"]:
-            glyphs.setdefault(quantity["selectionName"], quantity["glyph"])
+        plans = {plan["id"]: plan for plan in helpers(method)}
         for case in table["cases"]:
-            child = invocations[case["invocationId"]]
-            for quantity in method["quantities"]:
-                if quantity["role"] == "input":
-                    continue
-                symbol = child.symbols.get(quantity["variableName"])
-                if symbol is None:
-                    continue
-                nodes = {node["key"]: node for node in symbol.cso["valueTree"]["nodes"]}
-                _visit_formula(
-                    child,
-                    quantity,
-                    glyphs,
-                    nodes,
-                    values,
-                    symbol.cso["valueTree"]["rootKey"],
-                    outcomes,
-                )
+            visit(method, invocations[case["invocationId"]], plans)
     return outcomes
 
 

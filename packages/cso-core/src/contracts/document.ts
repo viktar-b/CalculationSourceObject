@@ -136,7 +136,7 @@ export const ResolvedAssetSchema = z
 const ContextPathSchema = z
   .string()
   .regex(
-    /^\/(?:sourceMetadata(?:\/|$)|sections\/\d+\/(?:metadata|items\/\d+\/(?:contextSource|symbol\/metadata))(?:\/|$)|detachedSymbols\/\d+\/(?:metadata|description|unit|comment)(?:\/|$))/,
+    /^\/(?:sourceMetadata(?:\/|$)|sections\/\d+\/(?:metadata|items\/\d+\/(?:(?:(?:content|helpers)\/\d+\/)*contextSource|symbol\/metadata))(?:\/|$)|detachedSymbols\/\d+\/(?:metadata|description|unit|comment)(?:\/|$))/,
   );
 export type PreparedContextValue =
   | { kind: 'text'; path: string; value: string | number | boolean }
@@ -233,6 +233,8 @@ export type PreparedMethodContent =
       kind: 'section';
       localId: string;
       title: string;
+      contextSource?: Record<string, HistoricalJsonValue>;
+      context?: PreparedContextField[];
       content: PreparedMethodContent[];
     }
   | {
@@ -254,6 +256,8 @@ export type PreparedMethodHelper = {
   function: string;
   content: PreparedMethodContent[];
   helpers: PreparedMethodHelper[];
+  contextSource?: Record<string, HistoricalJsonValue>;
+  context?: PreparedContextField[];
 };
 const PreparedMethodContentSchema: z.ZodType<PreparedMethodContent> = z.lazy(
   () =>
@@ -288,6 +292,8 @@ const PreparedMethodContentSchema: z.ZodType<PreparedMethodContent> = z.lazy(
         kind: z.literal('section'),
         localId: NonemptyStringSchema,
         title: NonemptyStringSchema,
+        contextSource: HistoricalJsonObjectSchema.optional(),
+        context: ContextSchema.optional(),
         content: z.array(PreparedMethodContentSchema),
       }),
       z.strictObject({
@@ -312,6 +318,8 @@ const PreparedMethodHelperSchema: z.ZodType<PreparedMethodHelper> = z.lazy(() =>
     function: NonemptyStringSchema,
     content: z.array(PreparedMethodContentSchema).min(1),
     helpers: z.array(PreparedMethodHelperSchema),
+    contextSource: HistoricalJsonObjectSchema.optional(),
+    context: ContextSchema.optional(),
   }),
 );
 const ApplicabilityNoteSchema = z.strictObject({
@@ -412,6 +420,7 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
       .array(
         z.strictObject({
           heading: NonemptyStringSchema,
+          callPath: NonemptyStringSchema.optional(),
           invocationId: NonemptyStringSchema,
           symbolId: NonemptyStringSchema,
           nodeKey: NonemptyStringSchema,
@@ -435,6 +444,7 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
             .array(
               z.strictObject({
                 heading: NonemptyStringSchema,
+                callPath: NonemptyStringSchema.optional(),
                 invocationId: NonemptyStringSchema,
                 value: z.boolean(),
                 reasons: z.array(NonemptyStringSchema).min(1).optional(),
@@ -455,6 +465,7 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
             .array(
               z.strictObject({
                 heading: NonemptyStringSchema,
+                callPath: NonemptyStringSchema.optional(),
                 invocationId: NonemptyStringSchema,
                 value: z.boolean(),
                 reasons: z.array(NonemptyStringSchema).min(1).optional(),
@@ -1055,6 +1066,26 @@ const validateContext = (document: PreparedDocument, ctx: z.RefinementCtx) => {
       checkValue(field.value, [...path, index, 'value'], field.path);
     });
   };
+  const checkContent = (
+    content: PreparedMethodContent[],
+    path: (string | number)[],
+  ): void => {
+    content.forEach((item, index) => {
+      if (item.kind !== 'section') return;
+      check(item.context ?? [], [...path, index, 'context']);
+      checkContent(item.content, [...path, index, 'content']);
+    });
+  };
+  const checkHelpers = (
+    helpers: PreparedMethodHelper[],
+    path: (string | number)[],
+  ): void => {
+    helpers.forEach((helper, index) => {
+      check(helper.context ?? [], [...path, index, 'context']);
+      checkContent(helper.content, [...path, index, 'content']);
+      checkHelpers(helper.helpers, [...path, index, 'helpers']);
+    });
+  };
   check(document.context, ['context']);
   const detachedIds = new Set(
     document.detachedSymbols.map((symbol) => symbol.id),
@@ -1065,6 +1096,10 @@ const validateContext = (document: PreparedDocument, ctx: z.RefinementCtx) => {
     section.items.forEach((item, itemIndex) => {
       const itemPath = [...path, 'items', itemIndex];
       check(item.context, [...itemPath, 'context']);
+      if (item.kind === 'method') {
+        checkContent(item.content, [...itemPath, 'content']);
+        checkHelpers(item.helpers, [...itemPath, 'helpers']);
+      }
       if (item.kind !== 'symbol' && item.kind !== 'symbolRef') {
         return;
       }

@@ -14,6 +14,7 @@ import { requiresExplicitOperandGroup } from '../mathml/symbol-value/operand-gro
 interface FormulaSheetValueTreeProps {
   readonly sheet: SheetDocument;
   readonly symbol: SheetSymbol;
+  readonly symbolicOnly?: boolean;
 }
 
 // Split only a left-associated addition chain. Each term keeps its original
@@ -59,61 +60,70 @@ const hasActiveSymbol = (tree: SheetValueTree): boolean => {
 export const FormulaSheetValueTree = ({
   sheet,
   symbol,
+  symbolicOnly = false,
 }: FormulaSheetValueTreeProps): ReactElement => {
   const showSymbolic = hasActiveSymbol(symbol.valueTree);
   const terms = additionTerms(symbol.valueTree, symbol.valueTree.rootKey);
   if (terms.length > 4) {
     return (
       <div className="cso-long-formula">
-        {(showSymbolic ? [false, true] : [true]).map((numerical) => (
-          // biome-ignore lint/a11y/useSemanticElements: This labels a formula group, not a fieldset of form controls.
-          <div
-            key={String(numerical)}
-            className="cso-formula-terms"
-            role="group"
-            aria-label={numerical ? 'Substitution' : 'Formula'}
-          >
-            {terms.map((rootKey, index) => {
-              const node = symbol.valueTree.nodes.find(
-                (node) => node.key === rootKey,
-              );
-              const operator =
-                node?.kind === 'function'
-                  ? getFunctionBinaryOperatorById(node.functionId)
-                  : undefined;
-              const grouped =
-                (operator !== undefined &&
-                  (operator.priority < SheetOperatorPriority.AddSubtract ||
-                    (index > 0 &&
-                      operator.priority === SheetOperatorPriority.AddSubtract))) ||
-                (node !== undefined &&
-                  requiresExplicitOperandGroup({
-                    sheet,
-                    node,
-                    numerical,
-                    literalsAsDrafts: true,
-                    parentFunctionId: 'fg.add',
-                    argumentIndex: index === 0 ? 0 : 1,
-                  }));
-              return (
-                <span className="cso-formula-term" key={`${index}-${rootKey}`}>
-                  <math display="inline">
-                    {index === 0 && <AsciiMathView expression={symbol.glyph} />}
-                    <mo>{index === 0 ? '=' : '+'}</mo>
-                    {grouped && <mo>(</mo>}
-                    <SymbolValueMathmlView
-                      sheet={sheet}
-                      valueTree={{ ...symbol.valueTree, rootKey }}
-                      noRootContainer={true}
-                      viewOptions={{ numerical, literalsAsDrafts: true }}
-                    />
-                    {grouped && <mo>)</mo>}
-                  </math>
-                </span>
-              );
-            })}
-          </div>
-        ))}
+        {(symbolicOnly ? [false] : showSymbolic ? [false, true] : [true]).map(
+          (numerical) => (
+            // biome-ignore lint/a11y/useSemanticElements: This labels a formula group, not a fieldset of form controls.
+            <div
+              key={String(numerical)}
+              className="cso-formula-terms"
+              role="group"
+              aria-label={numerical ? 'Substitution' : 'Formula'}
+            >
+              {terms.map((rootKey, index) => {
+                const node = symbol.valueTree.nodes.find(
+                  (node) => node.key === rootKey,
+                );
+                const operator =
+                  node?.kind === 'function'
+                    ? getFunctionBinaryOperatorById(node.functionId)
+                    : undefined;
+                const grouped =
+                  (operator !== undefined &&
+                    (operator.priority < SheetOperatorPriority.AddSubtract ||
+                      (index > 0 &&
+                        operator.priority ===
+                          SheetOperatorPriority.AddSubtract))) ||
+                  (node !== undefined &&
+                    requiresExplicitOperandGroup({
+                      sheet,
+                      node,
+                      numerical,
+                      literalsAsDrafts: true,
+                      parentFunctionId: 'fg.add',
+                      argumentIndex: index === 0 ? 0 : 1,
+                    }));
+                return (
+                  <span
+                    className="cso-formula-term"
+                    key={`${index}-${rootKey}`}
+                  >
+                    <math display="inline">
+                      {index === 0 && (
+                        <AsciiMathView expression={symbol.glyph} />
+                      )}
+                      <mo>{index === 0 ? '=' : '+'}</mo>
+                      {grouped && <mo>(</mo>}
+                      <SymbolValueMathmlView
+                        sheet={sheet}
+                        valueTree={{ ...symbol.valueTree, rootKey }}
+                        noRootContainer={true}
+                        viewOptions={{ numerical, literalsAsDrafts: true }}
+                      />
+                      {grouped && <mo>)</mo>}
+                    </math>
+                  </span>
+                );
+              })}
+            </div>
+          ),
+        )}
       </div>
     );
   }
@@ -122,8 +132,8 @@ export const FormulaSheetValueTree = ({
       sheet={sheet}
       symbol={symbol}
       showGlyph={true}
-      showSymbolic={showSymbolic}
-      showNumeric={true}
+      showSymbolic={symbolicOnly || showSymbolic}
+      showNumeric={!symbolicOnly}
     />
   );
 };

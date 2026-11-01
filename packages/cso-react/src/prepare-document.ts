@@ -10,6 +10,7 @@ import {
   type ExecutionPayload,
   ExecutionPayloadSchema,
   executionBindingFrom,
+  methodInvocationBindings,
   type HistoricalReview,
   HistoricalReviewSchema,
   type LegacyAssetManifest,
@@ -644,6 +645,9 @@ const presentMethodContent = (
         kind: 'section',
         localId: item.localId,
         title: item.title,
+        contextSource: HistoricalReviewSchema.shape.originalFields.parse({
+          metadata: item.metadata ?? {},
+        }),
         content: presentMethodContent(owner, item.content, notation),
       };
     }
@@ -667,6 +671,9 @@ const presentMethodHelpers = (
   helpers.map((helper) => ({
     id: helper.id,
     function: helper.function,
+    contextSource: HistoricalReviewSchema.shape.originalFields.parse({
+      metadata: helper.metadata ?? {},
+    }),
     content: presentMethodContent(helper, helper.content, notation),
     helpers: presentMethodHelpers(helper.helpers, notation),
   }));
@@ -677,63 +684,84 @@ const presentedBranchNotes = (
   method: MethodRecord,
   notation: MethodNotation,
 ) => {
-  const outcomes = (execution.branchOutcomes ?? []).filter((outcome) =>
-    table.cases.some((item) => item.invocationId === outcome.invocationId),
+  const outcomes = execution.branchOutcomes ?? [];
+  const bound = table.cases.flatMap((caseItem) =>
+    methodInvocationBindings(execution, method, caseItem.invocationId).flatMap(
+      ({ plan, invocation, callPath }) =>
+        outcomes
+          .filter((outcome) => outcome.invocationId === invocation.id)
+          .map((outcome) => {
+            const variable = invocation.symbols.find(
+              (item) => item.symbolId === outcome.symbolId,
+            )?.variableName;
+            const quantity =
+              plan.quantities.find((item) => item.variableName === variable) ??
+              fail(
+                'UNKNOWN_QUANTITY',
+                `Branch symbol '${outcome.symbolId}' is missing`,
+              );
+            return { caseItem, plan, callPath, outcome, quantity };
+          }),
+    ),
   );
-  const labels = new Map<string, string[]>();
-  const variableName = (outcome: (typeof outcomes)[number]) =>
-    execution.invocations
-      .find((item) => item.id === outcome.invocationId)
-      ?.symbols.find((item) => item.symbolId === outcome.symbolId)
-      ?.variableName ??
-    fail('UNKNOWN_QUANTITY', `Branch symbol '${outcome.symbolId}' is missing`);
-  const groupKey = (outcome: (typeof outcomes)[number]) =>
-    `${variableName(outcome)}|${outcome.nodeKey}`;
-  const chosenKey = (outcome: (typeof outcomes)[number]): string => {
-    const quantity =
-      method.quantities.find(
-        (item) => item.variableName === variableName(outcome),
-      ) ?? fail('UNKNOWN_QUANTITY', `Branch quantity is missing`);
-    const nodes = new Map(quantity.nodes.map((node) => [node.key, node]));
-    let key = outcome.nodeKey;
-    let holds = outcome.value;
-    for (;;) {
-      const arm = nodes.get(key)?.funcArgs?.[holds ? 1 : 2]?.key;
-      if (!arm) fail('UNKNOWN_QUANTITY', `Conditional '${key}' is incomplete`);
-      if (nodes.get(arm)?.funcSpec?.id !== 'fg.cnd') return arm;
-      const inner = outcomes.find(
-        (item) =>
-          item.invocationId === outcome.invocationId &&
-          item.symbolId === outcome.symbolId &&
-          item.nodeKey === arm,
-      );
-      if (!inner) return arm;
-      key = inner.nodeKey;
-      holds = inner.value;
-    }
-  };
-  for (const outcome of outcomes) {
-    const key = groupKey(outcome);
-    labels.set(key, [...(labels.get(key) ?? []), outcome.label]);
+  const groupKey = (item: (typeof bound)[number]) =>
+    JSON.stringify([
+      item.plan.id,
+      item.callPath,
+      item.quantity.variableName,
+      item.outcome.nodeKey,
+    ]);
+  const labels = new Map<string, Set<string>>();
+  for (const item of bound) {
+    const key = groupKey(item);
+    const values = labels.get(key) ?? new Set<string>();
+    values.add(item.outcome.label);
+    labels.set(key, values);
   }
-  return table.cases.flatMap((caseItem) =>
-    outcomes
-      .filter((outcome) => outcome.invocationId === caseItem.invocationId)
-      .filter((outcome) => new Set(labels.get(groupKey(outcome))).size > 1)
-      .map((outcome) => ({
+  return bound
+    .filter((item) => (labels.get(groupKey(item))?.size ?? 0) > 1)
+    .map(({ caseItem, plan, callPath, outcome, quantity }) => {
+      const nodes = new Map(quantity.nodes.map((node) => [node.key, node]));
+      let branch = outcome;
+      let chosen: string;
+      for (;;) {
+        const arm =
+          nodes.get(branch.nodeKey)?.funcArgs?.[branch.value ? 1 : 2]?.key ??
+          fail(
+            'UNKNOWN_QUANTITY',
+            `Conditional '${branch.nodeKey}' is incomplete`,
+          );
+        const inner =
+          nodes.get(arm)?.funcSpec?.id === 'fg.cnd'
+            ? outcomes.find(
+                (item) =>
+                  item.invocationId === outcome.invocationId &&
+                  item.symbolId === outcome.symbolId &&
+                  item.nodeKey === arm,
+              )
+            : undefined;
+        if (!inner) {
+          chosen = arm;
+          break;
+        }
+        branch = inner;
+      }
+      return {
         heading: caseItem.heading,
-        invocationId: caseItem.invocationId,
+        ...(callPath.length > 0 ? { callPath: callPath.join(' / ') } : {}),
+        invocationId: outcome.invocationId,
         symbolId: outcome.symbolId,
         nodeKey: outcome.nodeKey,
         label: outcome.label,
         conditionHolds: outcome.value,
         ...notation.branch(
-          variableName(outcome),
+          plan,
+          quantity.variableName,
           outcome.nodeKey,
-          chosenKey(outcome),
+          chosen,
         ),
-      })),
-  );
+      };
+    });
 };
 
 const comparisonPlacement = (
@@ -767,6 +795,10 @@ const comparisonPlacement = (
       kind: 'method',
       id: item.id,
       title: method.title,
+      contextSource: HistoricalReviewSchema.shape.originalFields.parse({
+        metadata: item.metadata ?? {},
+        contentMetadata: method.metadata ?? {},
+      }),
       quantities: method.quantities.map((quantity) =>
         presentMethodQuantity(method, quantity, notation),
       ),
@@ -816,41 +848,55 @@ const comparisonPlacement = (
     });
   const notation = notationFor(method);
   const branchNotes = presentedBranchNotes(execution, table, method, notation);
-  const engineeringChecks = (method.checks ?? []).flatMap((check) => {
-    const results = table.cases.flatMap((caseItem) => {
-      const outcome = (execution.checkOutcomes ?? []).find(
-        (item) =>
-          item.methodId === method.id &&
-          item.invocationId === caseItem.invocationId &&
-          item.checkId === check.id,
-      );
-      return outcome
+  const bindings = table.cases.flatMap((caseItem) =>
+    methodInvocationBindings(execution, method, caseItem.invocationId).map(
+      (binding) => ({ ...binding, heading: caseItem.heading }),
+    ),
+  );
+  const applicability = deriveApplicability(execution);
+  const checkPlans = new Map(bindings.map(({ plan }) => [plan.id, plan]));
+  const engineeringChecks = [...checkPlans.values()].flatMap((plan) =>
+    (plan.checks ?? []).flatMap((check) => {
+      const results = bindings
+        .filter((binding) => binding.plan.id === plan.id)
+        .flatMap(({ invocation, callPath, heading }) => {
+          const outcome = (execution.checkOutcomes ?? []).find(
+            (item) =>
+              item.methodId === plan.id &&
+              item.invocationId === invocation.id &&
+              item.checkId === check.id,
+          );
+          if (!outcome) return [];
+          const reasons = applicability.reasonsByCheck.get(
+            `${invocation.id}|${check.id}`,
+          );
+          return [
+            {
+              heading,
+              invocationId: invocation.id,
+              value: outcome.value,
+              ...(callPath.length > 0
+                ? { callPath: callPath.join(' / ') }
+                : {}),
+              ...(reasons ? { reasons: [...reasons] } : {}),
+            },
+          ];
+        });
+      return results.length > 0
         ? [
             {
-              heading: caseItem.heading,
-              invocationId: caseItem.invocationId,
-              value: outcome.value,
-              ...(() => {
-                const reasons = deriveApplicability(
-                  execution,
-                ).reasonsByCheck.get(`${caseItem.invocationId}|${check.id}`);
-                return reasons ? { reasons: [...reasons] } : {};
-              })(),
+              id:
+                plan.id === method.id
+                  ? check.id
+                  : JSON.stringify([plan.id, check.id]),
+              explanation: check.explanation,
+              predicateText: check.predicateText,
+              results,
             },
           ]
         : [];
-    });
-    return results.length > 0
-      ? [
-          {
-            id: check.id,
-            explanation: check.explanation,
-            predicateText: check.predicateText,
-            results,
-          },
-        ]
-      : [];
-  });
+    }),
+  );
   const applicabilityPlans = [
     method,
     ...method.helpers.flatMap(function walk(

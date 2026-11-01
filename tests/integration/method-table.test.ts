@@ -298,6 +298,34 @@ beforeAll(() => {
     { encoding: 'utf8' },
   );
   expect(installed.status, installed.stderr).toBe(0);
+  writeFileSync(
+    join(directory, 'forwarded.cso.py'),
+    `from typing import Annotated, TypeAlias
+from cso_python import CalculationResults, calculation, section, symbol
+from _cso_bindings.rectangle import rectangle
+Width: TypeAlias = Annotated[float, symbol(glyph="w", description="Width", unit="m")]
+Height: TypeAlias = Annotated[float, symbol(glyph="h", description="Height", unit="m")]
+@calculation(id="forwarded", title="Composed rectangle")
+@section(id="forwarded", title="Composed rectangle")
+def forwarded(width: Width, height: Height) -> CalculationResults:
+    geometry = rectangle(width=width, height=height)
+    return {"area": geometry["area"], "perimeter": geometry["perimeter"]}
+`,
+  );
+  for (const axis of ['rows', 'columns']) {
+    writeFileSync(
+      join(directory, `forwarded_${axis}.cso.py`),
+      publication
+        .replace(
+          'from _cso_bindings.rectangle import rectangle',
+          'from _cso_bindings.forwarded import forwarded as rectangle',
+        )
+        .replace(
+          'cases={"Case A": first_panel, "Case B": second_panel}',
+          `cases={"Case A": first_panel, "Case B": second_panel}, cases_axis="${axis}"`,
+        ),
+    );
+  }
   writeFileSync(join(directory, 'rectangle.cso.py'), rectangle);
   writeFileSync(join(directory, 'compare.cso.py'), compare);
   writeFileSync(join(directory, 'publish.cso.py'), publication);
@@ -725,6 +753,8 @@ test('typesets methods, notes and table values like ordinary formula rows', () =
   );
   expect(visibleText(html)).not.toContain('(w * h)');
   const areaRow = elementWith(html, 'data-quantity="area"');
+  expect(areaRow).toContain('cso-symbol-row');
+  expect(areaRow).not.toContain('<mn>6</mn>');
   expect(areaRow).toContain('<math');
   expect(areaRow).toContain('<msup');
   expect(html).toMatch(/data-quantity="area"[^>]*data-value="6"[^>]*>6\.00</);
@@ -1359,3 +1389,48 @@ test('repeats comparison context across vertical page breaks', () => {
   expect(oversized.stdout).toContain('DOCUMENT_LAYOUT_OVERFLOW');
   expect(readFileSync(sentinel, 'utf8')).toBe('keep');
 }, 180_000);
+
+test('composed method returns keep exact case bindings in both orientations', () => {
+  const captures = ['rows', 'columns'].map((axis) =>
+    capture(`forwarded_${axis}.cso.py`, 'compare'),
+  );
+  for (const execution of captures) {
+    expect(verifyExecution({ execution }).ok).toBe(true);
+    const cells = execution.tables?.[0]?.cells.filter(
+      (cell) => cell.role === 'output' && cell.quantity === 'area',
+    );
+    expect(cells).toHaveLength(2);
+    const [first, second] = cells ?? [];
+    if (!first || !second) throw new Error('Missing area cells');
+    expect(first.symbolId).not.toBe(second.symbolId);
+    for (const cell of cells ?? []) {
+      const output = execution.authoring?.outputs.find(
+        (output) =>
+          output.invocationId === cell.caseInvocationId &&
+          output.name === cell.quantity,
+      );
+      expect(output?.symbolId).toBe(cell.symbolId);
+      expect(output?.value).toBe(6);
+    }
+    const document = prepareExecutionDocument({ execution, assets: [] });
+    const html = renderToStaticMarkup(
+      createElement(PreparedFormulaSheet, { document }),
+    );
+    expect(html).toContain('cso-symbol-row');
+    expect(html).toContain('data-quantity="area"');
+    const tampered = structuredClone(execution);
+    const cell = tampered.tables?.[0]?.cells.find(
+      (cell) => cell.symbolId === first.symbolId,
+    );
+    if (!cell) throw new Error('Missing cell');
+    cell.symbolId = second.symbolId;
+    expect(
+      verifyExecution({ execution: tampered }).diagnostics.some(
+        (diagnostic) => diagnostic.code === 'CELL_BINDING_MISMATCH',
+      ),
+    ).toBe(true);
+  }
+  expect(captures[0].tables?.[0]?.cells).toEqual(
+    captures[1].tables?.[0]?.cells,
+  );
+});
