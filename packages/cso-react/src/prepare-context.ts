@@ -189,9 +189,13 @@ export const prepareDocumentContext = (
       section.items.flatMap((item) =>
         item.kind === 'symbol'
           ? [item.symbol.id]
-          : item.kind === 'symbolRef'
-            ? [item.id]
-            : [],
+          : item.kind === 'externalCall'
+            ? [...item.call.inputs, ...item.call.outputs].map(
+                (quantity) => quantity.symbolId,
+              )
+            : item.kind === 'symbolRef'
+              ? [item.id]
+              : [],
       ),
     ),
   );

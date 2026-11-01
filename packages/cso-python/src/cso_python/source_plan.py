@@ -180,12 +180,17 @@ def _prepare_statement(module: CapturedModule, node: ast.stmt) -> ast.stmt:
     rewritten = copy.deepcopy(node)
     rewritten.value = ast.copy_location(
         ast.Call(
-            func=ast.Name(id="calculation_call", ctx=ast.Load()),
+            func=ast.Name(
+                id=(
+                    "external_call"
+                    if handle.get("kind") == "external"
+                    else "calculation_call"
+                ),
+                ctx=ast.Load(),
+            ),
             args=[
                 ast.copy_location(
-                    ast.Constant(
-                        os.path.relpath(handle["path"], module.path.parent)
-                    ),
+                    ast.Constant(os.path.relpath(handle["path"], module.path.parent)),
                     original,
                 )
             ],
@@ -202,7 +207,9 @@ def _prepare_statement(module: CapturedModule, node: ast.stmt) -> ast.stmt:
                     value=ast.copy_location(
                         ast.Dict(
                             keys=[
-                                ast.copy_location(ast.Constant(keyword.arg), keyword.value)
+                                ast.copy_location(
+                                    ast.Constant(keyword.arg), keyword.value
+                                )
                                 for keyword in original.keywords
                             ],
                             values=[keyword.value for keyword in original.keywords],
@@ -260,7 +267,7 @@ def _describe_call(node: ast.stmt) -> Json | None:
         and len(node.targets) == 1
         and isinstance(node.targets[0], ast.Name)
         and isinstance(node.value, ast.Call)
-        and authoring_name(node.value.func) == "calculation_call"
+        and authoring_name(node.value.func) in {"calculation_call", "external_call"}
         and len(node.value.args) == 1
         and isinstance(node.value.args[0], ast.Constant)
         and isinstance(node.value.args[0].value, str)
@@ -281,6 +288,11 @@ def _describe_call(node: ast.stmt) -> Json | None:
         if isinstance(key, ast.Constant) and isinstance(key.value, str)
     ]
     return {
+        **(
+            {"kind": "external"}
+            if authoring_name(node.value.func) == "external_call"
+            else {}
+        ),
         "binding": node.targets[0].id,
         "path": node.value.args[0].value,
         "function": function.value,
@@ -299,7 +311,9 @@ def _quantity_kind(expr: ast.expr | None) -> str:
 
 
 def _project(nodes: list[Json]) -> list[Json]:
-    return [{key: value for key, value in node.items() if key != "_ast"} for node in nodes]
+    return [
+        {key: value for key, value in node.items() if key != "_ast"} for node in nodes
+    ]
 
 
 def lower_expression(
@@ -408,9 +422,7 @@ def lower_expression(
         elif isinstance(node, (ast.Name, ast.Subscript)):
             item["_ast"] = node
             if isinstance(node, ast.Name):
-                item.update(
-                    mode="SYMBOL", ref={"kind": "name", "name": node.id}
-                )
+                item.update(mode="SYMBOL", ref={"kind": "name", "name": node.id})
                 if node.id in parameters:
                     item["parameterName"] = node.id
             else:
@@ -491,7 +503,11 @@ def lower_expression(
                         },
                     )
                 else:
-                    fail(arg, "INVALID_GIVEN", "given accepts a parameter or finite literal")
+                    fail(
+                        arg,
+                        "INVALID_GIVEN",
+                        "given accepts a parameter or finite literal",
+                    )
             elif name == "documented_result":
                 if node is not expr:
                     fail(

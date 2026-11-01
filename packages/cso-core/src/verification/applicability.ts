@@ -91,11 +91,16 @@ export function deriveApplicability(execution: ExecutionPayload): {
       for (const definition of invocation.symbols) {
         const symbol = symbolsById.get(definition.symbolId);
         if (!symbol) continue;
-        const used = usedSymbolIds(
-          symbol.valueTree.nodes,
-          symbol.valueTree.rootKey,
-          valuesBySymbol,
-        );
+        const used =
+          definition.kind === 'externalResult'
+            ? execution.externalCalls
+                ?.find((call) => call.id === definition.externalCallId)
+                ?.inputs.map((input) => input.symbolId)
+            : usedSymbolIds(
+                symbol.valueTree.nodes,
+                symbol.valueTree.rootKey,
+                valuesBySymbol,
+              );
         if (!used) continue;
         let next = reasons.get(definition.symbolId) ?? [];
         for (const usedId of used) {

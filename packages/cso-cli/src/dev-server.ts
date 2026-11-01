@@ -8,7 +8,7 @@ import {
   PythonIdentifierSchema,
   type CalculationDefinition,
 } from '@cs-object/core';
-import { UsageError } from './arguments.ts';
+import { UsageError, executionTimeout } from './arguments.ts';
 import { HttpError } from './dev-errors.ts';
 import {
   createDevRuntime,
@@ -20,7 +20,7 @@ import { parseStrictJson } from './strict-json.ts';
 import { devPage } from './dev-ui.ts';
 
 type DevOptions = DevTarget & { port: number };
-export const devHelp = `Usage: cso dev <file.cso.py> --function <name> [--port <0-65535>] [--reference <file.json>]
+export const devHelp = `Usage: cso dev <file.cso.py> --function <name> [--port <0-65535>] [--reference <file.json>] [--timeout <seconds>]
 
 Serve a verified calculation on 127.0.0.1. Port 0 chooses an available port.
 PYTHON selects the installed cs-object interpreter. Source path and function are fixed at startup.
@@ -33,7 +33,7 @@ export function parseDevArgs(args: string[]): DevOptions {
     const key = rest[index];
     const value = rest[index + 1];
     if (
-      !['--function', '--port', '--reference'].includes(key) ||
+      !['--function', '--port', '--reference', '--timeout'].includes(key) ||
       values.has(key) ||
       !value ||
       value.startsWith('--')
@@ -59,6 +59,9 @@ export function parseDevArgs(args: string[]): DevOptions {
     functionName: normalizedFunction,
     port,
     ...(reference ? { referencePath: resolve(reference) } : {}),
+    ...(values.has('--timeout')
+      ? { executionTimeoutMs: executionTimeout(values.get('--timeout') ?? '') }
+      : {}),
   };
 }
 export function parseDevInputs(

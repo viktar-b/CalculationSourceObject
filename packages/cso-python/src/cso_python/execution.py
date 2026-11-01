@@ -11,6 +11,9 @@ import json
 import platform
 import sys
 import types
+import uuid
+import warnings
+import importlib.metadata
 from pathlib import Path
 from typing import Any
 
@@ -58,11 +61,24 @@ def _declared_number(
 
 
 class Execution:
-    def __init__(self, source: Path, function: str, inputs: Json):
+    def __init__(
+        self,
+        source: Path,
+        function: str,
+        inputs: Json,
+        *,
+        supports_external: bool = True,
+    ):
         self.planner = Planner(source)
         self.root = self.planner.plan(
             self.planner.capture.entry, function, supplied=inputs
         )
+        if self.planner.external_calls and not supports_external:
+            raise SourceError(
+                "INCOMPATIBLE_CONTRACT",
+                "External functions require an execution consumer supporting protocol 4 and retained call evidence; standalone CSO export is unsupported",
+                stage="source",
+            )
         qualify_glyphs(self.planner.invocations)
         self.code = {}
         for module in self.planner.capture.modules.values():
@@ -81,6 +97,8 @@ class Execution:
                 ) from error
         self.observations: list[Json] = []
         self.modules: dict[Path, Json] = {}
+        self.adapter_modules: dict[Path, Json] = {}
+        self.run_id = str(uuid.uuid4())
 
     def unchanged(self) -> bool:
         return self.planner.unchanged()
@@ -90,6 +108,8 @@ class Execution:
             name: number(value, stage="usage") for name, value in inputs.items()
         }
         self.observations.clear()
+        self.adapter_modules.clear()
+        self.run_id = str(uuid.uuid4())
         for invocation in self.planner.invocations:
             invocation.record["resolvedInputs"] = {}
             invocation.record["resolvedInputKinds"] = {}
@@ -262,7 +282,11 @@ class Execution:
                 if name not in invocation.signature_inputs:
                     continue
                 self.observe(name, resolved[name])
-            result = namespace[invocation.function.name](**resolved)
+            result = (
+                self.run_external(invocation, resolved)
+                if invocation.external
+                else namespace[invocation.function.name](**resolved)
+            )
             if type(result) is not dict or list(result) != list(invocation.outputs):
                 raise SourceError(
                     "INVALID_RETURN_KEYS",
@@ -303,6 +327,97 @@ class Execution:
         finally:
             ACTIVE.reset(token)
 
+    def run_external(self, invocation: Invocation, inputs: Json) -> Json:
+        external = invocation.external
+        record = next(
+            item for item in self.planner.external_calls if item["id"] == invocation.id
+        )
+        try:
+            with warnings.catch_warnings(record=True) as captured_warnings:
+                warnings.simplefilter("always")
+                namespace = self.adapter_modules.get(external.path)
+                if namespace is None:
+                    namespace = {
+                        "__name__": "_cso_external_adapter",
+                        "__file__": str(external.path),
+                    }
+                    self.adapter_modules[external.path] = namespace
+                    # This is the exact captured adapter, never a new disk read.
+                    exec(self.code[external.path], namespace)
+                target = namespace.get(external.function)
+                if not callable(target):
+                    raise SourceError(
+                        "MISSING_EXTERNAL_CALLABLE",
+                        f"Missing callable {external.function!r}",
+                        stage="execution",
+                    )
+                raw = target(**invocation.record["resolvedInputs"])
+                record["warnings"] = [
+                    f"{item.category.__name__}: {item.message}"
+                    for item in captured_warnings
+                ]
+            if type(raw) in (int, float) and len(external.outputs) == 1:
+                raw = {next(iter(external.outputs)): raw}
+            if type(raw) is not dict or raw.keys() != external.outputs.keys():
+                raise SourceError(
+                    "INVALID_EXTERNAL_OUTPUTS",
+                    "Adapter must return a native scalar for one output or a dictionary with exactly the declared output names",
+                    stage="execution",
+                )
+            result = {}
+            record["inputs"] = [
+                {
+                    "name": name,
+                    "symbolId": invocation.parameter_symbols[name].cso["id"],
+                    "numericType": declared.numeric_type,
+                    "value": invocation.record["resolvedInputs"][name],
+                    "numericKind": invocation.record["resolvedInputKinds"][name],
+                }
+                for name, declared in external.inputs.items()
+            ]
+            record["outputs"] = []
+            for name, declared in external.outputs.items():
+                symbol = invocation.outputs[name]
+                value = _declared_number(
+                    raw[name],
+                    declared.numeric_type,
+                    location=record["callSite"],
+                    code="EXTERNAL_OUTPUT_TYPE_MISMATCH",
+                    subject=f"External output {name!r}",
+                )
+                result[name] = value
+                self.observe(symbol.name, value)
+                symbol.cso["valueTree"]["nodes"][0]["literal"] = {
+                    "kind": "number",
+                    "value": value,
+                    "numericKind": numeric_kind(value),
+                }
+                record["outputs"].append(
+                    {
+                        "name": name,
+                        "symbolId": symbol.cso["id"],
+                        "numericType": declared.numeric_type,
+                        "value": value,
+                        "numericKind": numeric_kind(value),
+                    }
+                )
+            return result
+        except Exception as error:
+            if isinstance(error, SourceError):
+                error.diagnostic.setdefault("location", record["callSite"])
+                error.diagnostic.setdefault("invocationId", invocation.id)
+                error.diagnostic["message"] = (
+                    f"{record['adapter']['moduleId']}:{external.function}: {error.diagnostic['message']}"
+                )
+                raise
+            raise SourceError(
+                "EXTERNAL_EXECUTION_FAILED",
+                f"{record['adapter']['moduleId']}:{external.function}: {type(error).__name__}: {error}",
+                stage="execution",
+                location=record["callSite"],
+                invocationId=invocation.id,
+            ) from error
+
     def response(self) -> Json:
         self.run(self.root, self.root.record["resolvedInputs"])
         root = self.root
@@ -312,54 +427,52 @@ class Execution:
             m["sha256"] for m in manifest if m["moduleId"] == root.module.id
         )
         execution = {
-                "authoring": {
-                    "version": "2",
-                    "parameters": [
-                        p for inv in self.planner.invocations for p in inv.parameters_v2
-                    ],
-                    "uses": [
-                        use for inv in self.planner.invocations for use in inv.uses
-                    ],
-                    "outputDeclarations": [
-                        {
-                            k: v
-                            for k, v in output.items()
-                            if k not in {"value", "numericKind"}
-                        }
-                        for inv in self.planner.invocations
-                        for output in inv.output_records
-                    ],
-                    "outputs": [
-                        output
-                        for inv in self.planner.invocations
-                        for output in inv.output_records
-                    ],
+            "authoring": {
+                "version": "2",
+                "parameters": [
+                    p for inv in self.planner.invocations for p in inv.parameters_v2
+                ],
+                "uses": [use for inv in self.planner.invocations for use in inv.uses],
+                "outputDeclarations": [
+                    {
+                        k: v
+                        for k, v in output.items()
+                        if k not in {"value", "numericKind"}
+                    }
+                    for inv in self.planner.invocations
+                    for output in inv.output_records
+                ],
+                "outputs": [
+                    output
+                    for inv in self.planner.invocations
+                    for output in inv.output_records
+                ],
+            },
+            "cso": {
+                "schemaVersion": "1.0.0",
+                "title": root.calculation["title"],
+                "source": {
+                    "id": root.calculation["id"],
+                    "metadata": root.calculation.get("metadata", {}),
                 },
-                "cso": {
-                    "schemaVersion": "1.0.0",
-                    "title": root.calculation["title"],
-                    "source": {
-                        "id": root.calculation["id"],
-                        "metadata": root.calculation.get("metadata", {}),
-                    },
-                    "rootSectionIds": [root.section["id"]],
-                    "sections": self.planner.sections,
-                },
-                "entry": {
-                    "moduleId": root.module.id,
-                    "sourceHash": source_hash,
-                    "function": root.function.name,
-                    "invocationId": "root",
-                    "resolvedInputs": root.record["resolvedInputs"],
-                    "resolvedInputKinds": root.record["resolvedInputKinds"],
-                },
-                "sourceManifest": manifest,
-                "sourceClosureHash": capture.closure_hash(),
-                "invocations": [inv.record for inv in self.planner.invocations],
-                "observations": self.observations,
-                "assets": list(self.planner.assets.values()),
-                "versions": versions(),
-            }
+                "rootSectionIds": [root.section["id"]],
+                "sections": self.planner.sections,
+            },
+            "entry": {
+                "moduleId": root.module.id,
+                "sourceHash": source_hash,
+                "function": root.function.name,
+                "invocationId": "root",
+                "resolvedInputs": root.record["resolvedInputs"],
+                "resolvedInputKinds": root.record["resolvedInputKinds"],
+            },
+            "sourceManifest": manifest,
+            "sourceClosureHash": capture.closure_hash(),
+            "invocations": [inv.record for inv in self.planner.invocations],
+            "observations": self.observations,
+            "assets": list(self.planner.assets.values()),
+            "versions": versions(),
+        }
         protocol = "2"
         if self.planner.methods or self.planner.tables:
             protocol = "3"
@@ -377,6 +490,23 @@ class Execution:
             applicability_outcomes = collect_applicability_outcomes(self.planner)
             if applicability_outcomes:
                 execution["applicabilityOutcomes"] = applicability_outcomes
+        if self.planner.external_calls:
+            protocol = "4"
+            execution["cso"]["schemaVersion"] = "1.2.0"
+            execution["externalCalls"] = self.planner.external_calls
+            execution["runId"] = self.run_id
+            execution["environment"] = {
+                "pythonVersion": platform.python_version(),
+                "pythonImplementation": platform.python_implementation(),
+                "distributions": sorted(
+                    [
+                        [item.metadata["Name"], item.version]
+                        for item in importlib.metadata.distributions()
+                        if item.metadata["Name"]
+                    ],
+                    key=lambda item: (item[0].lower(), item[1]),
+                ),
+            }
         return {
             "protocolVersion": protocol,
             "ok": True,
@@ -395,10 +525,14 @@ def versions() -> Json:
     }
 
 
-def execute(source: Path, function: str, inputs: Json) -> Json:
+def execute(
+    source: Path, function: str, inputs: Json, *, supports_external: bool = True
+) -> Json:
     execution = Execution.__new__(Execution)
     try:
-        execution.__init__(source, function, inputs)
+        execution.__init__(
+            source, function, inputs, supports_external=supports_external
+        )
         return execution.response()
     except (SourceError, OSError, ValueError, UnicodeError, RuntimeError) as error:
         diagnostic = (
@@ -432,7 +566,9 @@ def execute(source: Path, function: str, inputs: Json) -> Json:
                     execution.planner.capture.closure_hash()
                 )
                 provenance["resolvedInputs"] = execution.root.record["resolvedInputs"]
-                provenance["resolvedInputKinds"] = execution.root.record["resolvedInputKinds"]
+                provenance["resolvedInputKinds"] = execution.root.record[
+                    "resolvedInputKinds"
+                ]
         return {
             "protocolVersion": "2",
             "ok": False,
@@ -523,6 +659,7 @@ def execute_from_argv(argv: list[str]) -> int:
     parser.add_argument("--function", required=True, action="append")
     parser.add_argument("--inputs-json", action="append", default=[])
     parser.add_argument("--input", action="append", default=[])
+    parser.add_argument("--supported-execution-protocol", action="append", default=[])
     args = parser.parse_args(argv)
     try:
         if len(args.function) != 1 or len(args.inputs_json) > 1:
@@ -560,7 +697,12 @@ def execute_from_argv(argv: list[str]) -> int:
                 )
             number(value, stage="usage")
         with authored_output_to_stderr():
-            response = execute(args.source, args.function[0], inputs)
+            response = execute(
+                args.source,
+                args.function[0],
+                inputs,
+                supports_external="4" in args.supported_execution_protocol,
+            )
     except (SourceError, ValueError) as error:
         diagnostic = (
             error.diagnostic

@@ -97,6 +97,12 @@ export function executeAndVerify(
     referenceCases: reference?.kind === 'parsed' ? reference.cases : undefined,
   });
   report.numericPolicy = verified.numericPolicy;
+  if (verified.externalCoverage) {
+    report.reportVersion = '2';
+    report.verificationVersion = verified.verificationVersion;
+    report.executionBinding = verified.executionBinding;
+    report.externalCoverage = verified.externalCoverage;
+  }
   Object.assign(report.checks, verified.checks);
   report.diagnostics.push(...verified.diagnostics);
   if (reference?.kind === 'failed') {

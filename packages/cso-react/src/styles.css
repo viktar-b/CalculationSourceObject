@@ -123,6 +123,16 @@ math {
 .cso-symbol-row { break-inside: avoid; page-break-inside: avoid; }
 .cso-symbol-placement { overflow-wrap: anywhere; }
 .cso-method, .cso-comparison { margin: 3mm 0 5mm; }
+.cso-external-call { margin: 3mm 0 5mm; }
+.cso-external-call table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
+.cso-external-call th, .cso-external-call td { border: 1px solid #d0d5dd; padding: 2mm; overflow-wrap: anywhere; text-align: left; }
+.cso-external-call thead { display: table-header-group; }
+.cso-external-call thead th { background: #f8fafc; }
+.cso-external-call h3, .cso-external-call p { margin: 0 0 1mm; }
+.cso-external-call tr { break-inside: avoid; }
+.cso-external-call td:last-child { font-variant-numeric: tabular-nums; }
+.cso-external-call math { display: inline-block; vertical-align: middle; }
+.cso-external-coverage { margin-top: 2mm !important; font-size: 10px; }
 .cso-method h3, .cso-comparison h3 { font-size: 13px; font-weight: 650; margin: 0 0 2mm; }
 .cso-method-quantity, .cso-method-text, .cso-method-call, .cso-branch-note { margin: 1mm 0; }
 .cso-method-quantity math, .cso-method-call math, .cso-branch-note math { vertical-align: middle; }

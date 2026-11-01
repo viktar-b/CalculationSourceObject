@@ -81,7 +81,8 @@ PDF can present the same report; the verification report is a separate record.
 
 **Source-to-document consistency**:
 Agreement between the authored calculation's runtime results and the values
-obtained by evaluating the documented formulas.
+obtained by evaluating documented formulas or matching captured external results.
+External-result consistency excludes the external algorithm from formula verification.
 _Avoid_: treating structural validation as numerical agreement.
 
 **Independent numerical reference case**:

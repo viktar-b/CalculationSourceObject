@@ -21,6 +21,7 @@ from .authoring import (
 )
 from .execution import calculation_call
 from .handles import CalculationHandle, load_calculation
+from .external import external_function, load_external
 
 __all__ = [
     "CalculationFunction",
@@ -37,6 +38,8 @@ __all__ = [
     "figure",
     "given",
     "load_calculation",
+    "external_function",
+    "load_external",
     "CalculationHandle",
     "method",
     "section",

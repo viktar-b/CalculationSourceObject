@@ -61,6 +61,12 @@ Reading several outputs shares that invocation. Separate calls remain separate
 even with identical inputs; CSO does not implicitly memoize them. ADR-0012 owns
 module lifetime and dependency-state limits between runs.
 
+External calls may occur inside an annotated calculation used by `method` or
+as a table case. Represent them as static external-call leaves in the shared
+source plan and method contract. Method planning, including a zero-case table,
+must neither import nor execute adapters. A direct external handle is not a
+`method(calculation=...)` target or a table case; use an annotated wrapper.
+
 ## Consequences
 
 ### Positive

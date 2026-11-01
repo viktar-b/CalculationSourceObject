@@ -224,7 +224,11 @@ after the maintained automatic presentation checks pass.
 
 The server binds only to IPv4 loopback and rejects foreign Host/Origin headers.
 It executes trusted local calculation sources. Python requests have a 30-second
-deadline and bounded output. Execution is synchronous, so the local server pauses
+default deadline and bounded output. `--timeout <seconds>` overrides the whole
+calculation deadline for `dev`, `verify`, `html` and `pdf`; zero disables it.
+One-shot commands have no deadline unless supplied. Invalid or negative durations
+fail before execution. A timed-out run leaves an earlier successful artifact
+unchanged. Browser-rendering deadlines remain separate. Execution is synchronous, so the local server pauses
 while Python runs. One PDF renders at a time, with a 90-second deadline. Retention
 is limited to 10 runs, 128 MiB of serialized report data, and 30 minutes. Expired or evicted
 run URLs return 404. Request bodies are limited to 64 KiB. Stop with Ctrl+C;

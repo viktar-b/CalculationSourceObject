@@ -351,7 +351,7 @@ const CalculationSourceOriginSchema = z
 
 export const CalculationSourceObjectSchema = z
   .object({
-    schemaVersion: z.enum(['1.0.0', '1.1.0']),
+    schemaVersion: z.enum(['1.0.0', '1.1.0', '1.2.0']),
     title: z.string(),
     source: z
       .object({
@@ -371,7 +371,13 @@ export const CalculationSourceObjectSchema = z
         (item) => item.kind === 'method' || item.kind === 'table',
       ),
     );
-    if ((document.schemaVersion === '1.1.0') !== comparison) {
+    const external = document.sections.some(
+      (section) => typeof section.metadata?.externalCallId === 'string',
+    );
+    if (
+      (document.schemaVersion === '1.2.0') !== external ||
+      (!external && (document.schemaVersion === '1.1.0') !== comparison)
+    ) {
       ctx.addIssue({
         code: 'custom',
         path: ['schemaVersion'],

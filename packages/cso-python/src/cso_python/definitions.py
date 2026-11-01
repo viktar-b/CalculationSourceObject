@@ -71,6 +71,58 @@ class Definitions:
             self.visiting.remove(key)
 
     def _read(self, module: CapturedModule, function: str) -> Definition:
+        if function in module.externals:
+            external = module.externals[function]
+            parameters = {
+                name: ParameterDefinition(
+                    node=ast.copy_location(
+                        ast.arg(arg=name), external.input_nodes[name]
+                    ),
+                    declared=declared,
+                    documented=declared,
+                    default=external.defaults.get(name),
+                    default_value=(
+                        literal(external.defaults[name], module.id)
+                        if name in external.defaults
+                        else None
+                    ),
+                )
+                for name, declared in external.inputs.items()
+            }
+            outputs = {
+                name: OutputDefinition(
+                    declared,
+                    ast.copy_location(
+                        ast.Name(id=name, ctx=ast.Load()), external.output_nodes[name]
+                    ),
+                    None,
+                )
+                for name, declared in external.outputs.items()
+            }
+            function_node = ast.copy_location(
+                ast.FunctionDef(
+                    name=function,
+                    args=ast.arguments(
+                        posonlyargs=[],
+                        args=[],
+                        kwonlyargs=[p.node for p in parameters.values()],
+                        kw_defaults=[],
+                        defaults=[],
+                    ),
+                    body=[],
+                    decorator_list=[],
+                ),
+                external.node,
+            )
+            return Definition(
+                module,
+                function_node,
+                parameters,
+                outputs,
+                external.fingerprint,
+                frozenset(),
+                False,
+            )
         fn = module.functions.get(function)
         if fn is None:
             raise SourceError("MISSING_FUNCTION", f"Missing calculation {function}")
@@ -339,9 +391,12 @@ class Definitions:
                             location=span(module.id, node),
                         )
                     keys = [
-                        key.value
-                        if isinstance(key, ast.Constant) and isinstance(key.value, str)
-                        else None
+                        (
+                            key.value
+                            if isinstance(key, ast.Constant)
+                            and isinstance(key.value, str)
+                            else None
+                        )
                         for key in node.value.keys
                     ]
                     if any(key is None or not key for key in keys) or len(
@@ -357,9 +412,9 @@ class Definitions:
                     legacy_return = legacy_signature and keys == documented_names
                     for key, value in zip(keys, node.value.values):
                         outputs[key] = OutputDefinition(
-                            annotation=known[key]
-                            if legacy_return
-                            else reference(value),
+                            annotation=(
+                                known[key] if legacy_return else reference(value)
+                            ),
                             selection=value,
                             parameter_source=parameter_source(value),
                         )

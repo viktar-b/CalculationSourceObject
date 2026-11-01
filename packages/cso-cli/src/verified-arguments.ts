@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import { parseCliArgs, UsageError } from './arguments.ts';
 
 export type VerifiedOptions = {
+  readonly executionTimeoutMs?: number;
   readonly sourcePath: string;
   readonly functionName: string;
   readonly inputs: Record<string, number>;
@@ -60,6 +61,7 @@ export function parseVerifiedArgs(
         '--input',
         '--reference',
         '--format',
+        '--timeout',
         ...(command !== 'verify' ? ['--out'] : []),
       ].includes(key)
     ) {
@@ -95,6 +97,9 @@ export function parseVerifiedArgs(
     functionName: parsed.functionName,
     inputs: parsed.inputs,
     referencePath,
+    ...(parsed.executionTimeoutMs === undefined
+      ? {}
+      : { executionTimeoutMs: parsed.executionTimeoutMs }),
   };
   if (command === 'html') {
     return {
@@ -113,7 +118,7 @@ export function parseVerifiedArgs(
 
 export function verifiedHelp(command: 'verify' | 'pdf' | 'html'): string {
   if (command === 'html')
-    return `Usage: cso html <file.cso.py> --function <name> [--input <name=number>] [--reference <file.json>] --out <path.html> [--format json] [--no-evidence] [--check-layout]
+    return `Usage: cso html <file.cso.py> --function <name> [--input <name=number>] [--reference <file.json>] [--timeout <seconds>] --out <path.html> [--format json] [--no-evidence] [--check-layout]
 
 Verify one captured execution and atomically publish standalone HTML with embedded CSS/assets.
 --check-layout uses Chromium to check assets, presentation and screen/print overflow before publication.
@@ -123,7 +128,7 @@ Inputs, reference matching, JSON reports, PYTHON and exit codes follow cso verif
 Paths resolve against the caller directory. --help executes neither Python nor Chromium.
 `;
 
-  return `Usage: cso ${command} <file.cso.py> --function <name> [--input <name=number>] [--reference <file.json>]${command === 'pdf' ? ' --out <path.pdf>' : ''} [--format json]${command === 'pdf' ? ' [--no-evidence]' : ''}
+  return `Usage: cso ${command} <file.cso.py> --function <name> [--input <name=number>] [--reference <file.json>] [--timeout <seconds>]${command === 'pdf' ? ' --out <path.pdf>' : ''} [--format json]${command === 'pdf' ? ' [--no-evidence]' : ''}
 
 ${command === 'verify' ? 'Execute once with installed cs-object and independently evaluate every documented result.' : 'Verify once, render the captured execution, and atomically replace the PDF. Evidence is retained unless --no-evidence is set.'}
 Repeat --input for distinct parameters. Duplicate, unknown and invalid inputs fail.

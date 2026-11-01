@@ -703,6 +703,28 @@ export const createFormulaEvaluator = (
     const definition = graph.definition;
     let result: EvaluationResult;
     switch (definition.kind) {
+      case 'externalResult': {
+        const output = execution.externalCalls
+          ?.find((call) => call.id === definition.externalCallId)
+          ?.outputs.find(
+            (item) =>
+              item.name === definition.outputName &&
+              item.symbolId === definition.symbolId,
+          );
+        result = output
+          ? numericEvaluation(
+              address,
+              validateNumber(output.value, output.numericKind),
+            )
+          : failure(
+              diagnostic({
+                address,
+                code: 'UNKNOWN_EXTERNAL_RESULT',
+                message: 'External result has no captured numeric authority',
+              }),
+            );
+        break;
+      }
       case 'input':
         result = evaluateInputAuthority(graph, nextStack);
         break;

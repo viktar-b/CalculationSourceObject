@@ -8,9 +8,13 @@ import {
   NonemptyStringSchema,
   SourceSpanSchema,
   sha256Bytes,
+  collectCsoSymbols,
+  exactCaptureHash,
 } from './common.ts';
 import { ExecutionPayloadSchema, executionBindingFrom } from './execution.ts';
 import { addSymbolDisplayIssues } from './glyphs.ts';
+import { ExternalCallSchema } from './external.ts';
+import { VerificationReportSchema } from './reports.ts';
 
 type HistoricalJsonValue = z.infer<ReturnType<typeof z.json>>;
 
@@ -345,6 +349,14 @@ const PreparedTableRowSchema = z.strictObject({
 
 export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
   z.strictObject({
+    kind: z.literal('externalCall'),
+    id: NonemptyStringSchema,
+    title: NonemptyStringSchema,
+    call: ExternalCallSchema,
+    contextSource: HistoricalJsonObjectSchema.optional(),
+    ...placementFields,
+  }),
+  z.strictObject({
     kind: z.literal('section'),
     id: NonemptyStringSchema,
     contextSource: HistoricalJsonObjectSchema.optional(),
@@ -504,7 +516,8 @@ export const PreparedDocumentSectionSchema = z.strictObject({
 
 export const PreparedDocumentSchema = z
   .strictObject({
-    documentVersion: z.enum(['2', '3']),
+    documentVersion: z.enum(['2', '3', '4']),
+    verification: VerificationReportSchema.optional(),
     context: ContextSchema,
     source: z.discriminatedUnion('kind', [
       ExecutionBindingSchema.safeExtend({ kind: z.literal('execution') }),
@@ -528,7 +541,38 @@ export const PreparedDocumentSchema = z
         (item) => item.kind === 'method' || item.kind === 'table',
       ),
     );
-    if ((document.documentVersion === '3') !== comparison) {
+    const external = document.sections.some((section) =>
+      section.items.some((item) => item.kind === 'externalCall'),
+    );
+    if (
+      external &&
+      (document.source.kind !== 'execution' ||
+        !document.source.captureHash ||
+        !document.source.runId)
+    )
+      addIssue(
+        ctx,
+        'DOCUMENT_EXECUTION_BINDING_MISMATCH',
+        'External documents require an exact capture binding',
+        ['source'],
+      );
+    if (
+      document.verification &&
+      (document.source.kind !== 'execution' ||
+        !document.verification.executionBinding ||
+        executionBindingKey(document.source) !==
+          executionBindingKey(document.verification.executionBinding))
+    )
+      addIssue(
+        ctx,
+        'DOCUMENT_VERIFICATION_BINDING_MISMATCH',
+        'Verification must belong to the document capture',
+        ['verification'],
+      );
+    if (
+      (document.documentVersion === '4') !== external ||
+      (!external && (document.documentVersion === '3') !== comparison)
+    ) {
       addIssue(
         ctx,
         'INCOMPATIBLE_CONTRACT',
@@ -582,8 +626,68 @@ export const BoundPreparedDocumentSchema = z
       (execution.methods ?? []).map((method) => method.id),
     );
     const tableIds = new Set((execution.tables ?? []).map((table) => table.id));
+    const externalIds = new Set<string>();
+    const capturedSymbols = new Map(
+      collectCsoSymbols(execution.cso).map((symbol) => [symbol.id, symbol]),
+    );
+    const preparedSymbols = new Map(
+      [
+        ...document.detachedSymbols,
+        ...document.sections.flatMap((section) =>
+          section.items.flatMap((item) =>
+            item.kind === 'symbol' ? [item.symbol] : [],
+          ),
+        ),
+      ].map((symbol) => [symbol.id, symbol]),
+    );
+    if (
+      document.verification &&
+      (!document.verification.executionBinding ||
+        executionBindingKey(document.verification.executionBinding) !==
+          executionBindingKey(expected.data))
+    ) {
+      addIssue(
+        ctx,
+        'DOCUMENT_VERIFICATION_BINDING_MISMATCH',
+        'Verification must belong to the exact captured execution',
+        ['document', 'verification'],
+      );
+    }
     for (const [sectionIndex, section] of document.sections.entries()) {
       for (const [itemIndex, item] of section.items.entries()) {
+        if (item.kind === 'externalCall') {
+          const call = execution.externalCalls?.find(
+            (call) => call.id === item.call.id,
+          );
+          if (
+            !call ||
+            externalIds.has(call.id) ||
+            JSON.stringify(call) !== JSON.stringify(item.call)
+          )
+            addIssue(
+              ctx,
+              'DOCUMENT_EXTERNAL_CONTENT_MISMATCH',
+              'Retain exactly one complete block for each captured external call',
+              ['document', 'sections', sectionIndex, 'items', itemIndex],
+            );
+          externalIds.add(item.call.id);
+          for (const quantity of [...item.call.inputs, ...item.call.outputs]) {
+            const expectedSymbol = capturedSymbols.get(quantity.symbolId);
+            const actualSymbol = preparedSymbols.get(quantity.symbolId);
+            if (
+              !expectedSymbol ||
+              !actualSymbol ||
+              exactCaptureHash(expectedSymbol) !==
+                exactCaptureHash(actualSymbol)
+            )
+              addIssue(
+                ctx,
+                'DOCUMENT_EXTERNAL_CONTENT_MISMATCH',
+                'External quantities must preserve captured values and metadata',
+                ['document', 'sections', sectionIndex, 'items', itemIndex],
+              );
+          }
+        }
         if (
           (item.kind === 'method' && !methodIds.has(item.id)) ||
           (item.kind === 'table' && !tableIds.has(item.id))
@@ -597,6 +701,13 @@ export const BoundPreparedDocumentSchema = z
         }
       }
     }
+    if (externalIds.size !== (execution.externalCalls?.length ?? 0))
+      addIssue(
+        ctx,
+        'DOCUMENT_EXTERNAL_CONTENT_MISMATCH',
+        'Every external call must remain visible in the prepared document',
+        ['document', 'sections'],
+      );
   });
 
 const addIssue = (

@@ -7,6 +7,7 @@ import { AuthoringEvidenceSchema } from './authoring.ts';
 import {
   AssetRecordSchema,
   collectCsoSymbols,
+  exactCaptureHash,
   DiagnosticSchema,
   type ExecutionBinding,
   HashSchema,
@@ -30,6 +31,11 @@ import {
   reproducePredicate,
 } from '../verification/branches.ts';
 import { NumericValueSchema } from './numbers.ts';
+import {
+  ExternalCallSchema,
+  ExternalEnvironmentSchema,
+  validateExternalCalls,
+} from './external.ts';
 import {
   methodInvocationBindings,
   validateMethodBindings,
@@ -65,6 +71,12 @@ const definitionIdentity = {
   definitionLocation: SourceSpanSchema,
 };
 export const SymbolDefinitionSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    ...definitionIdentity,
+    kind: z.literal('externalResult'),
+    externalCallId: IdentityStringSchema,
+    outputName: PythonIdentifierSchema,
+  }),
   z
     .object({
       ...definitionIdentity,
@@ -165,7 +177,13 @@ export const InvocationSchema = z.union([
 export const SymbolObservationSchema = NumericValueSchema.safeExtend({
   symbolId: IdentityStringSchema,
   invocationId: IdentityStringSchema,
-  kind: z.enum(['input', 'constant', 'formula', 'unsupported']),
+  kind: z.enum([
+    'input',
+    'constant',
+    'formula',
+    'unsupported',
+    'externalResult',
+  ]),
   definitionLocation: SourceSpanSchema,
 });
 export const OperationObservationSchema = NumericValueSchema.safeExtend({
@@ -431,6 +449,9 @@ const ExecutionPayloadBaseSchema = z
       .min(1)
       .optional(),
     assets: z.array(AssetRecordSchema),
+    externalCalls: z.array(ExternalCallSchema).min(1).optional(),
+    runId: z.string().uuid().optional(),
+    environment: ExternalEnvironmentSchema.optional(),
     versions: VersionsSchema,
   })
   .strict();
@@ -967,6 +988,14 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
         );
         if (
           previous &&
+          !(
+            definition.kind === 'externalResult' &&
+            execution.externalCalls?.some(
+              (call) =>
+                call.id === invocation.id &&
+                call.id === definition.externalCallId,
+            )
+          ) &&
           !precedes(previous.definitionLocation, definition.definitionLocation)
         ) {
           issue(
@@ -1592,7 +1621,11 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
     const comparisonRecords =
       (execution.methods?.length ?? 0) > 0 ||
       (execution.tables?.length ?? 0) > 0;
-    if ((execution.cso.schemaVersion === '1.1.0') !== comparisonRecords) {
+    validateExternalCalls(execution, ctx);
+    if (
+      execution.cso.schemaVersion !== '1.2.0' &&
+      (execution.cso.schemaVersion === '1.1.0') !== comparisonRecords
+    ) {
       issue(
         'INCOMPATIBLE_CONTRACT',
         ['cso', 'schemaVersion'],
@@ -2169,7 +2202,7 @@ export const ExecutionResponseSchema = z
   .discriminatedUnion('ok', [
     z
       .object({
-        protocolVersion: z.enum(['1', '2', '3']),
+        protocolVersion: z.enum(['1', '2', '3', '4']),
         ok: z.literal(true),
         diagnostics: z.array(DiagnosticSchema),
         execution: ExecutionPayloadSchema,
@@ -2177,7 +2210,7 @@ export const ExecutionResponseSchema = z
       .strict(),
     z
       .object({
-        protocolVersion: z.enum(['1', '2', '3']),
+        protocolVersion: z.enum(['1', '2', '3', '4']),
         ok: z.literal(false),
         diagnostics: z.array(DiagnosticSchema).min(1),
         provenance: ProvenanceSchema.optional(),
@@ -2199,7 +2232,11 @@ export const ExecutionResponseSchema = z
         path: ['protocolVersion'],
       });
     }
-    if ((response.protocolVersion === '3') !== comparison) {
+    const external = (response.execution.externalCalls?.length ?? 0) > 0;
+    if (
+      (response.protocolVersion === '4') !== external ||
+      (!external && (response.protocolVersion === '3') !== comparison)
+    ) {
       ctx.addIssue({
         code: 'custom',
         message: 'Protocol version must match comparison evidence',
@@ -2333,6 +2370,9 @@ export const executionBindingFrom = (
   sourceClosureHash: execution.sourceClosureHash,
   function: execution.entry.function,
   resolvedInputs: execution.entry.resolvedInputs,
+  ...(execution.externalCalls === undefined
+    ? {}
+    : { captureHash: exactCaptureHash(execution), runId: execution.runId }),
   ...(execution.entry.resolvedInputKinds === undefined
     ? {}
     : {

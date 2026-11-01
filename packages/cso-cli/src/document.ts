@@ -34,6 +34,7 @@ export async function documentCommand(
   try {
     const document = prepareExecutionDocument({
       execution: result.capture.execution,
+      ...(result.capture.execution.externalCalls ? {verificationReport: result.capture.verification} : {}),
       assets: captureAssets(options.sourcePath, result.capture.execution),
     });
     const retained = retainSource(result.capture, document);

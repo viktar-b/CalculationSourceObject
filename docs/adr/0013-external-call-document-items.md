@@ -23,6 +23,12 @@ source context. Shared inputs retain their Symbol identities and compact call
 summaries rather than new full input sections. Selecting several outputs from
 one invocation does not repeat its report block.
 
+When a comparison table replaces grouped case sections, retain complete
+case-specific external blocks, labeled with the owning case and call path.
+Selected table rows must not hide declared external inputs, outputs, method
+text or algorithm exclusions. Keep the existing row selection and orientation
+rules. Consolidating those details into another table design is deferred.
+
 Reuse the existing quantity, notation and prose rendering inside the grouped
 item. Keep the captured invocation and quantity references explicit so that
 preparation can validate complete call content without relying on loose item

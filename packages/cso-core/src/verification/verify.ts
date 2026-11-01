@@ -50,7 +50,8 @@ const VerificationBoundarySchema = z.strictObject({
 type ConsistencyCheckName =
   | 'inputConsistency'
   | 'constantConsistency'
-  | 'formulaConsistency';
+  | 'formulaConsistency'
+  | 'externalResultConsistency';
 
 interface Counts {
   checked: number;
@@ -1200,6 +1201,7 @@ const verifyDefinitions = ({
     inputConsistency: createCategoryState(),
     constantConsistency: createCategoryState(),
     formulaConsistency: createCategoryState(),
+    externalResultConsistency: createCategoryState(),
   };
   const bindingChecks = new Map<string, BindingCheck>();
   const usedBindings = new Set<string>();
@@ -1229,11 +1231,13 @@ const verifyDefinitions = ({
     };
     const evaluated = evaluator.evaluate(address);
     const check: ConsistencyCheckName =
-      definition.kind === 'input'
-        ? 'inputConsistency'
-        : definition.kind === 'constant'
-          ? 'constantConsistency'
-          : 'formulaConsistency';
+      definition.kind === 'externalResult'
+        ? 'externalResultConsistency'
+        : definition.kind === 'input'
+          ? 'inputConsistency'
+          : definition.kind === 'constant'
+            ? 'constantConsistency'
+            : 'formulaConsistency';
     const state = categories[check];
     let passed = true;
 
@@ -1249,6 +1253,14 @@ const verifyDefinitions = ({
           invocation,
         }),
       );
+    } else if (definition.kind === 'externalResult') {
+      // Membership, captured values, kinds and display caches are checked by the
+      // boundary schema. This establishes consistency, not algorithm agreement.
+      passed = evaluated.ok;
+      if (!evaluated.ok)
+        state.diagnostics.push(
+          ...evaluated.diagnostics.map((item) => ({ ...item, check })),
+        );
     } else if (definition.kind === 'formula') {
       passed = verifyFormulaDefinition({
         definition,
@@ -1312,6 +1324,9 @@ const verifyDefinitions = ({
       inputConsistency: categoryCheck(categories.inputConsistency),
       constantConsistency: categoryCheck(categories.constantConsistency),
       formulaConsistency: categoryCheck(categories.formulaConsistency),
+      externalResultConsistency: categoryCheck(
+        categories.externalResultConsistency,
+      ),
     },
     diagnostics: Object.values(categories).flatMap(
       (category) => category.diagnostics,
@@ -1603,13 +1618,29 @@ export const verifyExecution: VerifyExecution = (input): VerificationReport => {
     ...outputs.diagnostics,
     ...reference.diagnostics,
   ]);
+  const { externalResultConsistency, ...sourceChecks } = source.checks;
 
   return VerificationReportSchema.parse({
     ok: sourcePassed && reference.check.status !== 'failed',
+    ...(execution.externalCalls === undefined
+      ? {}
+      : {
+          verificationVersion: '2',
+          executionBinding: executionBindingFrom(execution),
+          externalCoverage: {
+            calls: execution.externalCalls.length,
+            results: execution.externalCalls.reduce(
+              (total, call) => total + call.outputs.length,
+              0,
+            ),
+            algorithmVerification: 'excluded',
+          },
+        }),
     numericPolicy,
     checks: {
       executionValidity: { status: 'passed' },
-      ...source.checks,
+      ...sourceChecks,
+      ...(execution.externalCalls ? { externalResultConsistency } : {}),
       outputConsistency: outputs.check,
       sourceToDocumentConsistency: {
         status: sourcePassed ? 'passed' : 'failed',

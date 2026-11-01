@@ -68,6 +68,15 @@ contains a method or table; otherwise it remains version 2. Source CSO schema
 `1.1.0` and execution protocol 3 follow the same rule. Rebuild that document
 from the captured execution rather than rewriting old evidence.
 
+Draft external captures use execution protocol 4, CSO schema `1.2.0` and prepared
+document version 4. They preserve one complete input/method/output block per
+captured call, including unused outputs and the external algorithm's formula
+verification exclusion. An optional `verificationReport` passed to
+`prepareExecutionDocument` must bind to that exact capture before its outcomes
+can appear. Repreparation reads captured evidence and assets without running
+the adapter. The external method/table and print acceptance work remains pending
+in PR #99; this format addition does not change older captures' meaning.
+
 A comparison is one logical table. On screen it scrolls horizontally and keeps
 the identifying column visible. Print divides the authored column axis into
 parts that fit the page width, then continues a tall part onto later pages.

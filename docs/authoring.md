@@ -208,6 +208,52 @@ for each invocation. See the
 
 ## Supported source and document content
 
+### External functions, draft implementation
+
+Declare an ordinary single-file Python adapter in a local metadata module with
+`external_function(path=..., function=..., inputs=..., outputs=...,
+description=..., defaults=...)`. Inputs and outputs map names to shared numeric
+metadata aliases. Defaults are optional finite numeric literals. The method
+description must be nonempty. Adapter paths resolve relative to the declaration
+module and remain within the calculation project.
+
+For example, a declaration named `square` in `methods.py` generates
+`from _cso_bindings._external.methods import square`. Generate bindings with the
+existing bindings command, then use it inside an annotated calculation:
+
+```python
+first = square(length=length)
+doubled: DoubledArea = 2.0 * first["area"]
+```
+
+The adapter returns a native Python number for one declared output, or a plain
+dictionary containing exactly every declared output. Booleans, library scalar
+objects, containers, nonfinite values and unsafe integers fail. Adapters convert
+library-specific objects and raise on numerical failure or nonconvergence.
+
+Each authored call executes once. Selecting several outputs shares that call;
+equal-input calls remain separate. Adapter state is shared within a run and
+starts fresh for the next run. CSO executes captured adapter bytes and records
+their identity, actual inputs, all outputs, warnings and bounded environment
+provenance. Static description and binding generation do not import adapters.
+Project-local imports inside an adapter are unsupported; install a dependency
+as a package or keep the implementation in one file.
+
+Generated external handles require an active top-level CSO execution. Ordinary
+Python can call a generated calculation containing external calls. Calling an
+external handle alone raises a context error. Changes to the declaration require
+regenerating bindings; adapter-only edits require a fresh capture.
+
+The draft report path preserves the complete input/method/output block, including
+unused outputs. External-result consistency and formula checks have separate
+counts. The external algorithm is excluded from formula verification. Preserve
+full execution evidence or prepared HTML/PDF; standalone CSO and math-only exports
+reject external calculations before dropping evidence.
+
+Method/table composition, scoped independent references, coordinated release
+pins and scientific/PDF acceptance remain implementation work in PR #99. The
+accepted external ADRs describe the intended complete feature.
+
 Supported formulas include numeric literals, references, unary minus, arithmetic
 `+`, `-`, `*`, `/`, `**`, `sqrt` / `math.sqrt`, `math.pi` (or imported `pi`),
 `ceil` / `math.ceil`, `floor` / `math.floor`, `exp` / `math.exp`,

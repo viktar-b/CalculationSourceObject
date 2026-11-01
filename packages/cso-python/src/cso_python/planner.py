@@ -28,6 +28,7 @@ from .source import (
     span,
 )
 
+
 class Planner:
     def __init__(self, entry: Path):
         self.capture = Capture(entry)
@@ -42,6 +43,7 @@ class Planner:
         self.tables: list[Json] = []
         self.method_index: dict[tuple[str, str], Json] = {}
         self.grouped_invocations: set[str] = set()
+        self.external_calls: list[Json] = []
 
     def unchanged(self) -> bool:
         if not self.capture.unchanged():
@@ -157,7 +159,12 @@ class Planner:
     ) -> Invocation:
         location = span(parent.module.id, call_node) if parent else None
         module = self.capture.load(path, location)
-        fn = module.functions.get(function)
+        external = module.externals.get(function)
+        fn = (
+            self.definitions.get(path, function).function
+            if external
+            else module.functions.get(function)
+        )
         if fn is None:
             raise SourceError(
                 "MISSING_FUNCTION",
@@ -192,6 +199,21 @@ class Planner:
                     location=span(module.id, dec),
                 )
             decorators[name] = dec
+        if external:
+            decorators = {
+                key: ast.copy_location(
+                    ast.Call(
+                        func=ast.Name(id=key, ctx=ast.Load()),
+                        args=[],
+                        keywords=[
+                            ast.keyword(arg="id", value=ast.Constant(function)),
+                            ast.keyword(arg="title", value=ast.Constant(function)),
+                        ],
+                    ),
+                    external.node,
+                )
+                for key in ("calculation", "section")
+            }
         if set(decorators) != {"calculation", "section"}:
             raise SourceError(
                 "MISSING_METADATA",
@@ -247,6 +269,7 @@ class Planner:
             section_obj,
             call_node=call_node,
             parent=parent,
+            external=external,
         )
         section_obj["metadata"] = self.metadata(
             inv, section_local, decorators["section"], section.get("metadata")
@@ -302,7 +325,8 @@ class Planner:
                 rec["numericKind"] = numeric_kind(rec["value"])
             record["inputBindings"].append(rec)
         record["resolvedInputKinds"] = {
-            name: numeric_kind(value) for name, value in record["resolvedInputs"].items()
+            name: numeric_kind(value)
+            for name, value in record["resolvedInputs"].items()
         }
         self.invocations.append(inv)
         self.sections.append(section_obj)
@@ -330,15 +354,18 @@ class Planner:
                 inv.parameter_symbols[name] = inherited
             elif spec is not None:
                 self.signature_input(inv, name, declared, binding_record)
-        plan = self.ensure_plan(inv, module, function)
-        inv.source_plan = plan
-        self.body(
-            inv,
-            section_obj,
-            {symbol.cso["id"] for symbol in inv.symbols.values()},
-            False,
-            plan.steps,
-        )
+        if external:
+            self.plan_external_outputs(inv)
+        else:
+            plan = self.ensure_plan(inv, module, function)
+            inv.source_plan = plan
+            self.body(
+                inv,
+                section_obj,
+                {symbol.cso["id"] for symbol in inv.symbols.values()},
+                False,
+                plan.steps,
+            )
         documented_parameters = {
             symbol.definition["givenSource"]["parameterName"]
             for symbol in inv.symbols.values()
@@ -395,6 +422,93 @@ class Planner:
                 }
             )
         return inv
+
+    def plan_external_outputs(self, inv: Invocation) -> None:
+        external = inv.external
+        inv.section["metadata"]["externalCallId"] = inv.id
+        adapter = self.capture.modules[external.path]
+        record = {
+            "id": inv.id,
+            "parentInvocationId": inv.parent.id,
+            "callBindingName": inv.record["callBindingName"],
+            "callSite": inv.record["callSite"],
+            "declaration": {
+                "moduleId": inv.module.id,
+                "name": external.name,
+                "fingerprint": external.fingerprint,
+                "location": span(inv.module.id, external.node),
+                "interface": external.interface,
+            },
+            "adapter": {
+                "moduleId": adapter.id,
+                "sha256": hashlib.sha256(adapter.data).hexdigest(),
+                "function": external.function,
+            },
+            "description": external.description,
+            "inputs": [],
+            "outputs": [],
+            "warnings": [],
+        }
+        self.external_calls.append(record)
+        for name, declared in external.outputs.items():
+            variable = "_result_" + name
+            sid = identity("symbol", inv.id, name)
+            spec = declared.metadata
+            node = external.node
+            self.validate_symbol_notation(inv, node, sid, spec)
+            definition = {
+                "symbolId": sid,
+                "localId": name,
+                "variableName": variable,
+                "definitionLocation": span(inv.module.id, node),
+                "kind": "externalResult",
+                "externalCallId": inv.id,
+                "outputName": name,
+            }
+            cso = {
+                "id": sid,
+                "glyph": spec["glyph"],
+                "glyphPlaintext": spec["glyph"],
+                "description": spec["description"],
+                "unit": spec["unit"],
+                "comment": spec.get("comment", ""),
+                **(
+                    {"notationScope": spec["notation_scope"]}
+                    if "notation_scope" in spec
+                    else {}
+                ),
+                "valueTree": {
+                    "rootKey": "n1",
+                    "nodes": [
+                        {
+                            "key": "n1",
+                            "mode": "LITERAL",
+                            "literal": {
+                                "kind": "number",
+                                "value": 0,
+                                "numericKind": "int",
+                            },
+                        }
+                    ],
+                },
+                "metadata": self.metadata(inv, name, node),
+            }
+            symbol = Symbol(
+                variable, spec, node, definition, cso, declared.numeric_type
+            )
+            inv.symbols[variable] = symbol
+            inv.record["symbols"].append(definition)
+            inv.section["items"].append({"kind": "symbol", "symbol": cso})
+            inv.outputs[name] = symbol
+            inv.output_records.append(
+                {
+                    "invocationId": inv.id,
+                    "name": name,
+                    "symbolId": sid,
+                    "source": {"kind": "symbol", "symbolId": sid},
+                    "location": span(inv.module.id, external.output_nodes[name]),
+                }
+            )
 
     def signature_input(
         self, inv: Invocation, name: str, declared: Annotation, binding: Json
@@ -715,7 +829,8 @@ class Planner:
                     len(node.targets) == 1
                     and isinstance(node.targets[0], ast.Name)
                     and isinstance(node.value, ast.Call)
-                    and authoring_name(node.value.func) == "calculation_call"
+                    and authoring_name(node.value.func)
+                    in {"calculation_call", "external_call"}
                     and (
                         "calculation_call" in inv.module.imported or inv.module.handles
                     )

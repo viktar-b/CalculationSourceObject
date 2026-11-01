@@ -24,6 +24,13 @@ the authored method explanation, and named numeric outputs. Each external result
 identifies its invocation and output name. Core uses those captured values when
 independently evaluating subsequent documented formulas.
 
+Every supplied quantity is a dependency of every external output for
+applicability. The opaque boundary cannot establish which internal branches
+ran. Preserve numerical results and propagate inapplicability with its reasons;
+downstream formulas continue to follow their actually used branches. Failed
+engineering checks retain their numbers and outcomes. Numerical failures stop
+execution.
+
 Permit normal report generation when execution, external boundary checks and all
 applicable formula/output checks pass, with no failed matching independent
 comparison. Count formula checks, captured external calls and external results
