@@ -78,6 +78,28 @@ def square(*, length):
             18.0,
         )
 
+    def test_self_is_a_valid_external_input_name(self):
+        methods = self.root / "methods.py"
+        methods.write_text(
+            methods.read_text().replace(
+                'inputs={"length": Length}', 'inputs={"self": Length}'
+            )
+        )
+        self.source.write_text(
+            self.source.read_text().replace(
+                "square(length=length)", "square(self=length)"
+            )
+        )
+        self.adapter.write_text(self.adapter.read_text().replace("length", "self"))
+        self.assertTrue(generate(self.root)["ok"])
+        response = execute(self.source, "calculate", {})
+        self.assertTrue(response["ok"], response)
+        self.assertEqual(
+            response["execution"]["externalCalls"][0]["inputs"][0]["name"], "self"
+        )
+        handle = runpy.run_path(str(self.root / "_cso_bindings/root.py"))["calculate"]
+        self.assertEqual(handle()["doubled"], 18.0)
+
     def test_equal_input_calls_share_adapter_state_but_runs_start_fresh(self):
         self.source.write_text(
             self.source.read_text().replace(

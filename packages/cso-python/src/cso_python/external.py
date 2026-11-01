@@ -183,7 +183,7 @@ class ExternalHandle:
     def __init__(self, path: Path, function: str, fingerprint: str):
         self.path, self.function, self.fingerprint = path, function, fingerprint
 
-    def __call__(self, **inputs):
+    def __call__(self, /, **inputs):
         from .execution import ACTIVE, invoke
 
         if ACTIVE.get() is None:
