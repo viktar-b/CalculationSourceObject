@@ -60,6 +60,23 @@ beforeAll(() => {
   writeFileSync(join(directory, 'leaf.cso.py'), leaf);
   writeFileSync(join(directory, 'wrapper.cso.py'), wrapper);
   writeFileSync(
+    join(directory, 'diamond.cso.py'),
+    wrapper
+      .replace(
+        'from _cso_bindings.leaf import rectangle',
+        'from _cso_bindings.leaf import rectangle\nfrom _cso_bindings.wrapper import pair',
+      )
+      .replace('def pair(', 'def combined(')
+      .replace('first = rectangle(', 'first = pair('),
+  );
+  writeFileSync(
+    join(directory, 'diamond_compare.cso.py'),
+    source('wrapper').replace(
+      'from _cso_bindings.wrapper import pair',
+      'from _cso_bindings.diamond import combined',
+    ),
+  );
+  writeFileSync(
     join(directory, 'negative.cso.py'),
     wrapper.replace(
       'second = rectangle(width=height, height=width)',
@@ -196,6 +213,25 @@ test('preserves negative literal call arguments and rejects altered constants or
     }
     expect(verifyExecution({ execution }).ok, mutation).toBe(false);
   }
+});
+
+test('explains a dependency shared by direct and nested calls once while keeping every outcome', () => {
+  const execution = capture('diamond_compare.cso.py');
+  const document = prepareExecutionDocument({ execution, assets: [] });
+  const html = renderToStaticMarkup(
+    createElement(PreparedFormulaSheet, { document }),
+  );
+  expect(html.match(/data-helper="rectangle"/g)).toHaveLength(1);
+  const table = document.sections
+    .flatMap((section) => section.items)
+    .find((item) => item.kind === 'table');
+  if (table?.kind !== 'table') throw new Error('Missing table');
+  expect(
+    table.engineeringChecks?.flatMap((check) => check.results),
+  ).toHaveLength(6);
+  expect(table.branchNotes).toHaveLength(6);
+  expect(html).toContain('First / first / first');
+  expect(html).toContain('First / second');
 });
 
 test('preserves method and helper context and visible outcomes with hidden quantities in both orientations', () => {

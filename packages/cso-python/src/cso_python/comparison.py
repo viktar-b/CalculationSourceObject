@@ -141,7 +141,7 @@ def _place_method(planner, inv, call: ast.Call, section: Json, ids: set[str]) ->
         "quantities": quantities,
         "metadata": _section_metadata(target, definition.function),
         "content": content,
-        "helpers": helpers,
+        "helpers": _unique_helpers(helpers, set()),
         "location": span(inv.module.id, call),
     }
     if checks:
@@ -158,6 +158,17 @@ def _place_method(planner, inv, call: ast.Call, section: Json, ids: set[str]) ->
             "metadata": planner.metadata(inv, local_id, call),
         }
     )
+
+
+def _unique_helpers(helpers: list[Json], seen: set[str]) -> list[Json]:
+    """Keep one definition when distinct call paths share a dependency."""
+    unique = []
+    for helper in helpers:
+        if helper["id"] in seen:
+            continue
+        seen.add(helper["id"])
+        unique.append({**helper, "helpers": _unique_helpers(helper["helpers"], seen)})
+    return unique
 
 
 def _section_metadata(module, function: ast.FunctionDef) -> Json:

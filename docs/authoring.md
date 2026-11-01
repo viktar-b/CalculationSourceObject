@@ -100,6 +100,7 @@ cases with fewer quantities.
 engineering criterion. Each case shows Pass or Fail with the explanation while
 keeping the calculated number. Nested helper outcomes identify their call path
 and remain visible when their quantities are omitted from the table.
+Write the explanation as the criterion, since it appears with both outcomes.
 `applicable(...)` uses the same arguments to record when a
 result may be used. An inapplicable result displays "Not applicable" and the
 originating explanation; the computed number stays in the execution.
