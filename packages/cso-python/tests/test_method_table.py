@@ -9,8 +9,7 @@ from unittest.mock import patch
 from cso_python.bindings import generate
 from cso_python.execution import Execution, execute
 
-
-RECTANGLE = '''from typing import Annotated, TypeAlias
+RECTANGLE = """from typing import Annotated, TypeAlias
 from cso_python import CalculationResults, calculation, section, symbol
 
 Width: TypeAlias = Annotated[float, symbol(glyph="w", description="Width", unit="m")]
@@ -23,7 +22,7 @@ def rectangle(width: Width, height: Height, allowance: Allowance = 0.0) -> Calcu
     area: Annotated[float, symbol(glyph="A", description="Area", unit="m^2")] = width * height
     perimeter: Annotated[float, symbol(glyph="P", description="Perimeter", unit="m")] = 2 * (width + height)
     return {"area": area, "perimeter": perimeter}
-'''
+"""
 
 
 PNG = base64.b64decode(
@@ -91,7 +90,7 @@ def content_shape(content: list) -> list:
 
 
 def compare_source(body: str) -> str:
-    return f'''from typing import Annotated
+    return f"""from typing import Annotated
 from cso_python import CalculationResults, calculation, method, section, symbol, table
 from _cso_bindings.rectangle import rectangle
 
@@ -101,7 +100,7 @@ def compare() -> CalculationResults:
 {body}
     compared: Annotated[float, symbol(glyph="R", description="Compared area", unit="m^2")] = first_panel["area"]
     return {{"compared": compared}}
-'''
+"""
 
 
 class MethodTableCaptureTest(unittest.TestCase):
@@ -120,13 +119,113 @@ class MethodTableCaptureTest(unittest.TestCase):
         self.assertTrue(response["ok"], response)
         return response
 
+    def external_sources(self):
+        (self.root / "methods.py").write_text("""from typing import Annotated, TypeAlias
+from cso_python import external_function, symbol
+Length: TypeAlias = Annotated[float, symbol(glyph="L_{in}", description="Length", unit="m")]
+Area: TypeAlias = Annotated[float, symbol(glyph="A_{out}", description="Area", unit="m^2")]
+Count: TypeAlias = Annotated[int, symbol(glyph="n_{diag}", description="Diagnostic count", unit="")]
+square = external_function(path="adapter.py", function="square", inputs={"length": Length}, outputs={"area": Area, "count": Count}, description="Square the supplied length.")
+""")
+        (self.root / "adapter.py").write_text("""calls = 0
+def square(*, length):
+    global calls
+    calls += 1
+    return {"area": length * length, "count": calls}
+""")
+        (self.root / "external_case.cso.py").write_text("""from typing import Annotated
+from cso_python import calculation, section, symbol
+from methods import Length
+from _cso_bindings._external.methods import square
+@calculation(id="case", title="External case")
+@section(title="External case", root=True)
+def external_case(length: Length):
+    searched = square(length=length)
+    doubled: Annotated[float, symbol(glyph="D_{out}", description="Double area", unit="m^2")] = searched["area"] * 2.0
+    return {"doubled": doubled}
+""")
+
+    def test_external_method_has_static_leaf_and_distinct_equal_input_calls(self):
+        self.external_sources()
+        (self.root / "external_compare.cso.py").write_text(
+            """from cso_python import calculation, section, method, table
+from _cso_bindings.external_case import external_case
+@calculation(id="compare", title="External comparison")
+@section(title="External comparison", root=True)
+def compare():
+    method(id="external-method", calculation=external_case, title="External method")
+    first_case = external_case(length=3.0)
+    second_case = external_case(length=3.0)
+    table(id="cases", method="external-method", title="Cases", cases={"First": first_case, "Second": second_case}, outputs=("doubled",))
+    return {"doubled": first_case["doubled"]}
+"""
+        )
+        generate(self.root)
+        response = execute(self.root / "external_compare.cso.py", "compare", {})
+        self.assertTrue(response["ok"], response)
+        execution = response["execution"]
+        leaf = next(
+            item
+            for item in execution["methods"][0]["content"]
+            if item["kind"] == "external"
+        )
+        self.assertEqual(leaf["binding"], "searched")
+        self.assertEqual(leaf["outputs"], ["area", "count"])
+        self.assertEqual(
+            leaf["declaration"]["interface"]["description"],
+            "Square the supplied length.",
+        )
+        self.assertEqual(
+            [call["outputs"][1]["value"] for call in execution["externalCalls"]], [1, 2]
+        )
+
+    def test_empty_external_method_never_imports_adapter_and_revision_tracks_adapter(
+        self,
+    ):
+        self.external_sources()
+        (self.root / "adapter.py").write_text(
+            'import missing_optional_library\nraise RuntimeError("must not run")\n'
+        )
+        (self.root / "empty_external.cso.py").write_text("""from typing import Annotated
+from cso_python import calculation, section, method, table, symbol
+from _cso_bindings.external_case import external_case
+@calculation(id="empty", title="Empty external comparison")
+@section(title="Empty", root=True)
+def compare():
+    method(id="external-method", calculation=external_case, title="External method")
+    table(id="cases", method="external-method", title="Cases", cases={})
+    ready: Annotated[int, symbol(glyph="r_{ok}", description="Ready", unit="")] = 1
+    return {"ready": ready}
+""")
+        generate(self.root)
+        first = execute(self.root / "empty_external.cso.py", "compare", {})
+        self.assertTrue(first["ok"], first)
+        self.assertEqual(first["protocolVersion"], "4")
+        self.assertEqual(first["execution"]["externalCalls"], [])
+        incompatible = execute(
+            self.root / "empty_external.cso.py", "compare", {}, supports_external=False
+        )
+        self.assertFalse(incompatible["ok"])
+        self.assertEqual(
+            incompatible["diagnostics"][0]["code"], "INCOMPATIBLE_CONTRACT"
+        )
+        (self.root / "adapter.py").write_text(
+            'import another_missing_library\nraise RuntimeError("still must not run")\n'
+        )
+        second = execute(self.root / "empty_external.cso.py", "compare", {})
+        self.assertTrue(second["ok"], second)
+        self.assertNotEqual(
+            first["execution"]["methods"][0]["revision"],
+            second["execution"]["methods"][0]["revision"],
+        )
+
     def test_column_cap_limits_print_groups_without_changing_cells(self):
         self.write_compare(
-            '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+            """    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
     first_panel = rectangle(width=2.0, height=3.0)
     second_panel = rectangle(width=1.0, height=6.0)
     table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={"Case A": first_panel, "Case B": second_panel}, column_cap=1)
-'''
+"""
         )
         execution = self.execution()["execution"]
         table = execution["tables"][0]
@@ -136,10 +235,10 @@ class MethodTableCaptureTest(unittest.TestCase):
 
     def test_invalid_column_cap_is_rejected_before_execution(self):
         self.write_compare(
-            '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+            """    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
     first_panel = rectangle(width=2.0, height=3.0)
     table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={"Case A": first_panel}, column_cap=0)
-'''
+"""
         )
         with patch.object(Execution, "run") as run:
             response = execute(self.root / "compare.cso.py", "compare", {})
@@ -148,7 +247,7 @@ class MethodTableCaptureTest(unittest.TestCase):
 
     def test_method_keeps_a_quantity_declared_inside_a_document_section(self):
         (self.root / "grouped.cso.py").write_text(
-            '''from typing import Annotated, TypeAlias
+            """from typing import Annotated, TypeAlias
 from cso_python import CalculationResults, calculation, document_section, section, symbol
 
 Width: TypeAlias = Annotated[float, symbol(glyph="w", description="Width", unit="m")]
@@ -159,10 +258,10 @@ def grouped(width: Width) -> CalculationResults:
     with document_section(id="inner", title="Inner"):
         inner: Annotated[float, symbol(glyph="I", description="Inner", unit="m")] = width
     return {"inner": inner}
-'''
+"""
         )
         (self.root / "grouped_compare.cso.py").write_text(
-            '''from typing import Annotated
+            """from typing import Annotated
 from cso_python import CalculationResults, calculation, method, section, symbol, table
 from _cso_bindings.grouped import grouped
 
@@ -174,22 +273,25 @@ def compare() -> CalculationResults:
     table(id="grouped-results", method="grouped-method", title="Grouped results", cases={"Case": case}, outputs=("inner",))
     ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = case["inner"]
     return {"ready": ready}
-'''
+"""
         )
         generate(self.root)
         response = execute(self.root / "grouped_compare.cso.py", "compare", {})
         self.assertTrue(response["ok"], response)
-        names = [item["selectionName"] for item in response["execution"]["methods"][0]["quantities"]]
+        names = [
+            item["selectionName"]
+            for item in response["execution"]["methods"][0]["quantities"]
+        ]
         self.assertIn("inner", names)
 
     def test_column_table_binds_equal_areas_without_a_representative_method_case(self):
         self.write_compare(
-            '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+            """    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
     first_panel = rectangle(width=2.0, height=3.0)
     second_panel = rectangle(width=1.0, height=6.0)
     extra_panel = rectangle(width=4.0, height=5.0)
     table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={"Case A": first_panel, "Case B": second_panel})
-'''
+"""
         )
         response = self.execution()
         execution = response["execution"]
@@ -203,12 +305,23 @@ def compare() -> CalculationResults:
         self.assertEqual(method["localId"], "rectangle-method")
         self.assertEqual(method["function"], "rectangle")
         self.assertNotIn("resolvedInputs", method)
-        self.assertNotIn(3, [node.get("literal", {}).get("value") for quantity in method["quantities"] for node in quantity["nodes"]])
+        self.assertNotIn(
+            3,
+            [
+                node.get("literal", {}).get("value")
+                for quantity in method["quantities"]
+                for node in quantity["nodes"]
+            ],
+        )
         self.assertEqual(
             [quantity["selectionName"] for quantity in method["quantities"]],
             ["width", "height", "allowance", "area", "perimeter"],
         )
-        area = next(quantity for quantity in method["quantities"] if quantity["selectionName"] == "area")
+        area = next(
+            quantity
+            for quantity in method["quantities"]
+            if quantity["selectionName"] == "area"
+        )
         self.assertEqual(area["glyph"], "A")
         self.assertIn("w", area["formulaText"])
         self.assertIn("h", area["formulaText"])
@@ -216,7 +329,9 @@ def compare() -> CalculationResults:
         self.assertEqual(table["casesAxis"], "columns")
         self.assertEqual(table["inputs"], ["width", "height", "allowance"])
         self.assertEqual(table["outputs"], ["area", "perimeter"])
-        self.assertEqual([case["heading"] for case in table["cases"]], ["Case A", "Case B"])
+        self.assertEqual(
+            [case["heading"] for case in table["cases"]], ["Case A", "Case B"]
+        )
         self.assertEqual(
             [case["invocationId"] for case in table["cases"]],
             ["root/first_panel", "root/second_panel"],
@@ -237,20 +352,27 @@ def compare() -> CalculationResults:
         area_cells = [cell for cell in table["cells"] if cell["quantity"] == "area"]
         self.assertEqual(
             [cell["symbolId"] for cell in area_cells],
-            [output["symbolId"] for output in areas if output["invocationId"] != "root/extra_panel"],
+            [
+                output["symbolId"]
+                for output in areas
+                if output["invocationId"] != "root/extra_panel"
+            ],
         )
-        allowance_cells = [cell for cell in table["cells"] if cell["quantity"] == "allowance"]
+        allowance_cells = [
+            cell for cell in table["cells"] if cell["quantity"] == "allowance"
+        ]
         self.assertEqual([cell["unit"] for cell in allowance_cells], ["m", "m"])
         root_items = execution["cso"]["sections"][0]["items"]
         kinds = [item["kind"] for item in root_items]
         self.assertLess(kinds.index("method"), kinds.index("table"))
         self.assertEqual(kinds.count("section"), 3)
-        modules = {item["moduleId"]: item["sha256"] for item in execution["sourceManifest"]}
+        modules = {
+            item["moduleId"]: item["sha256"] for item in execution["sourceManifest"]
+        }
         self.assertEqual(modules[method["moduleId"]], method["sourceHash"])
 
     def test_empty_cases_plan_the_method_without_executing_it(self):
-        (self.root / "compare.cso.py").write_text(
-            '''from typing import Annotated
+        (self.root / "compare.cso.py").write_text("""from typing import Annotated
 from cso_python import CalculationResults, calculation, method, section, symbol, table
 from _cso_bindings.rectangle import rectangle
 
@@ -261,10 +383,11 @@ def compare() -> CalculationResults:
     table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={})
     ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
     return {"ready": ready}
-'''
-        )
+""")
         execution = self.execution()["execution"]
-        self.assertEqual([item["function"] for item in execution["invocations"]], ["compare"])
+        self.assertEqual(
+            [item["function"] for item in execution["invocations"]], ["compare"]
+        )
         self.assertEqual(execution["tables"][0]["cases"], [])
         self.assertEqual(execution["tables"][0]["cells"], [])
         self.assertTrue(execution["methods"][0]["quantities"])
@@ -272,32 +395,32 @@ def compare() -> CalculationResults:
     def test_later_slices_are_diagnosed_before_execution(self):
         cases = {
             "invalid axis": (
-                '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+                """    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
     first_panel = rectangle(width=2.0, height=3.0)
     table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={"Case A": first_panel}, cases_axis="diagonal")
-''',
+""",
                 "INVALID_METHOD",
             ),
             "duplicate heading": (
-                '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+                """    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
     first_panel = rectangle(width=2.0, height=3.0)
     second_panel = rectangle(width=1.0, height=6.0)
     table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={"Case A": first_panel, "Case A": second_panel})
-''',
+""",
                 "DUPLICATE_CASE_HEADING",
             ),
             "forward reference": (
-                '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+                """    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
     table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={"Case A": first_panel})
     first_panel = rectangle(width=2.0, height=3.0)
-''',
+""",
                 "AMBIGUOUS_CASE_REFERENCE",
             ),
             "duplicate id": (
-                '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+                """    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
     method(id="rectangle-method", calculation=rectangle, title="Repeated method")
     first_panel = rectangle(width=2.0, height=3.0)
-''',
+""",
                 "DUPLICATE_IDENTITY",
             ),
         }
@@ -312,30 +435,30 @@ def compare() -> CalculationResults:
 
     def test_explicit_empty_selection_and_unknown_names(self):
         self.write_compare(
-            '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+            """    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
     first_panel = rectangle(width=2.0, height=3.0)
     table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={"Case A": first_panel}, inputs=(), outputs=("perimeter",))
-'''
+"""
         )
         table = self.execution()["execution"]["tables"][0]
         self.assertEqual(table["inputs"], [])
         self.assertEqual(table["outputs"], ["perimeter"])
         self.assertEqual([cell["quantity"] for cell in table["cells"]], ["perimeter"])
         self.write_compare(
-            '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+            """    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
     first_panel = rectangle(width=2.0, height=3.0)
     table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={"Case A": first_panel}, outputs=("area", "area"))
-'''
+"""
         )
         with patch.object(Execution, "run") as run:
             response = execute(self.root / "compare.cso.py", "compare", {})
             self.assertEqual(response["diagnostics"][0]["code"], "DUPLICATE_QUANTITY")
             run.assert_not_called()
         self.write_compare(
-            '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+            """    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
     first_panel = rectangle(width=2.0, height=3.0)
     table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={"Case A": first_panel}, outputs=("missing",))
-'''
+"""
         )
         with patch.object(Execution, "run") as run:
             response = execute(self.root / "compare.cso.py", "compare", {})
@@ -350,8 +473,7 @@ def compare() -> CalculationResults:
                 "    with open('x'):\n        pass\n    area:",
             )
         )
-        (self.root / "compare.cso.py").write_text(
-            '''from typing import Annotated
+        (self.root / "compare.cso.py").write_text("""from typing import Annotated
 from cso_python import CalculationResults, calculation, method, section, symbol, table
 from _cso_bindings.rectangle import rectangle
 
@@ -361,20 +483,21 @@ def compare() -> CalculationResults:
     method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
     ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
     return {"ready": ready}
-'''
-        )
+""")
         with patch.object(Execution, "run") as run:
             response = execute(self.root / "compare.cso.py", "compare", {})
-            self.assertEqual(response["diagnostics"][0]["code"], "UNSUPPORTED_METHOD_CONTENT")
+            self.assertEqual(
+                response["diagnostics"][0]["code"], "UNSUPPORTED_METHOD_CONTENT"
+            )
             run.assert_not_called()
 
     def test_overlapping_membership_is_rejected(self):
         self.write_compare(
-            '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+            """    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
     first_panel = rectangle(width=2.0, height=3.0)
     table(id="first-results", method="rectangle-method", title="First", cases={"Case A": first_panel})
     table(id="second-results", method="rectangle-method", title="Second", cases={"Case A again": first_panel})
-'''
+"""
         )
         with patch.object(Execution, "run") as run:
             response = execute(self.root / "compare.cso.py", "compare", {})
@@ -385,8 +508,7 @@ def compare() -> CalculationResults:
         (self.root / "sketch.png").write_bytes(PNG)
         (self.root / "margin.cso.py").write_text(MARGIN)
         (self.root / "panel.cso.py").write_text(PANEL)
-        (self.root / "compare.cso.py").write_text(
-            f'''from typing import Annotated
+        (self.root / "compare.cso.py").write_text(f"""from typing import Annotated
 from cso_python import CalculationResults, calculation, method, section, symbol, table, text
 from _cso_bindings.panel import panel
 
@@ -396,42 +518,52 @@ def compare() -> CalculationResults:
 {body}
     compared: Annotated[float, symbol(glyph="R", description="Compared area", unit="m^2")] = first_panel["area"]
     return {{"compared": compared}}
-'''
-        )
+""")
         generate(self.root)
 
     def test_forwarded_helper_outputs_bind_to_each_case(self):
-        self.write_composed('''    method(id="panel-method", calculation=panel, title="Panel")
+        self.write_composed(
+            """    method(id="panel-method", calculation=panel, title="Panel")
     first_panel = panel(width=2.0, height=3.0)
     second_panel = panel(width=4.0, height=5.0)
     table(id="panels", method="panel-method", title="Panels", cases={"First": first_panel, "Second": second_panel})
-''')
+"""
+        )
         path = self.root / "panel.cso.py"
-        path.write_text(PANEL.replace('return {"area": area}', 'return {"area": wider["grown"]}'))
+        path.write_text(
+            PANEL.replace('return {"area": area}', 'return {"area": wider["grown"]}')
+        )
         compare = self.root / "compare.cso.py"
         compare.write_text(compare.read_text().replace('unit="m^2"', 'unit="m"'))
         generate(self.root)
         response = self.execution()
         execution = response["execution"]
-        cells = [cell for cell in execution["tables"][0]["cells"] if cell["role"] == "output"]
+        cells = [
+            cell for cell in execution["tables"][0]["cells"] if cell["role"] == "output"
+        ]
         self.assertEqual(len(cells), 2)
         self.assertNotEqual(cells[0]["symbolId"], cells[1]["symbolId"])
         outputs = execution["authoring"]["outputs"]
         for cell in cells:
-            returned = next(output for output in outputs if output["invocationId"] == cell["caseInvocationId"] and output["name"] == "area")
+            returned = next(
+                output
+                for output in outputs
+                if output["invocationId"] == cell["caseInvocationId"]
+                and output["name"] == "area"
+            )
             self.assertEqual(cell["symbolId"], returned["symbolId"])
             self.assertEqual(cell["unit"], "m")
 
     def test_nested_helpers_keep_distinct_call_mappings(self):
         self.write_composed(
-            '''    method(id="panel-method", calculation=panel, title="How panel area is calculated")
+            """    method(id="panel-method", calculation=panel, title="How panel area is calculated")
     text(id="case-a", content="Case A is the narrow panel")
     first_panel = panel(width=2.0, height=3.0)
     text(id="case-b", content="Case B is the wide panel")
     second_panel = panel(width=1.0, height=6.0)
     table(id="panel-results", method="panel-method", title="Panel comparison", cases={"Case A": first_panel, "Case B": second_panel}, inputs=(), outputs=("area",))
     extra_panel = panel(width=4.0, height=5.0)
-'''
+"""
         )
         execution = self.execution()["execution"]
         method = execution["methods"][0]
@@ -455,7 +587,9 @@ def compare() -> CalculationResults:
             [item["helperId"] for item in method["content"] if item["kind"] == "call"],
             [helper["id"], helper["id"]],
         )
-        wider = next(item for item in method["content"] if item.get("binding") == "wider")
+        wider = next(
+            item for item in method["content"] if item.get("binding") == "wider"
+        )
         self.assertEqual(wider["inputs"][0]["nodes"][0]["mode"], "SYMBOL")
         self.assertEqual(wider["inputs"][0]["nodes"][0]["ref"]["name"], "width")
         self.assertEqual(
@@ -467,7 +601,9 @@ def compare() -> CalculationResults:
             ],
         )
         self.assertEqual(helper["content"][1]["content"], "The margin is one metre.")
-        product = next(item for item in method["quantities"] if item["variableName"] == "product")
+        product = next(
+            item for item in method["quantities"] if item["variableName"] == "product"
+        )
         self.assertEqual(product["formulaText"], "(wider.grown * taller.grown)")
         self.assertEqual(product["role"], "intermediate")
         rendered = str(method["content"])
@@ -488,10 +624,17 @@ def compare() -> CalculationResults:
         )
         self.assertIn(
             "root/first_panel",
-            [section["metadata"].get("invocationId") for section in execution["cso"]["sections"]],
+            [
+                section["metadata"].get("invocationId")
+                for section in execution["cso"]["sections"]
+            ],
         )
-        self.assertIn("root/extra_panel", [item["id"] for item in execution["invocations"]])
-        self.assertTrue(any(asset["path"] == "sketch.png" for asset in execution["assets"]))
+        self.assertIn(
+            "root/extra_panel", [item["id"] for item in execution["invocations"]]
+        )
+        self.assertTrue(
+            any(asset["path"] == "sketch.png" for asset in execution["assets"])
+        )
         self.assertNotIn(
             2,
             [
@@ -505,8 +648,7 @@ def compare() -> CalculationResults:
         (self.root / "sketch.png").write_bytes(PNG)
         (self.root / "margin.cso.py").write_text(MARGIN)
         (self.root / "panel.cso.py").write_text(PANEL)
-        (self.root / "compare.cso.py").write_text(
-            '''from typing import Annotated
+        (self.root / "compare.cso.py").write_text("""from typing import Annotated
 from cso_python import CalculationResults, calculation, method, section, symbol, table
 from _cso_bindings.panel import panel
 
@@ -517,27 +659,30 @@ def compare() -> CalculationResults:
     table(id="panel-results", method="panel-method", title="Panel comparison", cases={}, outputs=("area",))
     ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
     return {"ready": ready}
-'''
-        )
+""")
         generate(self.root)
         execution = self.execution()["execution"]
-        self.assertEqual([item["function"] for item in execution["invocations"]], ["compare"])
+        self.assertEqual(
+            [item["function"] for item in execution["invocations"]], ["compare"]
+        )
         method = execution["methods"][0]
         self.assertEqual(method["helpers"][0]["function"], "margin")
         self.assertEqual(
             [item["binding"] for item in method["content"] if item["kind"] == "call"],
             ["wider", "taller"],
         )
-        self.assertTrue(any(asset["path"] == "sketch.png" for asset in execution["assets"]))
+        self.assertTrue(
+            any(asset["path"] == "sketch.png" for asset in execution["assets"])
+        )
 
     def test_disjoint_tables_share_one_method(self):
         self.write_compare(
-            '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+            """    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
     first_panel = rectangle(width=2.0, height=3.0)
     second_panel = rectangle(width=1.0, height=6.0)
     table(id="left-results", method="rectangle-method", title="Left", cases={"A": first_panel})
     table(id="right-results", method="rectangle-method", title="Right", cases={"B": second_panel})
-'''
+"""
         )
         execution = self.execution()["execution"]
         self.assertEqual(len(execution["methods"]), 1)
@@ -548,7 +693,7 @@ def compare() -> CalculationResults:
 
     def test_inner_table_overlap_is_rejected(self):
         (self.root / "leaf.cso.py").write_text(
-            '''from typing import Annotated, TypeAlias
+            """from typing import Annotated, TypeAlias
 from cso_python import CalculationResults, calculation, section, symbol
 
 Width: TypeAlias = Annotated[float, symbol(glyph="w", description="Width", unit="m")]
@@ -558,10 +703,10 @@ Width: TypeAlias = Annotated[float, symbol(glyph="w", description="Width", unit=
 def leaf(width: Width) -> CalculationResults:
     value: Annotated[float, symbol(glyph="V", description="Value", unit="m")] = width
     return {"value": value}
-'''
+"""
         )
         (self.root / "wrapper.cso.py").write_text(
-            '''from typing import Annotated, TypeAlias
+            """from typing import Annotated, TypeAlias
 from cso_python import CalculationResults, calculation, method, section, symbol, table
 from _cso_bindings.leaf import leaf
 
@@ -575,10 +720,9 @@ def wrapper(width: Width) -> CalculationResults:
     table(id="inner", method="leaf-method", title="Inner", cases={"Only": only})
     value: Annotated[float, symbol(glyph="V", description="Value", unit="m")] = only["value"]
     return {"value": value}
-'''
+"""
         )
-        (self.root / "compare.cso.py").write_text(
-            '''from typing import Annotated
+        (self.root / "compare.cso.py").write_text("""from typing import Annotated
 from cso_python import CalculationResults, calculation, method, section, symbol, table
 from _cso_bindings.wrapper import wrapper
 
@@ -590,26 +734,27 @@ def compare() -> CalculationResults:
     table(id="outer", method="wrap", title="Outer", cases={"A": first})
     ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
     return {"ready": ready}
-'''
-        )
+""")
         generate(self.root)
         with patch.object(Execution, "run") as run:
             response = execute(self.root / "compare.cso.py", "compare", {})
             self.assertFalse(response["ok"], response)
             self.assertEqual(response["diagnostics"][0]["code"], "OVERLAPPING_TABLE")
             self.assertTrue(
-                response["diagnostics"][0]["location"]["moduleId"].endswith("compare.cso.py"),
+                response["diagnostics"][0]["location"]["moduleId"].endswith(
+                    "compare.cso.py"
+                ),
                 response["diagnostics"][0],
             )
             run.assert_not_called()
 
     def test_helper_source_edit_changes_the_dependency_hash(self):
         self.write_composed(
-            '''    method(id="panel-method", calculation=panel, title="How panel area is calculated")
+            """    method(id="panel-method", calculation=panel, title="How panel area is calculated")
     first_panel = panel(width=2.0, height=3.0)
     second_panel = panel(width=1.0, height=6.0)
     table(id="panel-results", method="panel-method", title="Panel comparison", cases={"Case A": first_panel, "Case B": second_panel}, outputs=("area",))
-'''
+"""
         )
         before = self.execution()["execution"]["methods"][0]["helpers"][0]["sourceHash"]
         margin = self.root / "margin.cso.py"
@@ -637,7 +782,7 @@ def compare() -> CalculationResults:
             for index, name in enumerate(names, start=1)
         )
         mapping = ", ".join(f'"{name}": {name}' for name in names)
-        return f'''from typing import Annotated
+        return f"""from typing import Annotated
 from cso_python import CalculationResults, calculation, method, section, symbol, table
 from _cso_bindings.rectangle import rectangle
 
@@ -649,10 +794,12 @@ def compare() -> CalculationResults:
     table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={{{mapping}}}, inputs=("width",), outputs=("area", "perimeter"), cases_axis="{axis}")
     ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
     return {{"ready": ready}}
-'''
+"""
 
     def test_row_orientation_keeps_the_same_cell_inventory(self):
-        (self.root / "compare.cso.py").write_text(self._orientation_source("columns", 12))
+        (self.root / "compare.cso.py").write_text(
+            self._orientation_source("columns", 12)
+        )
         columns = self.execution()["execution"]
         (self.root / "compare.cso.py").write_text(self._orientation_source("rows", 12))
         rows = self.execution()["execution"]
@@ -665,15 +812,17 @@ def compare() -> CalculationResults:
             [item["function"] for item in columns["invocations"]],
         )
         self.assertEqual(rows["methods"][0]["id"], columns["methods"][0]["id"])
-        area_cells = [cell for cell in rows["tables"][0]["cells"] if cell["quantity"] == "area"]
+        area_cells = [
+            cell for cell in rows["tables"][0]["cells"] if cell["quantity"] == "area"
+        ]
         self.assertEqual(len({cell["symbolId"] for cell in area_cells}), 12)
 
     def test_explicit_rows_selection_matches_columns(self):
-        body = '''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+        body = """    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
     first_panel = rectangle(width=2.0, height=3.0)
     second_panel = rectangle(width=1.0, height=6.0)
     table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={"Case A": first_panel, "Case B": second_panel}, inputs=(), outputs=("area",), cases_axis="AXIS")
-'''
+"""
         self.write_compare(body.replace("AXIS", "columns"))
         columns = self.execution()["execution"]["tables"][0]
         self.write_compare(body.replace("AXIS", "rows"))
@@ -683,8 +832,7 @@ def compare() -> CalculationResults:
         self.assertNotEqual(rows["cells"][0]["symbolId"], rows["cells"][1]["symbolId"])
 
     def test_empty_row_table_does_not_invent_cases(self):
-        (self.root / "compare.cso.py").write_text(
-            '''from typing import Annotated
+        (self.root / "compare.cso.py").write_text("""from typing import Annotated
 from cso_python import CalculationResults, calculation, method, section, symbol, table
 from _cso_bindings.rectangle import rectangle
 
@@ -695,10 +843,11 @@ def compare() -> CalculationResults:
     table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={}, cases_axis="rows")
     ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
     return {"ready": ready}
-'''
-        )
+""")
         execution = self.execution()["execution"]
-        self.assertEqual([item["function"] for item in execution["invocations"]], ["compare"])
+        self.assertEqual(
+            [item["function"] for item in execution["invocations"]], ["compare"]
+        )
         self.assertEqual(execution["tables"][0]["casesAxis"], "rows")
         self.assertEqual(execution["tables"][0]["cases"], [])
         self.assertEqual(execution["tables"][0]["cells"], [])
@@ -709,12 +858,23 @@ def compare() -> CalculationResults:
         check = execution["methods"][0]["checks"][0]
         self.assertEqual(check["predicateText"], "A <= 20")
         self.assertEqual(check["explanation"], "Area exceeds 20 square metres.")
-        outcomes = [item for item in execution["checkOutcomes"] if item["checkId"] == "area-limit"]
+        outcomes = [
+            item
+            for item in execution["checkOutcomes"]
+            if item["checkId"] == "area-limit"
+        ]
         self.assertEqual([item["value"] for item in outcomes], [True, False])
-        self.assertEqual([symbol_result(execution, item["symbolId"]) for item in execution["tables"][0]["cells"] if item["quantity"] == "area"], [6, 24])
+        self.assertEqual(
+            [
+                symbol_result(execution, item["symbolId"])
+                for item in execution["tables"][0]["cells"]
+                if item["quantity"] == "area"
+            ],
+            [6, 24],
+        )
 
     def test_hidden_quantity_keeps_the_check(self):
-        self.write_checked(outputs='outputs=()')
+        self.write_checked(outputs="outputs=()")
         execution = self.execution()["execution"]
         self.assertEqual(execution["tables"][0]["outputs"], [])
         self.assertEqual(len(execution["checkOutcomes"]), 4)
@@ -732,7 +892,9 @@ def compare() -> CalculationResults:
     def test_bare_check_predicate_is_diagnosed_before_execution(self):
         self.write_checked()
         path = self.root / "rectangle.cso.py"
-        path.write_text(path.read_text().replace("predicate=area <= 20", "predicate=area"))
+        path.write_text(
+            path.read_text().replace("predicate=area <= 20", "predicate=area")
+        )
         generate(self.root)
         with patch.object(Execution, "run") as run:
             response = execute(self.root / "compare.cso.py", "compare", {})
@@ -742,7 +904,9 @@ def compare() -> CalculationResults:
     def test_check_exception_stays_a_whole_run_failure(self):
         self.write_checked()
         path = self.root / "rectangle.cso.py"
-        path.write_text(path.read_text().replace("predicate=area <= 20", "predicate=1 / 0 <= area"))
+        path.write_text(
+            path.read_text().replace("predicate=area <= 20", "predicate=1 / 0 <= area")
+        )
         generate(self.root)
         response = execute(self.root / "compare.cso.py", "compare", {})
         self.assertFalse(response["ok"])
@@ -781,12 +945,17 @@ def compare() -> CalculationResults:
         self.write_applicable(outputs="outputs=()")
         execution = self.execution()["execution"]
         self.assertEqual(execution["tables"][0]["outputs"], [])
-        self.assertEqual([item["value"] for item in execution["applicabilityOutcomes"]], [True, False])
+        self.assertEqual(
+            [item["value"] for item in execution["applicabilityOutcomes"]],
+            [True, False],
+        )
 
     def test_empty_cases_do_not_invent_applicability_outcomes(self):
         self.write_applicable(cases="{}")
         execution = self.execution()["execution"]
-        self.assertEqual(execution["methods"][0]["applicability"][0]["id"], "area-limit")
+        self.assertEqual(
+            execution["methods"][0]["applicability"][0]["id"], "area-limit"
+        )
         self.assertNotIn("applicabilityOutcomes", execution)
 
     def test_repeated_execution_records_the_same_applicability(self):
@@ -801,7 +970,9 @@ def compare() -> CalculationResults:
     def test_bare_applicability_predicate_is_diagnosed_before_execution(self):
         self.write_applicable()
         path = self.root / "rectangle.cso.py"
-        path.write_text(path.read_text().replace("predicate=area <= 20", "predicate=area"))
+        path.write_text(
+            path.read_text().replace("predicate=area <= 20", "predicate=area")
+        )
         generate(self.root)
         with patch.object(Execution, "run") as run:
             response = execute(self.root / "compare.cso.py", "compare", {})
@@ -811,7 +982,9 @@ def compare() -> CalculationResults:
     def test_applicability_exception_stays_a_whole_run_failure(self):
         self.write_applicable()
         path = self.root / "rectangle.cso.py"
-        path.write_text(path.read_text().replace("predicate=area <= 20", "predicate=1 / 0 <= area"))
+        path.write_text(
+            path.read_text().replace("predicate=area <= 20", "predicate=1 / 0 <= area")
+        )
         generate(self.root)
         response = execute(self.root / "compare.cso.py", "compare", {})
         self.assertFalse(response["ok"])
@@ -828,14 +1001,22 @@ def compare() -> CalculationResults:
     def test_conditional_records_exact_selected_branch(self):
         self.write_choice()
         payload = self.execution()["execution"]
-        chosen = next(item for item in payload["methods"][0]["quantities"] if item["variableName"] == "chosen")
+        chosen = next(
+            item
+            for item in payload["methods"][0]["quantities"]
+            if item["variableName"] == "chosen"
+        )
         self.assertEqual(chosen["formulaText"], "(w if w > h else h)")
         outcomes = payload["branchOutcomes"]
         self.assertEqual([item["value"] for item in outcomes], [True, False])
         self.assertEqual([item["label"] for item in outcomes], ["w", "h"])
-        self.assertEqual([item["invocationId"] for item in outcomes], ["root/narrow", "root/wide"])
+        self.assertEqual(
+            [item["invocationId"] for item in outcomes], ["root/narrow", "root/wide"]
+        )
         self.assertEqual(payload["tables"][0]["casesAxis"], "rows")
-        self.assertTrue(any(item["id"] == "root/spare" for item in payload["invocations"]))
+        self.assertTrue(
+            any(item["id"] == "root/spare" for item in payload["invocations"])
+        )
         self.assertEqual(
             [symbol_result(payload, outcome["symbolId"]) for outcome in outcomes],
             [4, 4],
@@ -854,13 +1035,20 @@ def compare() -> CalculationResults:
         self.write_guard()
         execution = self.execution()["execution"]
         outcome = execution["branchOutcomes"][0]
-        chosen = next(item for item in execution["methods"][0]["quantities"] if item["variableName"] == "chosen")
+        chosen = next(
+            item
+            for item in execution["methods"][0]["quantities"]
+            if item["variableName"] == "chosen"
+        )
         nodes = {node["key"]: node for node in chosen["nodes"]}
         dormant = next(
             node["key"]
             for node in chosen["nodes"]
             if node.get("funcSpec", {}).get("id") == "fg.gt"
-            and any((nodes[argument["key"]].get("literal") or {}).get("value") == 10 for argument in node["funcArgs"])
+            and any(
+                (nodes[argument["key"]].get("literal") or {}).get("value") == 10
+                for argument in node["funcArgs"]
+            )
         )
         self.assertEqual(outcome["value"], False)
         self.assertNotIn(dormant, outcome["usedKeys"])
@@ -875,8 +1063,16 @@ def compare() -> CalculationResults:
     def test_dormant_division_is_not_executed(self):
         self.write_division(2)
         execution = self.execution()["execution"]
-        chosen = next(item for item in execution["methods"][0]["quantities"] if item["variableName"] == "chosen")
-        divide = next(node["key"] for node in chosen["nodes"] if node.get("funcSpec", {}).get("id") == "fg.divide")
+        chosen = next(
+            item
+            for item in execution["methods"][0]["quantities"]
+            if item["variableName"] == "chosen"
+        )
+        divide = next(
+            node["key"]
+            for node in chosen["nodes"]
+            if node.get("funcSpec", {}).get("id") == "fg.divide"
+        )
         outcome = execution["branchOutcomes"][0]
         self.assertEqual(outcome["value"], True)
         self.assertNotIn(divide, outcome["usedKeys"])
@@ -903,14 +1099,13 @@ def compare() -> CalculationResults:
             "from cso_python import CalculationResults, calculation, check, section, symbol",
         ).replace(
             '    return {"area": area, "perimeter": perimeter}',
-            f'''    check(id="area-limit", targets=("{target}",), explanation="Area exceeds 20 square metres.", predicate=area <= 20)
+            f"""    check(id="area-limit", targets=("{target}",), explanation="Area exceeds 20 square metres.", predicate=area <= 20)
     check(id="perimeter-limit", targets=("perimeter",), explanation="Perimeter stays under 100 metres.", predicate=perimeter < 100)
-    return {{"area": area, "perimeter": perimeter}}''',
+    return {{"area": area, "perimeter": perimeter}}""",
         )
         (self.root / "rectangle.cso.py").write_text(source)
         if cases == "{}":
-            (self.root / "compare.cso.py").write_text(
-                '''from typing import Annotated
+            (self.root / "compare.cso.py").write_text("""from typing import Annotated
 from cso_python import CalculationResults, calculation, method, section, symbol, table
 from _cso_bindings.rectangle import rectangle
 
@@ -921,15 +1116,14 @@ def compare() -> CalculationResults:
     table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={})
     ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
     return {"ready": ready}
-'''
-            )
+""")
         else:
             suffix = f", {outputs}" if outputs else ""
             self.write_compare(
-                f'''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+                f"""    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
     first_panel = rectangle(width=2.0, height=3.0)
     second_panel = rectangle(width=8.0, height=3.0)
-    table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={{"Case A": first_panel, "Case B": second_panel}}{suffix})'''
+    table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={{"Case A": first_panel, "Case B": second_panel}}{suffix})"""
             )
         generate(self.root)
 
@@ -939,13 +1133,12 @@ def compare() -> CalculationResults:
             "from cso_python import CalculationResults, applicable, calculation, section, symbol",
         ).replace(
             '    return {"area": area, "perimeter": perimeter}',
-            f'''    applicable(id="area-limit", targets=("{target}",), explanation="Area exceeds the method limit.", predicate=area <= 20)
-    return {{"area": area, "perimeter": perimeter}}''',
+            f"""    applicable(id="area-limit", targets=("{target}",), explanation="Area exceeds the method limit.", predicate=area <= 20)
+    return {{"area": area, "perimeter": perimeter}}""",
         )
         (self.root / "rectangle.cso.py").write_text(source)
         if cases == "{}":
-            (self.root / "compare.cso.py").write_text(
-                '''from typing import Annotated
+            (self.root / "compare.cso.py").write_text("""from typing import Annotated
 from cso_python import CalculationResults, calculation, method, section, symbol, table
 from _cso_bindings.rectangle import rectangle
 
@@ -956,21 +1149,19 @@ def compare() -> CalculationResults:
     table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={})
     ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
     return {"ready": ready}
-'''
-            )
+""")
         else:
             suffix = f", {outputs}" if outputs else ""
             self.write_compare(
-                f'''    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
+                f"""    method(id="rectangle-method", calculation=rectangle, title="How rectangle results are calculated")
     first_panel = rectangle(width=2.0, height=3.0)
     second_panel = rectangle(width=8.0, height=3.0)
-    table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={{"Case A": first_panel, "Case B": second_panel}}{suffix})'''
+    table(id="rectangle-results", method="rectangle-method", title="Rectangle comparison", cases={{"Case A": first_panel, "Case B": second_panel}}{suffix})"""
             )
         generate(self.root)
 
     def write_choice(self, cases=None):
-        (self.root / "choice.cso.py").write_text(
-            '''from typing import Annotated
+        (self.root / "choice.cso.py").write_text("""from typing import Annotated
 from cso_python import CalculationResults, calculation, section, symbol
 
 @calculation(id="choice", title="Choice")
@@ -978,14 +1169,16 @@ from cso_python import CalculationResults, calculation, section, symbol
 def choice(width: Annotated[float, symbol(glyph="w", description="Width", unit="m")], height: Annotated[float, symbol(glyph="h", description="Height", unit="m")]) -> CalculationResults:
     chosen: Annotated[float, symbol(glyph="c", description="Chosen", unit="m")] = width if width > height else height
     return {"chosen": chosen}
-'''
-        )
-        body = '''narrow = choice(width=4, height=1)
+""")
+        body = (
+            """narrow = choice(width=4, height=1)
     wide = choice(width=1, height=4)
     spare = choice(width=2, height=2)
-    table(id="choice-results", method="choice-method", title="Choice comparison", cases={"Narrow": narrow, "Wide": wide}, cases_axis="rows")''' if cases is None else f'''table(id="choice-results", method="choice-method", title="Choice comparison", cases={cases})'''
-        (self.root / "compare.cso.py").write_text(
-            f'''from typing import Annotated
+    table(id="choice-results", method="choice-method", title="Choice comparison", cases={"Narrow": narrow, "Wide": wide}, cases_axis="rows")"""
+            if cases is None
+            else f"""table(id="choice-results", method="choice-method", title="Choice comparison", cases={cases})"""
+        )
+        (self.root / "compare.cso.py").write_text(f"""from typing import Annotated
 from cso_python import CalculationResults, calculation, method, section, symbol, table
 from _cso_bindings.choice import choice
 
@@ -996,13 +1189,11 @@ def compare() -> CalculationResults:
     {body}
     ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
     return {{"ready": ready}}
-'''
-        )
+""")
         generate(self.root)
 
     def write_guard(self):
-        (self.root / "guard.cso.py").write_text(
-            '''from typing import Annotated
+        (self.root / "guard.cso.py").write_text("""from typing import Annotated
 from cso_python import CalculationResults, calculation, section, symbol
 
 @calculation(id="guard", title="Guard")
@@ -1010,10 +1201,8 @@ from cso_python import CalculationResults, calculation, section, symbol
 def guard(width: Annotated[float, symbol(glyph="w", description="Width", unit="m")]) -> CalculationResults:
     chosen: Annotated[float, symbol(glyph="c", description="Chosen", unit="")] = 1 if width > 0 and width > 10 else 0
     return {"chosen": chosen}
-'''
-        )
-        (self.root / "compare.cso.py").write_text(
-            '''from typing import Annotated
+""")
+        (self.root / "compare.cso.py").write_text("""from typing import Annotated
 from cso_python import CalculationResults, calculation, method, section, symbol, table
 from _cso_bindings.guard import guard
 
@@ -1025,13 +1214,11 @@ def compare() -> CalculationResults:
     table(id="guard-results", method="guard-method", title="Guard comparison", cases={"Negative": negative})
     ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
     return {"ready": ready}
-'''
-        )
+""")
         generate(self.root)
 
     def write_chain(self):
-        (self.root / "chain.cso.py").write_text(
-            '''from typing import Annotated
+        (self.root / "chain.cso.py").write_text("""from typing import Annotated
 from cso_python import CalculationResults, calculation, section, symbol
 
 @calculation(id="chain", title="Chain")
@@ -1039,10 +1226,8 @@ from cso_python import CalculationResults, calculation, section, symbol
 def chain(width: Annotated[float, symbol(glyph="w", description="Width", unit="m")]) -> CalculationResults:
     chosen: Annotated[float, symbol(glyph="c", description="Chosen", unit="")] = 1 if 0 < width < 10 else 0
     return {"chosen": chosen}
-'''
-        )
-        (self.root / "compare.cso.py").write_text(
-            '''from typing import Annotated
+""")
+        (self.root / "compare.cso.py").write_text("""from typing import Annotated
 from cso_python import CalculationResults, calculation, method, section, symbol, table
 from _cso_bindings.chain import chain
 
@@ -1055,13 +1240,11 @@ def compare() -> CalculationResults:
     table(id="chain-results", method="chain-method", title="Chain comparison", cases={"Below": below, "Inside": inside})
     ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
     return {"ready": ready}
-'''
-        )
+""")
         generate(self.root)
 
     def write_nested(self):
-        (self.root / "nested.cso.py").write_text(
-            '''from typing import Annotated
+        (self.root / "nested.cso.py").write_text("""from typing import Annotated
 from cso_python import CalculationResults, calculation, section, symbol
 
 @calculation(id="nested", title="Nested")
@@ -1069,10 +1252,8 @@ from cso_python import CalculationResults, calculation, section, symbol
 def nested(width: Annotated[float, symbol(glyph="w", description="Width", unit="m")], height: Annotated[float, symbol(glyph="h", description="Height", unit="m")]) -> CalculationResults:
     chosen: Annotated[float, symbol(glyph="c", description="Chosen", unit="m")] = (width if width > 0 else 0) if height > 0 else height
     return {"chosen": chosen}
-'''
-        )
-        (self.root / "compare.cso.py").write_text(
-            '''from typing import Annotated
+""")
+        (self.root / "compare.cso.py").write_text("""from typing import Annotated
 from cso_python import CalculationResults, calculation, method, section, symbol, table
 from _cso_bindings.nested import nested
 
@@ -1084,13 +1265,11 @@ def compare() -> CalculationResults:
     table(id="nested-results", method="nested-method", title="Nested comparison", cases={"Sample": sample})
     ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
     return {"ready": ready}
-'''
-        )
+""")
         generate(self.root)
 
     def write_division(self, width: int):
-        (self.root / "division.cso.py").write_text(
-            '''from typing import Annotated
+        (self.root / "division.cso.py").write_text("""from typing import Annotated
 from cso_python import CalculationResults, calculation, section, symbol
 
 @calculation(id="division", title="Division")
@@ -1098,10 +1277,8 @@ from cso_python import CalculationResults, calculation, section, symbol
 def division(width: Annotated[float, symbol(glyph="w", description="Width", unit="m")]) -> CalculationResults:
     chosen: Annotated[float, symbol(glyph="c", description="Chosen", unit="m")] = width if width > 0 else 1 / width
     return {"chosen": chosen}
-'''
-        )
-        (self.root / "compare.cso.py").write_text(
-            f'''from typing import Annotated
+""")
+        (self.root / "compare.cso.py").write_text(f"""from typing import Annotated
 from cso_python import CalculationResults, calculation, method, section, symbol, table
 from _cso_bindings.division import division
 
@@ -1113,8 +1290,7 @@ def compare() -> CalculationResults:
     table(id="division-results", method="division-method", title="Division comparison", cases={{"Sample": sample}})
     ready: Annotated[float, symbol(glyph="r", description="Ready", unit="")] = 1
     return {{"ready": ready}}
-'''
-        )
+""")
         generate(self.root)
 
 

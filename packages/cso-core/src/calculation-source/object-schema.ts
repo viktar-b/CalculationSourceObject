@@ -355,6 +355,7 @@ export const CalculationSourceObjectSchema = z
     title: z.string(),
     source: z
       .object({
+        externalMethods: z.literal(true).optional(),
         id: IdSchema,
         metadata: JsonObjectSchema,
         origin: CalculationSourceOriginSchema.optional(),
@@ -371,9 +372,11 @@ export const CalculationSourceObjectSchema = z
         (item) => item.kind === 'method' || item.kind === 'table',
       ),
     );
-    const external = document.sections.some(
-      (section) => typeof section.metadata?.externalCallId === 'string',
-    );
+    const external =
+      document.source.externalMethods === true ||
+      document.sections.some(
+        (section) => typeof section.metadata?.externalCallId === 'string',
+      );
     if (
       (document.schemaVersion === '1.2.0') !== external ||
       (!external && (document.schemaVersion === '1.1.0') !== comparison)

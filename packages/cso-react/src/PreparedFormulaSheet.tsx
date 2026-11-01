@@ -147,6 +147,43 @@ export const PreparedFormulaSheet = ({
       items: readonly PreparedMethodContent[],
     ): ReactElement[] =>
       items.map((item, index) => {
+        if (item.kind === 'external') {
+          return (
+            <section
+              key={`external-${item.binding}`}
+              className="cso-method-external"
+              data-method-external={item.binding}
+            >
+              <h4>{item.binding}</h4>
+              <p>
+                External source: {item.adapter.moduleId},{' '}
+                {item.adapter.function}
+              </p>
+              <p>External algorithm excluded from CSO formula verification.</p>
+              <h5>Inputs</h5>
+              {item.inputs.map((input) => (
+                <div key={input.name} data-external-method-input={input.name}>
+                  {notation.row(input.symbolId, symbolIndex++)}
+                </div>
+              ))}
+              <h5>Method</h5>
+              {item.declaration.interface.description
+                .split(/\n\s*\n/u)
+                .map((paragraph, paragraphIndex) => (
+                  <p key={`paragraph-${paragraphIndex}`}>{paragraph}</p>
+                ))}
+              <h5>Outputs</h5>
+              {item.outputs.map((output) => (
+                <div
+                  key={output.name}
+                  data-external-method-output={output.name}
+                >
+                  {notation.row(output.symbolId, symbolIndex++)}
+                </div>
+              ))}
+            </section>
+          );
+        }
         if (item.kind === 'check' || item.kind === 'applicability') {
           return (
             <p
@@ -284,15 +321,29 @@ export const PreparedFormulaSheet = ({
             const quantityRow = (
               quantity: (typeof item.call.outputs)[number],
               role: string,
+              index: number,
             ) => {
               const symbol = requiredItem(symbols, quantity.symbolId);
+              const qualification = item.qualifications?.find(
+                (note) => note.symbolId === quantity.symbolId,
+              );
               return (
                 <tr
                   key={`${role}-${quantity.name}`}
                   data-external-quantity={quantity.name}
+                  data-external-role={role}
+                  data-external-index={index}
                   data-symbol-id={quantity.symbolId}
                 >
                   <td colSpan={2} className="cso-external-quantity-cell">
+                    {qualification ? (
+                      <p
+                        className="cso-branch-note"
+                        data-applicability="not-applicable"
+                      >
+                        Not applicable. {qualification.reasons.join(' ')}
+                      </p>
+                    ) : null}
                     <FormulaSheetSymbolRow
                       sheet={sheet}
                       item={symbol}
@@ -330,8 +381,8 @@ export const PreparedFormulaSheet = ({
                     <tr>
                       <th colSpan={2}>Inputs</th>
                     </tr>
-                    {item.call.inputs.map((quantity) =>
-                      quantityRow(quantity, 'input'),
+                    {item.call.inputs.map((quantity, index) =>
+                      quantityRow(quantity, 'input', index),
                     )}
                     <tr>
                       <th colSpan={2}>Method</th>
@@ -346,8 +397,8 @@ export const PreparedFormulaSheet = ({
                     <tr>
                       <th colSpan={2}>Outputs</th>
                     </tr>
-                    {item.call.outputs.map((quantity) =>
-                      quantityRow(quantity, 'output'),
+                    {item.call.outputs.map((quantity, index) =>
+                      quantityRow(quantity, 'output', index),
                     )}
                     {item.call.warnings.map((warning, index) => (
                       <tr key={`warning-${index}`}>
@@ -370,6 +421,30 @@ export const PreparedFormulaSheet = ({
                     {document.verification.externalCoverage.calls}. External
                     results: {document.verification.externalCoverage.results}.
                   </p>
+                ) : null}
+                {document.verification?.externalReferenceCoverage ? (
+                  <div className="cso-external-reference-coverage">
+                    <p>
+                      Independent external reference coverage:{' '}
+                      {document.verification.externalReferenceCoverage.status}.
+                    </p>
+                    <p>
+                      Checked outputs:{' '}
+                      {document.verification.externalReferenceCoverage.checked
+                        .filter((slot) => slot.externalCallId === item.call.id)
+                        .map((slot) => slot.outputName)
+                        .join(', ') || 'None'}
+                      .
+                    </p>
+                    <p>
+                      Uncovered outputs:{' '}
+                      {document.verification.externalReferenceCoverage.uncovered
+                        .filter((slot) => slot.externalCallId === item.call.id)
+                        .map((slot) => slot.outputName)
+                        .join(', ') || 'None'}
+                      .
+                    </p>
+                  </div>
                 ) : null}
                 <EngineeringMetadata entries={item.context} />
               </section>

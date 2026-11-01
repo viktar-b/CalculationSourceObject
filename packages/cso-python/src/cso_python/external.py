@@ -6,6 +6,7 @@ import ast
 import hashlib
 from keyword import iskeyword
 import sys
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -66,6 +67,8 @@ def read_declaration(
         )
     target = literal(fields["path"], module)
     function = literal(fields["function"], module)
+    if isinstance(function, str):
+        function = unicodedata.normalize("NFKC", function)
     description = literal(fields["description"], module)
     if (
         not isinstance(target, str)
@@ -90,16 +93,27 @@ def read_declaration(
             fail(f"{field} must be a literal-key mapping")
         result = {}
         for key, item in zip(value.keys, value.values):
+            if not isinstance(key, ast.Constant) or not isinstance(key.value, str):
+                fail(f"{field} needs unique nonempty string keys")
+            name = (
+                key.value
+                if field == "outputs"
+                else unicodedata.normalize("NFKC", key.value)
+            )
             if (
-                not isinstance(key, ast.Constant)
-                or not isinstance(key.value, str)
-                or not key.value.isidentifier()
-                or iskeyword(key.value)
-                or key.value.startswith("__cso_")
-                or key.value in result
+                not name
+                or field != "outputs"
+                and (
+                    not name.isidentifier()
+                    or iskeyword(name)
+                    or name.startswith("__cso_")
+                )
+                or name in result
             ):
-                fail(f"{field} needs unique identifier keys")
-            result[key.value] = item
+                fail(
+                    f"{field} needs unique nonempty {'string' if field == 'outputs' else 'identifier'} keys"
+                )
+            result[name] = item
         return result
 
     input_nodes, output_nodes, defaults = (

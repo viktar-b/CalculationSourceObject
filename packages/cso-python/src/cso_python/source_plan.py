@@ -121,6 +121,17 @@ def compile_source_plan(
     calls: list[Json] = []
     content: list[Json] = []
     _collect(module, steps, expressions, quantities, calls, content)
+    for call in calls:
+        if call.get("kind") != "external":
+            continue
+        declaration_module = definitions.capture.load(module.path.parent / call["path"])
+        declaration = declaration_module.externals[call["function"]]
+        adapter = definitions.capture.modules[declaration.path]
+        call["declarationFingerprint"] = declaration.fingerprint
+        call["declarationSourceHash"] = hashlib.sha256(
+            declaration_module.data
+        ).hexdigest()
+        call["adapterSourceHash"] = hashlib.sha256(adapter.data).hexdigest()
     payload = {"quantities": quantities, "calls": calls, "content": content}
     return SourcePlan(
         function=function,

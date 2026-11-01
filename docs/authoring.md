@@ -208,12 +208,13 @@ for each invocation. See the
 
 ## Supported source and document content
 
-### External functions, draft implementation
+### External functions
 
 Declare an ordinary single-file Python adapter in a local metadata module with
 `external_function(path=..., function=..., inputs=..., outputs=...,
-description=..., defaults=...)`. Inputs and outputs map names to shared numeric
-metadata aliases. Defaults are optional finite numeric literals. The method
+description=..., defaults=...)`. Inputs map Python parameter names and outputs
+map nonempty public string keys to shared numeric metadata aliases. Defaults are
+optional finite numeric literals. The method
 description must be nonempty. Adapter paths resolve relative to the declaration
 module and remain within the calculation project.
 
@@ -244,15 +245,28 @@ Python can call a generated calculation containing external calls. Calling an
 external handle alone raises a context error. Changes to the declaration require
 regenerating bindings; adapter-only edits require a fresh capture.
 
-The draft report path preserves the complete input/method/output block, including
+The report preserves the complete input/method/output block, including
 unused outputs. External-result consistency and formula checks have separate
 counts. The external algorithm is excluded from formula verification. Preserve
 full execution evidence or prepared HTML/PDF; standalone CSO and math-only exports
 reject external calculations before dropping evidence.
 
-Method/table composition, scoped independent references, coordinated release
-pins and scientific/PDF acceptance remain implementation work in PR #99. The
-accepted external ADRs describe the intended complete feature.
+An annotated wrapper containing external calls can be used by `method` and
+`table`. The shared method explains the opaque boundary without importing or
+running the adapter, including when there are zero cases. Grouped cases retain
+their complete external blocks with case/call labels, even when table rows omit
+some results. Every supplied quantity contributes applicability dependencies to
+every external output; downstream formulas continue to follow their used branch.
+Failed engineering checks retain their numbers and outcomes. Numerical failures
+stop execution.
+
+Scoped independent reference cases can check selected external outputs. Their
+identity includes source, declarations, adapters, resolved inputs and environment,
+without run IDs or returned answers. Uncovered diagnostics remain visible and
+pending. See the [examples](../examples/external-functions/README.md) and
+[reference contract](../packages/cso-core/src/contracts/reference.ts).
+
+### Formulas and document content
 
 Supported formulas include numeric literals, references, unary minus, arithmetic
 `+`, `-`, `*`, `/`, `**`, `sqrt` / `math.sqrt`, `math.pi` (or imported `pi`),

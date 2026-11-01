@@ -60,6 +60,23 @@ def _declared_number(
     return value
 
 
+def _uses_external_methods(methods: list[Json]) -> bool:
+    def content(items: list[Json]) -> bool:
+        return any(
+            item["kind"] == "external"
+            or item["kind"] == "section"
+            and content(item["content"])
+            for item in items
+        )
+
+    def method(plan: Json) -> bool:
+        return content(plan["content"]) or any(
+            method(helper) for helper in plan["helpers"]
+        )
+
+    return any(method(plan) for plan in methods)
+
+
 class Execution:
     def __init__(
         self,
@@ -73,7 +90,9 @@ class Execution:
         self.root = self.planner.plan(
             self.planner.capture.entry, function, supplied=inputs
         )
-        if self.planner.external_calls and not supports_external:
+        self.external_methods = _uses_external_methods(self.planner.methods)
+        self.has_external = bool(self.planner.external_calls) or self.external_methods
+        if self.has_external and not supports_external:
             raise SourceError(
                 "INCOMPATIBLE_CONTRACT",
                 "External functions require an execution consumer supporting protocol 4 and retained call evidence; standalone CSO export is unsupported",
@@ -338,6 +357,7 @@ class Execution:
         record = next(
             item for item in self.planner.external_calls if item["id"] == invocation.id
         )
+        captured_warnings: list[warnings.WarningMessage] = []
         try:
             with warnings.catch_warnings(record=True) as captured_warnings:
                 warnings.simplefilter("always")
@@ -409,21 +429,35 @@ class Execution:
                     }
                 )
             return result
-        except Exception as error:
+        except (Exception, SystemExit) as error:
+            warning_diagnostics = [
+                {
+                    "code": "EXTERNAL_WARNING",
+                    "message": f"{record['adapter']['moduleId']}:{external.function}: {item.category.__name__}: {item.message}",
+                    "stage": "execution",
+                    "location": record["callSite"],
+                    "invocationId": invocation.id,
+                }
+                for item in captured_warnings
+            ]
             if isinstance(error, SourceError):
+                error.additional_diagnostics.extend(warning_diagnostics)
                 error.diagnostic.setdefault("location", record["callSite"])
                 error.diagnostic.setdefault("invocationId", invocation.id)
                 error.diagnostic["message"] = (
                     f"{record['adapter']['moduleId']}:{external.function}: {error.diagnostic['message']}"
                 )
+                error.args = (error.diagnostic["message"],)
                 raise
-            raise SourceError(
+            failure = SourceError(
                 "EXTERNAL_EXECUTION_FAILED",
                 f"{record['adapter']['moduleId']}:{external.function}: {type(error).__name__}: {error}",
                 stage="execution",
                 location=record["callSite"],
                 invocationId=invocation.id,
-            ) from error
+            )
+            failure.additional_diagnostics.extend(warning_diagnostics)
+            raise failure from error
 
     def response(self) -> Json:
         self.run(self.root, self.root.record["resolvedInputs"])
@@ -497,9 +531,11 @@ class Execution:
             applicability_outcomes = collect_applicability_outcomes(self.planner)
             if applicability_outcomes:
                 execution["applicabilityOutcomes"] = applicability_outcomes
-        if self.planner.external_calls:
+        if self.has_external:
             protocol = "4"
             execution["cso"]["schemaVersion"] = "1.2.0"
+            if self.external_methods:
+                execution["cso"]["source"]["externalMethods"] = True
             execution["externalCalls"] = self.planner.external_calls
             execution["runId"] = self.run_id
             execution["environment"] = {
@@ -579,7 +615,14 @@ def execute(
         return {
             "protocolVersion": "2",
             "ok": False,
-            "diagnostics": [diagnostic],
+            "diagnostics": [
+                diagnostic,
+                *(
+                    error.additional_diagnostics
+                    if isinstance(error, SourceError)
+                    else []
+                ),
+            ],
             "provenance": provenance,
         }
 

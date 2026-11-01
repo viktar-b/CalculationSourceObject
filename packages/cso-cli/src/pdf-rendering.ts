@@ -98,6 +98,16 @@ async function waitForPrintAssetsInPage(): Promise<void> {
 }
 
 function presentationInput(preparedDocument: PreparedDocument) {
+  const symbols = new Map(
+    [
+      ...preparedDocument.detachedSymbols,
+      ...preparedDocument.sections.flatMap((section) =>
+        section.items.flatMap((item) =>
+          item.kind === 'symbol' ? [item.symbol] : [],
+        ),
+      ),
+    ].map((symbol) => [symbol.id, symbol]),
+  );
   return {
     sections: preparedDocument.sections.map((section) => ({
       id: section.id,
@@ -108,6 +118,36 @@ function presentationInput(preparedDocument: PreparedDocument) {
         sourcePlacementId: item.sourcePlacementId,
         text: item.kind === 'text' ? item.text.content : undefined,
         figure: item.kind === 'figure' ? item.figure : undefined,
+        external:
+          item.kind === 'externalCall'
+            ? {
+                id: item.call.id,
+                description: item.call.description,
+                adapterModuleId: item.call.adapter.moduleId,
+                adapterFunction: item.call.adapter.function,
+                warnings: item.call.warnings,
+                quantities: [
+                  ...item.call.inputs.map((quantity, index) => ({
+                    quantity,
+                    role: 'input',
+                    index,
+                  })),
+                  ...item.call.outputs.map((quantity, index) => ({
+                    quantity,
+                    role: 'output',
+                    index,
+                  })),
+                ].map(({ quantity, role, index }) => ({
+                  name: quantity.name,
+                  symbolId: quantity.symbolId,
+                  role,
+                  index,
+                  description:
+                    symbols.get(quantity.symbolId)?.description ?? '',
+                  comment: symbols.get(quantity.symbolId)?.comment ?? '',
+                })),
+              }
+            : undefined,
       })),
     })),
     assets: preparedDocument.assets.map(({ asset }) => asset),
@@ -172,6 +212,64 @@ function inspectPreparedPresentationInPage(
         break;
       case 'section':
         break;
+      case 'externalCall': {
+        const external = item.external;
+        if (!external || element.dataset.externalCall !== external.id)
+          throw new Error('External call identity mismatch');
+        const text = element.textContent ?? '';
+        for (const paragraph of external.description.split(/\n\s*\n/u)) {
+          if (!text.includes(paragraph))
+            throw new Error('Missing external method paragraph');
+        }
+        if (
+          !text.includes(external.adapterModuleId) ||
+          !text.includes(external.adapterFunction) ||
+          !text.includes(
+            'External algorithm excluded from CSO formula verification.',
+          )
+        )
+          throw new Error('Missing external source or algorithm exclusion');
+        const quantities = [
+          ...element.querySelectorAll<HTMLElement>('[data-external-quantity]'),
+        ];
+        if (quantities.length !== external.quantities.length)
+          throw new Error('Missing or repeated external input/output row');
+        for (const quantity of external.quantities) {
+          const row = quantities.find(
+            (row) =>
+              row.dataset.externalRole === quantity.role &&
+              row.dataset.externalIndex === String(quantity.index) &&
+              row.dataset.symbolId === quantity.symbolId,
+          );
+          if (
+            !row?.querySelector('.cso-symbol-row math') ||
+            !row.textContent?.includes(quantity.description) ||
+            (quantity.comment && !row.textContent.includes(quantity.comment))
+          )
+            throw new Error(
+              'External quantity must preserve its indexed row, description and comment',
+            );
+          mappings.push({
+            pointer: `${itemPointer}/call/${quantity.role === 'input' ? 'inputs' : 'outputs'}/${quantity.index}`,
+            role: `external ${quantity.role} indexed quantity`,
+            selector: `${itemSelector} [data-external-role="${quantity.role}"][data-external-index="${quantity.index}"]`,
+          });
+        }
+        for (const warning of external.warnings)
+          if (!text.includes(warning))
+            throw new Error('Missing captured external warning');
+        mappings.push({
+          pointer: `${itemPointer}/call/description`,
+          role: 'external method explanation',
+          selector: itemSelector,
+        });
+        mappings.push({
+          pointer: `${itemPointer}/call/adapter`,
+          role: 'external adapter label and formula verification exclusion',
+          selector: itemSelector,
+        });
+        break;
+      }
       case 'method':
       case 'table':
         mappings.push({
@@ -429,7 +527,7 @@ async function withPreparedPage<T>(
       if (media === 'print') {
         diagnostics.push(
           ...(await page.evaluate<ReturnType<typeof renderComparisonParts>>(
-            `(${renderComparisonParts.toString()})(${JSON.stringify(comparisonPlans)}, undefined, ${partitionRowAxis.toString()})`
+            `(${renderComparisonParts.toString()})(${JSON.stringify(comparisonPlans)}, undefined, ${partitionRowAxis.toString()})`,
           )),
         );
       }

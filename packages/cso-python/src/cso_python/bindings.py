@@ -7,6 +7,7 @@ import json
 import keyword
 import os
 import tempfile
+import unicodedata
 from pathlib import Path
 
 from .definitions import Definitions
@@ -35,7 +36,12 @@ def generate(directory: Path, *, check: bool = False) -> dict:
                 "BINDING_OUTPUT_CONFLICT",
                 "_external is reserved for generated external handles",
             )
-        if any(not part.isidentifier() or keyword.iskeyword(part) for part in parts):
+        if any(
+            not part.isidentifier()
+            or keyword.iskeyword(part)
+            or unicodedata.normalize("NFKC", part) != part
+            for part in parts
+        ):
             raise SourceError(
                 "INVALID_BINDING_NAME",
                 f"Binding module needs identifier path components: {relative}",
@@ -107,7 +113,9 @@ def generate(directory: Path, *, check: bool = False) -> dict:
                 continue
             relative_module = declaration_module.path.relative_to(root).with_suffix("")
             if any(
-                not part.isidentifier() or keyword.iskeyword(part)
+                not part.isidentifier()
+                or keyword.iskeyword(part)
+                or unicodedata.normalize("NFKC", part) != part
                 for part in relative_module.parts
             ):
                 raise SourceError(

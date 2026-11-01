@@ -4,6 +4,10 @@ import tempfile
 import unittest
 import math
 import runpy
+import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 from cso_python.bindings import generate
@@ -317,6 +321,374 @@ def wrapper():
         response = execute(self.source, "calculate", {})
         self.assertTrue(response["ok"], response)
         self.assertEqual(len(response["execution"]["externalCalls"]), 2)
+
+    def test_external_package_initializer_import_uses_normal_package_name(self):
+        package = self.root / "pkg"
+        package.mkdir()
+        declaration = (
+            (self.root / "methods.py")
+            .read_text()
+            .replace('path="adapter.py"', 'path="../adapter.py"')
+        )
+        (package / "__init__.py").write_text(declaration)
+        self.source.write_text(
+            self.source.read_text().replace(
+                "from _cso_bindings._external.methods import square",
+                "from _cso_bindings._external.pkg import square",
+            )
+        )
+        self.assertTrue(generate(self.root)["ok"])
+        self.assertTrue(generate(self.root, check=True)["ok"])
+        response = execute(self.source, "calculate", {})
+        self.assertTrue(response["ok"], response)
+
+    def test_local_package_prefix_imports_are_rejected_before_execution(self):
+        package = self.root / "local_helpers"
+        package.mkdir()
+        (package / "__init__.py").write_text('raise RuntimeError("must not import")\n')
+        self.adapter.write_text(
+            "import local_helpers.submodule\ndef square(*, length):\n    return length\n"
+        )
+        with self.assertRaises(SourceError) as caught:
+            generate(self.root)
+        self.assertEqual(
+            caught.exception.diagnostic["code"], "UNSUPPORTED_ADAPTER_IMPORT"
+        )
+
+    def test_named_outputs_accept_non_identifier_public_keys(self):
+        declaration = self.root / "methods.py"
+        declaration.write_text(
+            declaration.read_text().replace('"area": Area', '"selected area": Area')
+        )
+        self.adapter.write_text(
+            'def square(*, length):\n    return {"selected area": length * length, "count": 1}\n'
+        )
+        self.source.write_text(
+            self.source.read_text().replace('first["area"]', 'first["selected area"]')
+        )
+        generate(self.root)
+        self.assertIn(
+            "'selected area': float",
+            (self.root / "_cso_bindings/_external/methods.pyi").read_text(),
+        )
+        response = execute(self.source, "calculate", {})
+        self.assertTrue(response["ok"], response)
+        self.assertEqual(
+            response["execution"]["externalCalls"][0]["outputs"][0]["name"],
+            "selected area",
+        )
+
+    def test_native_number_boundaries_preserve_kinds_and_reject_adapted_objects(self):
+        declaration = self.root / "methods.py"
+        declaration.write_text(
+            declaration.read_text().replace(
+                'outputs={"area": Area, "count": Count}', 'outputs={"area": Area}'
+            )
+        )
+        self.source.write_text(
+            "\n".join(
+                line
+                for line in self.source.read_text().splitlines()
+                if not line.startswith("    doubled:")
+            ).replace(
+                'return {"doubled": doubled}', 'return {"doubled": first["area"]}'
+            )
+            + "\n"
+        )
+        generate(self.root)
+        for expression, kind in (
+            ("2**53 - 1", "int"),
+            ("float(2**54)", "float"),
+            ("1e308", "float"),
+            ("-0.0", "float"),
+        ):
+            with self.subTest(expression=expression):
+                self.adapter.write_text(
+                    f"def square(*, length):\n    return {expression}\n"
+                )
+                response = execute(self.source, "calculate", {})
+                self.assertTrue(response["ok"], response)
+                self.assertEqual(
+                    response["execution"]["externalCalls"][0]["outputs"][0][
+                        "numericKind"
+                    ],
+                    kind,
+                )
+        for implementation in (
+            "class Scalar(float):\n    pass\ndef square(*, length):\n    return Scalar(9)\n",
+            "class Results(dict):\n    pass\ndef square(*, length):\n    return Results(area=9)\n",
+            "def square(*, length):\n    return 2**53\n",
+            'def square(*, length):\n    return float("inf")\n',
+        ):
+            with self.subTest(implementation=implementation):
+                self.adapter.write_text(implementation)
+                response = execute(self.source, "calculate", {})
+                self.assertFalse(response["ok"], response)
+                self.assertNotIn("execution", response)
+
+    def test_defaults_metadata_and_reserved_namespace_fail_before_adapter_execution(
+        self,
+    ):
+        declaration = self.root / "methods.py"
+        original = declaration.read_text()
+        marker = self.root / "adapter-imported.txt"
+        self.adapter.write_text(
+            f"from pathlib import Path\nPath({str(marker)!r}).touch()\n"
+        )
+        for changed in (
+            original.replace(
+                'description="Square the supplied length."', 'description=" "'
+            ),
+            original.replace(
+                'description="Square', 'defaults={"length": True}, description="Square'
+            ),
+            original.replace(
+                'description="Square', 'defaults={"unknown": 1.0}, description="Square'
+            ),
+            original.replace('"length": Length', '"length": float'),
+            original.replace('"length": Length', '"class": Length'),
+            original.replace('"area": Area', '"": Area'),
+        ):
+            with self.subTest(changed=changed):
+                declaration.write_text(changed)
+                with self.assertRaises(SourceError):
+                    generate(self.root)
+                self.assertFalse(marker.exists())
+        declaration.write_text(original)
+        (self.root / "_external.cso.py").write_text(self.source.read_text())
+        with self.assertRaises(SourceError) as caught:
+            generate(self.root)
+        self.assertEqual(caught.exception.diagnostic["code"], "BINDING_OUTPUT_CONFLICT")
+        self.assertFalse(marker.exists())
+
+    def test_adapter_paths_and_symlinks_cannot_escape_the_project(self):
+        outside = tempfile.TemporaryDirectory(prefix="cso-external-outside-")
+        self.addCleanup(outside.cleanup)
+        target = Path(outside.name) / "outside.py"
+        target.write_text('raise RuntimeError("must not import")\n')
+        declaration = self.root / "methods.py"
+        original = declaration.read_text()
+        for path in (str(target), os.path.relpath(target, self.root)):
+            with self.subTest(path=path):
+                declaration.write_text(
+                    original.replace('path="adapter.py"', f"path={path!r}")
+                )
+                with self.assertRaises(SourceError):
+                    generate(self.root)
+        self.adapter.unlink()
+        self.adapter.symlink_to(target)
+        declaration.write_text(original)
+        with self.assertRaises(SourceError) as caught:
+            generate(self.root)
+        self.assertEqual(caught.exception.diagnostic["code"], "INVALID_DEPENDENCY_PATH")
+
+    def test_missing_callable_package_and_numerical_failures_have_adapter_diagnostics(
+        self,
+    ):
+        generate(self.root)
+        for implementation, message in (
+            ("import missing_optional_scientific_library\n", "ModuleNotFoundError"),
+            ("unrelated = 1\n", "Missing callable"),
+            (
+                'def square(*, length):\n    raise ArithmeticError("no admissible solution")\n',
+                "no admissible solution",
+            ),
+            (
+                'def square(*, length):\n    raise MemoryError("resource exhausted")\n',
+                "resource exhausted",
+            ),
+        ):
+            with self.subTest(message=message):
+                self.adapter.write_text(implementation)
+                response = execute(self.source, "calculate", {})
+                self.assertFalse(response["ok"], response)
+                diagnostic = response["diagnostics"][0]
+                self.assertEqual(diagnostic["stage"], "execution")
+                self.assertIn("adapter.py:square", diagnostic["message"])
+                self.assertIn(message, diagnostic["message"])
+
+    def test_python_and_native_output_do_not_corrupt_json_and_warnings_are_retained(
+        self,
+    ):
+        self.adapter.write_text("""import os
+import warnings
+print("adapter imported")
+def square(*, length):
+    print("adapter called")
+    os.write(1, b"native adapter output\\n")
+    warnings.warn("estimated result", UserWarning)
+    return {"area": length * length, "count": 1}
+""")
+        generate(self.root)
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "cso_python",
+                "execute",
+                str(self.source),
+                "--function",
+                "calculate",
+                "--supported-execution-protocol",
+                "4",
+            ],
+            env=os.environ.copy(),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        response = json.loads(result.stdout)
+        self.assertTrue(response["ok"], response)
+        self.assertEqual(
+            response["execution"]["externalCalls"][0]["warnings"],
+            ["UserWarning: estimated result"],
+        )
+        self.assertIn("adapter imported", result.stderr)
+        self.assertIn("adapter called", result.stderr)
+        self.assertIn("native adapter output", result.stderr)
+
+    def test_nonfatal_warnings_survive_a_later_adapter_failure(self):
+        implementations = (
+            (
+                """import warnings
+def square(*, length):
+    warnings.warn("search approached its iteration limit", UserWarning)
+    raise ArithmeticError("no admissible solution")
+""",
+                "no admissible solution",
+            ),
+            (
+                """import warnings
+warnings.warn("search approached its iteration limit", UserWarning)
+raise RuntimeError("adapter initialization failed")
+""",
+                "adapter initialization failed",
+            ),
+            (
+                """import warnings
+def square(*, length):
+    warnings.warn("search approached its iteration limit", UserWarning)
+    return {"area": True, "count": 1}
+""",
+                "UNSUPPORTED_RESULT",
+            ),
+        )
+        for implementation, failure in implementations:
+            with self.subTest(failure=failure):
+                self.adapter.write_text(implementation)
+                generate(self.root)
+                response = execute(self.source, "calculate", {})
+                self.assertFalse(response["ok"], response)
+                self.assertNotIn("execution", response)
+                primary = response["diagnostics"][0]
+                self.assertIn(failure, primary["code"] + primary["message"])
+                warnings = [
+                    diagnostic
+                    for diagnostic in response["diagnostics"]
+                    if diagnostic["code"] == "EXTERNAL_WARNING"
+                ]
+                self.assertEqual(len(warnings), 1)
+                self.assertIn(
+                    "search approached its iteration limit", warnings[0]["message"]
+                )
+                self.assertIn("adapter.py:square", warnings[0]["message"])
+                self.assertEqual(warnings[0]["invocationId"], "root/first")
+
+    def test_convergence_warning_promoted_by_adapter_remains_a_failure(self):
+        self.adapter.write_text("""import warnings
+def square(*, length):
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        warnings.warn("solver did not converge", RuntimeWarning)
+    return {"area": 9.0, "count": 1}
+""")
+        generate(self.root)
+        response = execute(self.source, "calculate", {})
+        self.assertFalse(response["ok"], response)
+        self.assertIn(
+            "RuntimeWarning: solver did not converge",
+            response["diagnostics"][0]["message"],
+        )
+        self.assertNotIn("execution", response)
+
+    def test_generated_calculation_exception_message_identifies_invalid_adapter_output(
+        self,
+    ):
+        self.adapter.write_text(
+            'def square(*, length):\n    return {"area": True, "count": 1}\n'
+        )
+        generate(self.root)
+        handle = runpy.run_path(str(self.root / "_cso_bindings/root.py"))["calculate"]
+        with self.assertRaises(SourceError) as caught:
+            handle()
+        self.assertIn("adapter.py:square", str(caught.exception))
+
+    def test_external_identifier_names_follow_python_normalization_but_outputs_remain_exact(
+        self,
+    ):
+        declaration = self.root / "methods.py"
+        original = declaration.read_text()
+        declaration.write_text(
+            original.replace('"length": Length', '"K": Length')
+            .replace('function="square"', 'function="ｓｑｕａｒｅ"')
+            .replace('"area": Area', '"K": Area')
+            .replace('description="Square', 'defaults={"K": 3.0}, description="Square')
+        )
+        self.source.write_text(
+            self.source.read_text()
+            .replace("square(length=length)", "square(K=length)")
+            .replace('first["area"]', 'first["K"]')
+        )
+        self.adapter.write_text(
+            'def ｓｑｕａｒｅ(*, K):\n    return {"K": K * K, "count": 1}\n'
+        )
+        generate(self.root)
+        for call in ("square(K=length)", "square()"):
+            self.source.write_text(
+                self.source.read_text().replace("square(K=length)", call)
+            )
+            response = execute(self.source, "calculate", {})
+            self.assertTrue(response["ok"], response)
+            captured = response["execution"]["externalCalls"][0]
+            self.assertEqual(captured["inputs"][0]["name"], "K")
+            self.assertEqual(captured["outputs"][0]["name"], "K")
+            self.assertEqual(captured["adapter"]["function"], "square")
+        for changed in (
+            original.replace('"length": Length', '"K": Length, "K": Length'),
+            original.replace('"length": Length', '"K": Length').replace(
+                'description="Square',
+                'defaults={"K": 1.0, "K": 2.0}, description="Square',
+            ),
+            original.replace('"length": Length', '"ｃｌａｓｓ": Length'),
+        ):
+            with self.subTest(changed=changed):
+                declaration.write_text(changed)
+                with self.assertRaises(SourceError):
+                    generate(self.root)
+
+    def test_adapter_system_exit_is_failure_evidence_with_call_context(self):
+        self.adapter.write_text("""import warnings
+def square(*, length):
+    warnings.warn("before solver exit")
+    raise SystemExit("no admissible solution")
+""")
+        generate(self.root)
+        response = execute(self.source, "calculate", {})
+        self.assertFalse(response["ok"])
+        self.assertNotIn("execution", response)
+        self.assertEqual(
+            response["diagnostics"][0]["code"], "EXTERNAL_EXECUTION_FAILED"
+        )
+        self.assertIn("adapter.py:square", response["diagnostics"][0]["message"])
+        self.assertIn("no admissible solution", response["diagnostics"][0]["message"])
+        self.assertEqual(response["diagnostics"][1]["code"], "EXTERNAL_WARNING")
+
+    def test_generation_rejects_path_components_that_python_would_normalize(self):
+        self.source.rename(self.root / "K.cso.py")
+        with self.assertRaises(SourceError) as caught:
+            generate(self.root)
+        self.assertEqual(caught.exception.diagnostic["code"], "INVALID_BINDING_NAME")
 
 
 if __name__ == "__main__":

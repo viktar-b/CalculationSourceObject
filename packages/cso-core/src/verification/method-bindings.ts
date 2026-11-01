@@ -1,5 +1,6 @@
 import type { CalculationSourceValueNode } from '../calculation-source/object-schema.ts';
-import { collectCsoSymbols } from '../contracts/common.ts';
+import { collectCsoSymbols, exactCaptureHash } from '../contracts/common.ts';
+import { methodExternalCalls } from '../contracts/external.ts';
 import type {
   ExecutionPayload,
   MethodContentItem,
@@ -209,13 +210,17 @@ export const validateMethodBindings = (
         )
           return { kind: 'symbol', id: ref.name };
         if (ref?.kind === 'output') {
+          const external = methodExternalCalls(plan.content).find(
+            (item) => item.binding === ref.call,
+          );
           const call = methodCalls(plan.content).find(
             (item) => item.binding === ref.call,
           );
           if (
-            call &&
             ref.output &&
-            plans.get(call.helperId)?.outputNames.includes(ref.output)
+            (external?.outputs.includes(ref.output) ||
+              (call &&
+                plans.get(call.helperId)?.outputNames.includes(ref.output)))
           )
             return {
               kind: 'symbol',
@@ -258,9 +263,10 @@ export const validateMethodBindings = (
         ...plan.quantities
           .filter((quantity) => quantity.nodes.length > 0)
           .map((quantity) => quantity.nodes),
-        ...methodCalls(plan.content).flatMap((call) =>
-          call.inputs.map((input) => input.nodes),
-        ),
+        ...[
+          ...methodCalls(plan.content),
+          ...methodExternalCalls(plan.content),
+        ].flatMap((call) => call.inputs.map((input) => input.nodes)),
         ...(plan.checks ?? []).map((check) => check.nodes),
         ...(plan.applicability ?? []).map((condition) => condition.nodes),
       ];
@@ -311,9 +317,10 @@ export const validateMethodBindings = (
             if (
               'parentInvocationId' in called &&
               called.parentInvocationId === invocation.id &&
-              !methodCalls(plan.content).some(
-                (call) => call.binding === called.callBindingName,
-              )
+              ![
+                ...methodCalls(plan.content),
+                ...methodExternalCalls(plan.content),
+              ].some((call) => call.binding === called.callBindingName)
             )
               mismatch(called.callBindingName);
           }
@@ -410,17 +417,46 @@ export const validateMethodBindings = (
             )
               mismatch(quantity.variableName);
           }
-          for (const call of methodCalls(plan.content)) {
+          for (const call of [
+            ...methodCalls(plan.content),
+            ...methodExternalCalls(plan.content),
+          ]) {
             const called = child(call.binding);
-            const helper = plans.get(call.helperId);
-            if (
-              !called ||
-              !helper ||
-              called.moduleId !== helper.moduleId ||
-              called.function !== helper.function
-            ) {
+            if (!called) {
               mismatch(call.binding);
               continue;
+            }
+            if (call.kind === 'external') {
+              const captured = execution.externalCalls?.find(
+                (item) =>
+                  item.id === called.id &&
+                  item.parentInvocationId === invocation.id &&
+                  item.callBindingName === call.binding,
+              );
+              if (
+                !captured ||
+                exactCaptureHash(captured.declaration) !==
+                  exactCaptureHash(call.declaration) ||
+                exactCaptureHash(captured.adapter) !==
+                  exactCaptureHash(call.adapter) ||
+                exactCaptureHash(captured.callSite) !==
+                  exactCaptureHash(call.callSite) ||
+                captured.outputs.length !== call.outputs.length ||
+                captured.outputs.some(
+                  (output, index) => output.name !== call.outputs[index],
+                )
+              )
+                mismatch(call.binding);
+            } else {
+              const helper = plans.get(call.helperId);
+              if (
+                !helper ||
+                called.moduleId !== helper.moduleId ||
+                called.function !== helper.function
+              ) {
+                mismatch(call.binding);
+                continue;
+              }
             }
             const provided = called.inputBindings.filter(
               (binding) => binding.kind !== 'parsedDefault',

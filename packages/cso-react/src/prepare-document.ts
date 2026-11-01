@@ -618,6 +618,29 @@ const presentMethodContent = (
   notation: MethodNotation,
 ): PreparedMethodContent[] =>
   content.map((item) => {
+    if (item.kind === 'external') {
+      return {
+        kind: 'external',
+        binding: item.binding,
+        declaration: item.declaration,
+        adapter: item.adapter,
+        inputs: item.declaration.interface.inputs.map(([name]) => ({
+          name,
+          formulaText:
+            item.inputs.find((input) => input.name === name)?.formulaText ??
+            String(
+              item.declaration.interface.defaults.find(
+                (input) => input.name === name,
+              )?.value ?? '',
+            ),
+          symbolId: notation.callInputId(owner, item.binding, name),
+        })),
+        outputs: item.outputs.map((name) => ({
+          name,
+          symbolId: notation.callOutputId(owner, item.binding, name),
+        })),
+      };
+    }
     if (item.kind === 'check' || item.kind === 'applicability') {
       const declared = (
         (item.kind === 'check' ? owner.checks : owner.applicability) ?? []
@@ -1047,6 +1070,8 @@ export const prepareExecutionDocument = (
     call: NonNullable<ExecutionPayload['externalCalls']>[number],
     sectionId: string,
     index: number,
+    title = call.callBindingName,
+    suffix = '',
   ): PreparedDocumentItem => ({
     kind: 'externalCall',
     id: JSON.stringify([
@@ -1054,10 +1079,26 @@ export const prepareExecutionDocument = (
       call.parentInvocationId,
       call.callBindingName,
     ]),
-    title: call.callBindingName,
+    title,
     call,
+    qualifications: [
+      ...new Set(
+        [...call.inputs, ...call.outputs].map((quantity) => quantity.symbolId),
+      ),
+    ].flatMap((symbolId) => {
+      const reasons = applicability.reasonsBySymbolId.get(symbolId);
+      return reasons?.length
+        ? [
+            {
+              symbolId,
+              state: 'not-applicable' as const,
+              reasons: [...reasons],
+            },
+          ]
+        : [];
+    }),
     context: [],
-    sourcePlacementId: placementId(sectionId, index),
+    sourcePlacementId: placementId(sectionId, index) + suffix,
     localId: call.callBindingName,
     invocationId: call.parentInvocationId,
     location: call.callSite,
@@ -1099,6 +1140,29 @@ export const prepareExecutionDocument = (
           if (target && replaced(target)) return [];
         }
         if (item.kind === 'method' || item.kind === 'table') {
+          const table =
+            item.kind === 'table'
+              ? execution.tables?.find((table) => table.id === item.id)
+              : undefined;
+          const retained =
+            table?.cases.flatMap((caseItem) =>
+              (execution.externalCalls ?? [])
+                .filter((call) =>
+                  call.id.startsWith(`${caseItem.invocationId}/`),
+                )
+                .map((call) =>
+                  externalPlacement(
+                    call,
+                    section.id,
+                    index,
+                    `${caseItem.heading} / ${call.id
+                      .slice(caseItem.invocationId.length + 1)
+                      .split('/')
+                      .join(' / ')}`,
+                    `:external:${encodeURIComponent(call.id)}`,
+                  ),
+                ),
+            ) ?? [];
           return [
             comparisonPlacement(
               execution,
@@ -1107,6 +1171,7 @@ export const prepareExecutionDocument = (
               index,
               applicability,
             ),
+            ...retained,
           ];
         }
         return [

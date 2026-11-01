@@ -3,6 +3,7 @@
 **Status**: Accepted
 **Date**: 2026-10-01
 **Authors**: viktar-b, Codex
+**Amended**: 2026-11-01
 
 ## Context
 
@@ -107,5 +108,6 @@ source/input/environment matching that does not use the observed answer.
 - [Local calculation projects](0006-local-calculation-projects.md)
 - [Introduce imported black box calculation functions](https://github.com/viktar-b/CalculationSourceObject/issues/54)
 
-This records accepted design intent. It does not claim implemented isolation,
-dependency capture, numerical verification or performance measurements.
+See the [authoring guide](../authoring.md#external-functions) and
+[rendering guide](../rendering.md#engineering-presentation) for supported behavior
+and the maintained verification workflow.

@@ -136,15 +136,24 @@ export function parseCliArgs(args: readonly string[]): DevelopmentOptions {
 
 export function executionTimeout(value: string): number {
   const seconds = Number(value);
+  const coefficient = value.split(/[eE]/u)[0] ?? '';
+  const zeroSpelling = !/[1-9]/u.test(coefficient);
+  const milliseconds = zeroSpelling
+    ? 0
+    : seconds === 0
+      ? 1
+      : Math.ceil(seconds * 1000);
   if (
-    !/^(?:0|[1-9]\d*)(?:\.\d+)?$/u.test(value) ||
+    !numericPattern.test(value) ||
     !Number.isFinite(seconds) ||
-    seconds * 1000 > 2_147_483_647
+    seconds < 0 ||
+    (value.startsWith('-') && !zeroSpelling) ||
+    !Number.isSafeInteger(milliseconds)
   )
     throw new UsageError(
       '--timeout requires a nonnegative duration in seconds; zero disables the deadline',
     );
-  return seconds * 1000;
+  return milliseconds;
 }
 
 export const help = `Usage: cso <verify|html|pdf|bindings|dev|dev-export|dev-render> [arguments]

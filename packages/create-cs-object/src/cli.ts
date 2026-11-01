@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdirSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  mkdirSync,
+  readdirSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -40,7 +46,7 @@ try {
       `${JSON.stringify(
         {
           name,
-          version: '0.1.0',
+          version: '1.0.0',
           private: true,
           type: 'module',
           engines: { node: '>=24' },
@@ -51,8 +57,8 @@ try {
             typecheck: 'tsc -b --pretty false',
           },
           dependencies: {
-            '@cs-object/cli': '0.1.2',
-            '@cs-object/core': '0.1.0',
+            '@cs-object/cli': '1.0.0',
+            '@cs-object/core': '1.0.0',
             '@base-ui/react': '^1.8.0',
             '@fontsource-variable/geist-mono': '^5.3.0',
             '@fontsource-variable/raleway': '^5.3.0',

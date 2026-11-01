@@ -281,9 +281,28 @@ const verificationFields = {
   executionBinding: ExecutionBindingSchema.optional(),
   externalCoverage: z
     .strictObject({
-      calls: z.number().int().positive(),
-      results: z.number().int().positive(),
+      calls: z.number().int().nonnegative(),
+      results: z.number().int().nonnegative(),
       algorithmVerification: z.literal('excluded'),
+    })
+    .optional(),
+  externalReferenceCoverage: z
+    .strictObject({
+      status: z.enum(['pending', 'partial', 'complete', 'not_applicable']),
+      checked: z.array(
+        z.strictObject({
+          externalCallId: NonemptyStringSchema,
+          outputName: NonemptyStringSchema,
+          symbolId: NonemptyStringSchema,
+        }),
+      ),
+      uncovered: z.array(
+        z.strictObject({
+          externalCallId: NonemptyStringSchema,
+          outputName: NonemptyStringSchema,
+          symbolId: NonemptyStringSchema,
+        }),
+      ),
     })
     .optional(),
   ok: z.boolean(),
@@ -298,6 +317,7 @@ function validateExternalCoverage(
   ctx: z.RefinementCtx,
 ) {
   const external =
+    report.externalReferenceCoverage !== undefined ||
     report.externalCoverage !== undefined ||
     report.verificationVersion !== undefined ||
     report.checks.externalResultConsistency !== undefined ||
@@ -319,6 +339,39 @@ function validateExternalCoverage(
       'REPORT_EXTERNAL_COVERAGE_MISMATCH',
       'External reports require exact capture binding and separate call/result coverage',
     );
+  }
+  const coverage = report.externalReferenceCoverage;
+  if (!coverage) {
+    reportIssue(
+      ctx,
+      ['externalReferenceCoverage'],
+      'REPORT_REFERENCE_COVERAGE_REQUIRED',
+      'External reports must list checked and uncovered external quantities',
+    );
+  } else {
+    const all = [...coverage.checked, ...coverage.uncovered];
+    const identities = all.map((slot) =>
+      JSON.stringify([slot.externalCallId, slot.outputName]),
+    );
+    const expectedStatus =
+      all.length === 0
+        ? 'not_applicable'
+        : coverage.checked.length === 0
+          ? 'pending'
+          : coverage.uncovered.length === 0
+            ? 'complete'
+            : 'partial';
+    if (
+      new Set(identities).size !== identities.length ||
+      all.length !== report.externalCoverage?.results ||
+      coverage.status !== expectedStatus
+    )
+      reportIssue(
+        ctx,
+        ['externalReferenceCoverage'],
+        'REPORT_REFERENCE_COVERAGE_MISMATCH',
+        'Reference coverage must partition external results exactly and retain pending quantities',
+      );
   }
   if (
     report.checks.externalResultConsistency?.status === 'failed' &&

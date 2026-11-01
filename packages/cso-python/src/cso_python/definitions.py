@@ -93,11 +93,12 @@ class Definitions:
                 name: OutputDefinition(
                     declared,
                     ast.copy_location(
-                        ast.Name(id=name, ctx=ast.Load()), external.output_nodes[name]
+                        ast.Name(id=f"__cso_result_{index}", ctx=ast.Load()),
+                        external.output_nodes[name],
                     ),
                     None,
                 )
-                for name, declared in external.outputs.items()
+                for index, (name, declared) in enumerate(external.outputs.items())
             }
             function_node = ast.copy_location(
                 ast.FunctionDef(

@@ -99,6 +99,7 @@ class SourceError(Exception):
     ):
         super().__init__(message)
         self.diagnostic = {"code": code, "message": message, "stage": stage, **details}
+        self.additional_diagnostics: list[Json] = []
         if location is not None:
             self.diagnostic["location"] = location
         if related:
@@ -389,12 +390,19 @@ class Capture:
                 folder = path.parent if node.level else self.root
                 for _ in range(max(0, node.level - 1)):
                     folder = folder.parent
-                target = folder.joinpath(*node.module.split(".")).with_suffix(".py")
+                module_path = folder.joinpath(*node.module.split("."))
+                target = module_path.with_suffix(".py")
+                if not target.exists() and (module_path / "__init__.py").exists():
+                    target = module_path / "__init__.py"
                 if self.for_bindings and node.module.startswith("_cso_bindings."):
                     external = node.module.startswith("_cso_bindings._external.")
                     target_source = self.root.joinpath(
                         *node.module.split(".")[2 if external else 1 :]
                     ).with_suffix(".py" if external else ".cso.py")
+                    if external and not target_source.exists():
+                        initializer = target_source.with_suffix("") / "__init__.py"
+                        if initializer.exists():
+                            target_source = initializer
                     self.resolve(target_source, span(module, node))
                     for entry in node.names:
                         handles[entry.asname or entry.name] = {
@@ -649,13 +657,17 @@ class Capture:
                 for name in imported_names:
                     parts = name.split(".")
                     for folder in (self.root, path.parent):
-                        candidate = folder.joinpath(*parts)
-                        if candidate.with_suffix(".py").exists() or candidate.is_dir():
-                            raise SourceError(
-                                "UNSUPPORTED_ADAPTER_IMPORT",
-                                f"Project-local adapter import {name!r} is unsupported",
-                                location=location,
-                            )
+                        for length in range(1, len(parts) + 1):
+                            candidate = folder.joinpath(*parts[:length])
+                            if (
+                                candidate.with_suffix(".py").exists()
+                                or candidate.is_dir()
+                            ):
+                                raise SourceError(
+                                    "UNSUPPORTED_ADAPTER_IMPORT",
+                                    f"Project-local adapter import {name!r} is unsupported",
+                                    location=location,
+                                )
         module = CapturedModule(
             path,
             path.relative_to(self.root).as_posix(),

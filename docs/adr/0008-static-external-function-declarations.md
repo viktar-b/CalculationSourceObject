@@ -3,6 +3,7 @@
 **Status**: Accepted
 **Date**: 2026-10-01
 **Authors**: viktar-b, Codex
+**Amended**: 2026-11-01
 
 ## Context
 
@@ -108,5 +109,6 @@ determinism. Authors instead retain one call result and select its named outputs
 - [Domain glossary](../../CONTEXT.md)
 - [Introduce imported black box calculation functions](https://github.com/viktar-b/CalculationSourceObject/issues/54)
 
-This records accepted design intent, not implemented support. The related
-external-result, execution, document and compatibility ADRs complete the contract.
+See the [authoring guide](../authoring.md#external-functions) and
+[rendering guide](../rendering.md#engineering-presentation) for supported behavior
+and the maintained verification workflow.

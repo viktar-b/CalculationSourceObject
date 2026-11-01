@@ -12,13 +12,16 @@ if (!consumer || !python)
 for (const directory of [
   'examples/two-panel',
   'examples/section-properties',
+  'examples/external-functions',
 ]) {
   cpSync(join(repository, directory), join(consumer, directory), {
     recursive: true,
     filter: (path) =>
-      !path.split('/').some((part) =>
-        ['pdfs', '__pycache__', '_cso_bindings'].includes(part),
-      ),
+      !path
+        .split('/')
+        .some((part) =>
+          ['pdfs', '__pycache__', '_cso_bindings'].includes(part),
+        ),
   });
 }
 const fixtures = join(repository, 'tests/integration/installed/fixtures');
@@ -34,6 +37,7 @@ for (const name of [
   'signed-zero-consumer.mjs',
   'pdf-consumer.mjs',
   'html-consumer.mjs',
+  'external-consumer.mjs',
 ]) {
   cpSync(
     join(repository, 'tests/integration/installed', name),
@@ -56,6 +60,7 @@ for (const file of [
   'signed-zero-results.json',
   'pdf-results.json',
   'html-results.json',
+  'external-results.json',
 ]) {
   const report = JSON.parse(readFileSync(join(consumer, file), 'utf8'));
   if (!report.ok) throw new Error(`${file} failed`);

@@ -7,10 +7,24 @@ import {
   collectCsoSymbols,
 } from './common.ts';
 import { NumericValueSchema } from './numbers.ts';
-import type { ExecutionPayload } from './execution.ts';
+import type {
+  ExecutionPayload,
+  MethodContentItem,
+  MethodHelperRecord,
+} from './execution.ts';
 
-const ExternalQuantitySchema = NumericValueSchema.safeExtend({
-  name: PythonIdentifierSchema,
+const ExternalNumberSchema = NumericValueSchema.superRefine((record, ctx) => {
+  if (record.numericKind === 'int' && Object.is(record.value, -0))
+    ctx.addIssue({
+      code: 'custom',
+      path: ['value'],
+      message:
+        'Captured native Python integers cannot carry a negative-zero sign.',
+      params: { diagnosticCode: 'NUMERIC_KIND_MISMATCH' },
+    });
+});
+const ExternalQuantitySchema = ExternalNumberSchema.safeExtend({
+  name: z.string().min(1),
   symbolId: z.string().min(1),
   numericType: z.enum(['int', 'float']),
 });
@@ -21,9 +35,54 @@ const MetadataSchema = z.strictObject({
   comment: z.string().optional(),
   notation_scope: z.string().min(1).optional(),
 });
-const DeclaredQuantitiesSchema = z.array(
+const DeclaredInputsSchema = z.array(
   z.tuple([PythonIdentifierSchema, z.enum(['int', 'float']), MetadataSchema]),
 );
+const DeclaredOutputsSchema = z.array(
+  z.tuple([z.string().min(1), z.enum(['int', 'float']), MetadataSchema]),
+);
+const ExternalInterfaceSchema = z
+  .strictObject({
+    path: ModuleIdSchema,
+    function: PythonIdentifierSchema,
+    description: z.string().refine((value) => value.trim().length > 0),
+    inputs: DeclaredInputsSchema,
+    outputs: DeclaredOutputsSchema.min(1),
+    defaults: z.array(
+      ExternalNumberSchema.safeExtend({ name: PythonIdentifierSchema }),
+    ),
+  })
+  .superRefine((declaration, ctx) => {
+    const inputNames = declaration.inputs.map((input) => input[0]);
+    const outputNames = declaration.outputs.map((output) => output[0]);
+    const defaultNames = declaration.defaults.map((input) => input.name);
+    if (
+      new Set(inputNames).size !== inputNames.length ||
+      new Set(outputNames).size !== outputNames.length ||
+      new Set(defaultNames).size !== defaultNames.length
+    )
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          'External declarations require unique input, output and default names',
+        params: { diagnosticCode: 'INVALID_EXTERNAL_DECLARATION' },
+      });
+    for (const [index, value] of declaration.defaults.entries()) {
+      const input = declaration.inputs.find((input) => input[0] === value.name);
+      if (
+        !input ||
+        value.numericKind === undefined ||
+        (input[1] === 'int' && value.numericKind !== 'int')
+      )
+        ctx.addIssue({
+          code: 'custom',
+          path: ['defaults', index],
+          message:
+            'External defaults must match a declared input and native numeric kind',
+          params: { diagnosticCode: 'INVALID_EXTERNAL_DECLARATION' },
+        });
+    }
+  });
 
 export const ExternalCallSchema = z.strictObject({
   id: z.string().min(1),
@@ -35,16 +94,7 @@ export const ExternalCallSchema = z.strictObject({
     name: PythonIdentifierSchema,
     fingerprint: HashSchema,
     location: SourceSpanSchema,
-    interface: z.strictObject({
-      path: ModuleIdSchema,
-      function: PythonIdentifierSchema,
-      description: z.string().min(1),
-      inputs: DeclaredQuantitiesSchema,
-      outputs: DeclaredQuantitiesSchema,
-      defaults: z.array(
-        NumericValueSchema.safeExtend({ name: PythonIdentifierSchema }),
-      ),
-    }),
+    interface: ExternalInterfaceSchema,
   }),
   adapter: z.strictObject({
     moduleId: ModuleIdSchema,
@@ -64,12 +114,31 @@ export const ExternalEnvironmentSchema = z.strictObject({
   distributions: z.array(z.tuple([z.string().min(1), z.string().min(1)])),
 });
 
+export const methodExternalCalls = (
+  content: readonly MethodContentItem[],
+): Extract<MethodContentItem, { kind: 'external' }>[] =>
+  content.flatMap((item) =>
+    item.kind === 'external'
+      ? [item]
+      : item.kind === 'section'
+        ? methodExternalCalls(item.content)
+        : [],
+  );
+const hasExternalMethods = (methods: readonly MethodHelperRecord[]): boolean =>
+  methods.some(
+    (method) =>
+      methodExternalCalls(method.content).length > 0 ||
+      hasExternalMethods(method.helpers),
+  );
+
 /** Validate the opaque boundary, never the adapter's internal algorithm. */
 export function validateExternalCalls(
   execution: ExecutionPayload,
   ctx: z.RefinementCtx,
 ): void {
   const calls = execution.externalCalls ?? [];
+  const staticExternal = hasExternalMethods(execution.methods ?? []);
+  const external = calls.length > 0 || staticExternal;
   const invocations = new Map(
     execution.invocations.map((item) => [item.id, item]),
   );
@@ -85,9 +154,11 @@ export function validateExternalCalls(
       params: { diagnosticCode: 'EXTERNAL_BOUNDARY_MISMATCH' },
     });
   if (
-    calls.length > 0 !== (execution.cso.schemaVersion === '1.2.0') ||
-    calls.length > 0 !== (execution.runId !== undefined) ||
-    calls.length > 0 !== (execution.environment !== undefined)
+    external !== (execution.cso.schemaVersion === '1.2.0') ||
+    external !== (execution.externalCalls !== undefined) ||
+    external !== (execution.runId !== undefined) ||
+    external !== (execution.environment !== undefined) ||
+    staticExternal !== (execution.cso.source.externalMethods === true)
   ) {
     ctx.addIssue({
       code: 'custom',

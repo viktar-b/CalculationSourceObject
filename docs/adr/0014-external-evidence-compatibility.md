@@ -3,6 +3,7 @@
 **Status**: Accepted
 **Date**: 2026-10-01
 **Authors**: viktar-b, Codex
+**Amended**: 2026-11-01
 
 ## Context
 
@@ -82,5 +83,6 @@ Saved presentation must remain attached to its retained execution.
 - [External-call document items](0013-external-call-document-items.md)
 - [Introduce imported black box calculation functions](https://github.com/viktar-b/CalculationSourceObject/issues/54)
 
-This records accepted design intent. Protocol negotiation, new format versions
-and consumer compatibility checks remain implementation work.
+See the [authoring guide](../authoring.md#external-functions) and
+[rendering guide](../rendering.md#engineering-presentation) for supported behavior
+and the maintained verification workflow.

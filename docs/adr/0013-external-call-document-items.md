@@ -3,6 +3,7 @@
 **Status**: Accepted
 **Date**: 2026-10-01
 **Authors**: viktar-b, Codex
+**Amended**: 2026-11-01
 
 ## Context
 
@@ -85,5 +86,7 @@ Its long text was a pagination stress case, not a recommended method length.
 - [Rendering and inspection](../rendering.md)
 - [Introduce imported black box calculation functions](https://github.com/viktar-b/CalculationSourceObject/issues/54)
 
-This records accepted design intent. The static preview did not use the
-production prepared-document renderer and does not establish feature acceptance.
+See the [authoring guide](../authoring.md#external-functions) and
+[rendering guide](../rendering.md#engineering-presentation) for supported behavior
+and the maintained verification workflow. The earlier static preview was a layout
+study and does not establish production-renderer acceptance.

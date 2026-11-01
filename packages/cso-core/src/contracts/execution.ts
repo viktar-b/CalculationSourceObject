@@ -75,7 +75,7 @@ export const SymbolDefinitionSchema = z.discriminatedUnion('kind', [
     ...definitionIdentity,
     kind: z.literal('externalResult'),
     externalCallId: IdentityStringSchema,
-    outputName: PythonIdentifierSchema,
+    outputName: NonemptyStringSchema,
   }),
   z
     .object({
@@ -230,7 +230,24 @@ const MethodQuantitySchema = z.strictObject({
   nodes: z.array(SymbolicFormulaNodeSchema),
 });
 type MethodQuantity = z.infer<typeof MethodQuantitySchema>;
+const MethodExternalSchema = z.strictObject({
+  kind: z.literal('external'),
+  binding: PythonIdentifierSchema,
+  callSite: SourceSpanSchema,
+  declaration: ExternalCallSchema.shape.declaration,
+  declarationSourceHash: HashSchema,
+  adapter: ExternalCallSchema.shape.adapter,
+  inputs: z.array(
+    z.strictObject({
+      name: PythonIdentifierSchema,
+      formulaText: z.string(),
+      nodes: z.array(SymbolicFormulaNodeSchema).min(1),
+    }),
+  ),
+  outputs: z.array(NonemptyStringSchema).min(1),
+});
 export type MethodContentItem =
+  | z.infer<typeof MethodExternalSchema>
   | { kind: 'quantity'; variableName: string }
   | { kind: 'text'; localId: string; content: string }
   | {
@@ -284,6 +301,7 @@ export type MethodHelperRecord = {
 };
 const MethodContentSchema: z.ZodType<MethodContentItem> = z.lazy(() =>
   z.discriminatedUnion('kind', [
+    MethodExternalSchema,
     z.strictObject({
       kind: z.literal('quantity'),
       variableName: PythonIdentifierSchema,
@@ -449,7 +467,7 @@ const ExecutionPayloadBaseSchema = z
       .min(1)
       .optional(),
     assets: z.array(AssetRecordSchema),
-    externalCalls: z.array(ExternalCallSchema).min(1).optional(),
+    externalCalls: z.array(ExternalCallSchema).optional(),
     runId: z.string().uuid().optional(),
     environment: ExternalEnvironmentSchema.optional(),
     versions: VersionsSchema,
@@ -1710,6 +1728,7 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
       quantities: MethodQuantity[],
       helpers: Map<string, MethodHelperRecord>,
       bindings: Set<string>,
+      moduleId: string,
     ): void => {
       for (const [contentIndex, item] of content.entries()) {
         const itemPath = [...path, contentIndex];
@@ -1733,6 +1752,61 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
               'Method figure must name a captured asset',
             );
           }
+        } else if (item.kind === 'external') {
+          if (bindings.has(item.binding))
+            issue(
+              'CALL_MAPPING_MISMATCH',
+              [...itemPath, 'binding'],
+              'Each external call keeps its own binding',
+            );
+          bindings.add(item.binding);
+          location(item.callSite, [...itemPath, 'callSite'], moduleId);
+          location(
+            item.declaration.location,
+            [...itemPath, 'declaration', 'location'],
+            item.declaration.moduleId,
+          );
+          const declarationModule = execution.sourceManifest.find(
+            (entry) => entry.moduleId === item.declaration.moduleId,
+          );
+          const adapterModule = execution.sourceManifest.find(
+            (entry) => entry.moduleId === item.adapter.moduleId,
+          );
+          if (
+            declarationModule?.sha256 !== item.declarationSourceHash ||
+            adapterModule?.sha256 !== item.adapter.sha256 ||
+            item.adapter.moduleId !== item.declaration.interface.path ||
+            item.adapter.function !== item.declaration.interface.function
+          )
+            issue(
+              'DEPENDENCY_SOURCE_MISMATCH',
+              itemPath,
+              'External method source must match captured declaration and adapter identities',
+            );
+          const names = item.inputs.map((input) => input.name);
+          const declaredInputs = item.declaration.interface.inputs.map(
+            (input) => input[0],
+          );
+          const declaredOutputs = item.declaration.interface.outputs.map(
+            (output) => output[0],
+          );
+          const defaults = new Set(
+            item.declaration.interface.defaults.map((input) => input.name),
+          );
+          if (
+            new Set(names).size !== names.length ||
+            names.some((name) => !declaredInputs.includes(name)) ||
+            declaredInputs.some(
+              (name) => !names.includes(name) && !defaults.has(name),
+            ) ||
+            item.outputs.length !== declaredOutputs.length ||
+            item.outputs.some((name, index) => name !== declaredOutputs[index])
+          )
+            issue(
+              'CALL_MAPPING_MISMATCH',
+              itemPath,
+              'External method mapping must retain declared inputs, defaults and every output',
+            );
         } else if (item.kind === 'call') {
           if (bindings.has(item.binding)) {
             issue(
@@ -1779,6 +1853,7 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
             quantities,
             helpers,
             bindings,
+            moduleId,
           );
         }
       }
@@ -1795,6 +1870,7 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
           helper.quantities,
           known,
           new Set(),
+          helper.moduleId,
         );
         checkHelperContent(
           helper.helpers,
@@ -1829,6 +1905,7 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
         method.quantities,
         helpers,
         new Set(),
+        method.moduleId,
       );
       checkHelperContent(
         method.helpers,
@@ -2232,7 +2309,7 @@ export const ExecutionResponseSchema = z
         path: ['protocolVersion'],
       });
     }
-    const external = (response.execution.externalCalls?.length ?? 0) > 0;
+    const external = response.execution.externalCalls !== undefined;
     if (
       (response.protocolVersion === '4') !== external ||
       (!external && (response.protocolVersion === '3') !== comparison)

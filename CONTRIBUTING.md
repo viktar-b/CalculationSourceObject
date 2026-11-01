@@ -2,9 +2,10 @@
 
 Issues and design discussion are welcome.
 
-This project is a prototype. The `.cso.py` authoring format and APIs will
-break. Pin the package versions you use. Existing calculations may need edits
-after an upgrade.
+Pin the package versions you use. Supported `.cso.py` authoring and public APIs
+follow their documented versioned contracts. Breaking changes require an
+explicit version change and migration guidance; existing calculations must be
+reverified after an upgrade.
 
 ## Bugs
 
@@ -19,8 +20,8 @@ change will be implemented.
 ## Pull requests
 
 Code PRs are reviewed case by case. Link an issue when one exists. Say what
-changed and how you checked it. Expect requests to rebase or rewrite while the
-prototype moves.
+changed and how you checked it. Expect requests to rebase or rewrite when a
+change breaks an established contract or lacks evidence for affected behavior.
 
 Use `<type>(<scope>): <description>` for PR titles, for example
 `feat(demo): show original Python alongside calculation examples`. Choose the

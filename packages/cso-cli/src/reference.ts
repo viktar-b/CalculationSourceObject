@@ -1,10 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import {
-  executionBindingFrom,
   ReferenceFileSchema,
   contractIssuesToDiagnostics,
-  referenceBindingKey,
+  referenceMatchesExecution,
   type Diagnostic,
   type ExecutionPayload,
   type Provenance,
@@ -50,9 +49,8 @@ export function captureReference(
         ),
       };
     }
-    const binding = referenceBindingKey(executionBindingFrom(execution));
     provenance.revisions = parsed.data.cases
-      .filter((item) => referenceBindingKey(item.binding) === binding)
+      .filter((item) => referenceMatchesExecution(item, execution))
       .map((item) => item.revision);
     return { kind: 'parsed', cases: parsed.data.cases, bytes, provenance };
   } catch (error) {

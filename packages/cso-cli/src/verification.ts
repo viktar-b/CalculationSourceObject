@@ -102,6 +102,7 @@ export function executeAndVerify(
     report.verificationVersion = verified.verificationVersion;
     report.executionBinding = verified.executionBinding;
     report.externalCoverage = verified.externalCoverage;
+    report.externalReferenceCoverage = verified.externalReferenceCoverage;
   }
   Object.assign(report.checks, verified.checks);
   report.diagnostics.push(...verified.diagnostics);

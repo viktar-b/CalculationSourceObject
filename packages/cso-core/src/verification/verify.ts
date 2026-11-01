@@ -8,11 +8,9 @@ import {
   type CheckName,
   type Comparison,
   type Diagnostic,
-  ExecutionBindingSchema,
   NodeAddressSchema,
   SourceSpanSchema,
   collectCsoSymbols,
-  executionBindingKey,
   resolvedInputKind,
 } from '../contracts/common.ts';
 import {
@@ -25,7 +23,15 @@ import {
 } from '../contracts/execution.ts';
 import {
   BoundReferenceCaseSchema,
+  ExternalReferenceBindingSchema,
+  externalReferenceBindingFrom,
+  ReferenceBindingSchema,
+  referenceBindingKey,
+  referenceSourceBindingFrom,
+  type ExternalOutputReferenceCase,
+  type LegacyReferenceCase,
   type ReferenceCase,
+  referenceMatchesExecution,
   ReferenceCasesSchema,
   type VerifyExecution,
 } from '../contracts/reference.ts';
@@ -305,16 +311,35 @@ const applyReferenceIssueContext = (
       ) ?? diagnosticSymbolId(stringProperty(row, 'symbolId'));
     let execution = valueAtPath(input, ['execution']);
     if (typeof collection === 'number' && referenceExecution !== undefined) {
-      const binding = ExecutionBindingSchema.safeParse(
-        valueAtPath(input, [collection, 'binding']),
-      );
+      const rawBinding = valueAtPath(input, [collection, 'binding']);
+      const binding = ReferenceBindingSchema.safeParse(rawBinding);
+      const externalBinding =
+        ExternalReferenceBindingSchema.safeParse(rawBinding);
       if (
-        binding.success &&
-        executionBindingKey(binding.data) ===
-          executionBindingKey(executionBindingFrom(referenceExecution))
+        (binding.success &&
+          referenceBindingKey(binding.data) ===
+            referenceBindingKey(
+              referenceSourceBindingFrom(referenceExecution),
+            )) ||
+        (externalBinding.success &&
+          referenceExecution.externalCalls !== undefined &&
+          referenceExecution.environment !== undefined &&
+          referenceBindingKey(externalBinding.data) ===
+            referenceBindingKey(
+              externalReferenceBindingFrom(referenceExecution),
+            ))
       ) {
         execution = referenceExecution;
       }
+    }
+    if (context.symbolId === undefined && row !== undefined) {
+      const parsed = ExecutionPayloadSchema.safeParse(execution);
+      if (parsed.success)
+        context.symbolId = parsed.data.externalCalls
+          ?.find((call) => call.id === stringProperty(row, 'externalCallId'))
+          ?.outputs.find(
+            (output) => output.name === stringProperty(row, 'outputName'),
+          )?.symbolId;
     }
     if (context.symbolId !== undefined) {
       Object.assign(context, definitionContext(execution, context.symbolId));
@@ -1344,7 +1369,7 @@ const referenceComparison = (
   referenceRevision: revision,
 });
 
-const verifyReferences = ({
+const verifyLegacyReferences = ({
   evaluator,
   execution,
   referenceCases,
@@ -1372,10 +1397,11 @@ const verifyReferences = ({
       }),
     };
   }
-  const bindingKey = executionBindingKey(executionBindingFrom(execution));
-  const reference = parsed.data.find(
-    (candidate) => executionBindingKey(candidate.binding) === bindingKey,
-  );
+  const reference = parsed.data
+    .filter(
+      (candidate): candidate is LegacyReferenceCase => !('kind' in candidate),
+    )
+    .find((candidate) => referenceMatchesExecution(candidate, execution));
   if (reference === undefined) {
     return {
       check: { status: 'not_applicable', counts: emptyCounts() },
@@ -1523,6 +1549,185 @@ const verifyReferences = ({
   };
 };
 
+type ExternalReferenceCoverage = NonNullable<
+  VerificationReport['externalReferenceCoverage']
+>;
+type ReferenceVerification = {
+  readonly check: Check;
+  readonly diagnostics: readonly Diagnostic[];
+  readonly externalReferenceCoverage?: ExternalReferenceCoverage;
+};
+const externalReferenceSlots = (
+  execution: ExecutionPayload,
+): ExternalReferenceCoverage['checked'] =>
+  (execution.externalCalls ?? []).flatMap((call) =>
+    call.outputs.map((output) => ({
+      externalCallId: call.id,
+      outputName: output.name,
+      symbolId: output.symbolId,
+    })),
+  );
+const slotKey = (slot: {
+  externalCallId: string;
+  outputName: string;
+}): string => JSON.stringify([slot.externalCallId, slot.outputName]);
+const referenceCoverage = (
+  execution: ExecutionPayload,
+  checked: ReadonlySet<string>,
+): ExternalReferenceCoverage | undefined => {
+  if (execution.externalCalls === undefined) return undefined;
+  const slots = externalReferenceSlots(execution);
+  const selected = slots.filter((slot) => checked.has(slotKey(slot)));
+  const uncovered = slots.filter((slot) => !checked.has(slotKey(slot)));
+  return {
+    status:
+      slots.length === 0
+        ? 'not_applicable'
+        : selected.length === 0
+          ? 'pending'
+          : uncovered.length === 0
+            ? 'complete'
+            : 'partial',
+    checked: selected,
+    uncovered,
+  };
+};
+const verifyExternalReference = (
+  execution: ExecutionPayload,
+  reference: ExternalOutputReferenceCase,
+): { check: Check; diagnostics: Diagnostic[] } => {
+  const counts = emptyCounts();
+  const diagnostics: Diagnostic[] = [];
+  for (const expected of reference.expected) {
+    const call = execution.externalCalls?.find(
+      (call) => call.id === expected.externalCallId,
+    );
+    const output = call?.outputs.find(
+      (output) => output.name === expected.outputName,
+    );
+    if (!call || !output) {
+      record(counts, false);
+      diagnostics.push({
+        code: 'UNKNOWN_REFERENCE_SYMBOL',
+        stage: 'reference',
+        check: 'independentReferenceAgreement',
+        message:
+          'External independent reference must select a captured call and named output',
+      });
+      continue;
+    }
+    const compared = compareNumbers(output.value, expected.value);
+    record(counts, compared.matches);
+    if (!compared.matches)
+      diagnostics.push({
+        code: 'REFERENCE_EXTERNAL_MISMATCH',
+        stage: 'reference',
+        check: 'independentReferenceAgreement',
+        message: `Captured external output '${expected.outputName}' differs from the independent reference value.`,
+        invocationId: call.id,
+        symbolId: output.symbolId,
+        location: call.callSite,
+        comparison: referenceComparison(
+          compared.comparison,
+          undefined,
+          reference.revision,
+        ),
+      });
+  }
+  return {
+    check: { status: counts.failed > 0 ? 'failed' : 'passed', counts },
+    diagnostics,
+  };
+};
+const verifyReferences = ({
+  evaluator,
+  execution,
+  referenceCases,
+}: {
+  readonly evaluator: FormulaEvaluator;
+  readonly execution: ExecutionPayload;
+  readonly referenceCases: unknown;
+}): ReferenceVerification => {
+  const checked = new Set<string>();
+  const coverage = () => referenceCoverage(execution, checked);
+  if (referenceCases === undefined)
+    return {
+      check: { status: 'not_applicable', counts: emptyCounts() },
+      diagnostics: [],
+      externalReferenceCoverage: coverage(),
+    };
+  const parsed = ReferenceCasesSchema.safeParse(referenceCases);
+  if (!parsed.success)
+    return {
+      check: { status: 'failed' },
+      diagnostics: issuesToDiagnostics({
+        check: 'independentReferenceAgreement',
+        input: referenceCases,
+        issues: parsed.error.issues,
+        referenceExecution: execution,
+        stage: 'reference',
+      }),
+      externalReferenceCoverage: coverage(),
+    };
+  const matched = parsed.data.filter((reference) =>
+    referenceMatchesExecution(reference, execution),
+  );
+  const counts = emptyCounts();
+  const diagnostics: Diagnostic[] = [];
+  let invalid = false;
+  for (const reference of matched) {
+    const bound = BoundReferenceCaseSchema.safeParse({
+      execution,
+      referenceCase: reference,
+    });
+    if (!bound.success) {
+      invalid = true;
+      diagnostics.push(
+        ...issuesToDiagnostics({
+          check: 'independentReferenceAgreement',
+          input: { execution, referenceCase: reference },
+          issues: bound.error.issues,
+          stage: 'reference',
+        }),
+      );
+      continue;
+    }
+    const result =
+      'kind' in reference
+        ? verifyExternalReference(execution, reference)
+        : verifyLegacyReferences({
+            evaluator,
+            execution,
+            referenceCases: [reference],
+          });
+    if ('kind' in reference)
+      for (const expected of reference.expected) checked.add(slotKey(expected));
+    if (result.check.status === 'failed' && result.check.counts === undefined)
+      invalid = true;
+    if (result.check.counts) {
+      counts.checked += result.check.counts.checked;
+      counts.passed += result.check.counts.passed;
+      counts.failed += result.check.counts.failed;
+    }
+    diagnostics.push(...result.diagnostics);
+  }
+  return {
+    check: invalid
+      ? { status: 'failed' }
+      : {
+          status:
+            counts.failed > 0
+              ? 'failed'
+              : counts.checked > 0
+                ? 'passed'
+                : 'not_applicable',
+          counts,
+        },
+    diagnostics,
+    externalReferenceCoverage: coverage(),
+  };
+};
+
 const uniqueDiagnostics = (
   diagnostics: readonly Diagnostic[],
 ): Diagnostic[] => {
@@ -1635,6 +1840,7 @@ export const verifyExecution: VerifyExecution = (input): VerificationReport => {
             ),
             algorithmVerification: 'excluded',
           },
+          externalReferenceCoverage: reference.externalReferenceCoverage,
         }),
     numericPolicy,
     checks: {

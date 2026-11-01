@@ -138,6 +138,9 @@ math {
 .cso-method-quantity math, .cso-method-call math, .cso-branch-note math { vertical-align: middle; }
 .cso-method-helper, .cso-method-section { margin: 2mm 0 2mm 4mm; }
 .cso-method-helper h4, .cso-method-section h4 { font-size: 12px; font-weight: 650; margin: 0 0 1mm; }
+.cso-method-external { margin: 2mm 0; }
+.cso-method-external h4, .cso-method-external h5 { font-size: 12px; font-weight: 650; margin: 2mm 0 1mm; }
+.cso-method-external p, .cso-external-reference-coverage p { margin: 1mm 0; }
 .cso-comparison table { width: max-content; min-width: 100%; border-collapse: collapse; table-layout: auto; font-size: 11px; }
 .cso-comparison th, .cso-comparison td { border: 1px solid #d0d5dd; padding: 1.75mm 2.5mm; overflow-wrap: anywhere; white-space: pre-wrap; vertical-align: middle; }
 .cso-comparison th { text-align: left; font-weight: 600; }

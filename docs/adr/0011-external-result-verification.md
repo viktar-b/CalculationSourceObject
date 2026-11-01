@@ -3,6 +3,7 @@
 **Status**: Accepted
 **Date**: 2026-10-01
 **Authors**: viktar-b, Codex
+**Amended**: 2026-11-01
 
 ## Context
 
@@ -98,5 +99,6 @@ useful comparisons without claiming coverage of untested outputs.
 - [Domain glossary](../../CONTEXT.md)
 - [Introduce imported black box calculation functions](https://github.com/viktar-b/CalculationSourceObject/issues/54)
 
-This records accepted design intent. It does not claim implemented support or
-settle execution lifetime, dependency provenance, exact report layout or rollout.
+See the [authoring guide](../authoring.md#external-functions) and
+[rendering guide](../rendering.md#engineering-presentation) for supported behavior
+and the maintained verification workflow.

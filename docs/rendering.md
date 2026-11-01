@@ -63,19 +63,24 @@ Version 1 prepared JSON is rejected. Regenerate saved documents with
 `prepareLegacyDocument` from the original CSO, asset manifest and captured assets.
 Reattach historical reviews through the preparation options. Synthetic documents
 constructed directly must provide context arrays and symbol operand arrays.
-Update core and React together. A prepared document is version 3 only when it
+Update core and React together. For pure-CSO captures, a prepared document is version 3 only when it
 contains a method or table; otherwise it remains version 2. Source CSO schema
 `1.1.0` and execution protocol 3 follow the same rule. Rebuild that document
 from the captured execution rather than rewriting old evidence.
 
-Draft external captures use execution protocol 4, CSO schema `1.2.0` and prepared
+External captures use execution protocol 4, CSO schema `1.2.0` and prepared
 document version 4. They preserve one complete input/method/output block per
 captured call, including unused outputs and the external algorithm's formula
 verification exclusion. An optional `verificationReport` passed to
 `prepareExecutionDocument` must bind to that exact capture before its outcomes
 can appear. Repreparation reads captured evidence and assets without running
-the adapter. The external method/table and print acceptance work remains pending
-in PR #99; this format addition does not change older captures' meaning.
+the adapter. Static methods with an external boundary use the same new versions
+even when no cases run. A comparison retains complete external detail blocks for
+each captured case/call path. Input and output quantities use the same indexed
+description, variable, value, unit and comment cells as ordinary rows. Bound
+reference summaries list checked and uncovered outputs; they do not claim that
+an external algorithm was independently evaluated. Older captures retain their
+original meaning.
 
 A comparison is one logical table. On screen it scrolls horizontally and keeps
 the identifying column visible. Print divides the authored column axis into
