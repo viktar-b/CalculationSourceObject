@@ -29,13 +29,13 @@
     "esbuild": "0.28.2"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.15",
+    "@biomejs/biome": "2.6.2",
     "@cs-object/core": "0.1.0",
     "@types/node": "^26",
     "tsup": "^8.5.1",
     "typescript": "^5",
-    "vite": "^8.3.2",
-    "zod": "^4.6.5"
+    "vite": "^8.3.5",
+    "zod": "^4.6.7"
   },
   "repository": {
     "type": "git",
