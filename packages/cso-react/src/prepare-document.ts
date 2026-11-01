@@ -473,9 +473,14 @@ const applicabilityField = (reasons: readonly string[] | undefined) =>
       }
     : {};
 
-const sectionChecks = (execution: ExecutionPayload, invocationId: unknown) => {
+type Applicability = ReturnType<typeof deriveApplicability>;
+
+const sectionChecks = (
+  execution: ExecutionPayload,
+  invocationId: unknown,
+  derived: Applicability,
+) => {
   if (typeof invocationId !== 'string') return {};
-  const derived = deriveApplicability(execution);
   type CheckPlan = {
     id: string;
     checks?: readonly {
@@ -538,6 +543,7 @@ const replacesInvocation = (
 const presentedCell = (
   execution: ExecutionPayload,
   cell: NonNullable<ExecutionPayload['tables']>[number]['cells'][number],
+  applicability: Applicability,
 ) => {
   if (cell.role === 'input') {
     const invocation = execution.invocations.find(
@@ -557,9 +563,7 @@ const presentedCell = (
       symbolId: cell.symbolId,
       value,
       numericKind: numericKind as 'int' | 'float',
-      ...applicabilityField(
-        deriveApplicability(execution).reasonsBySymbolId.get(cell.symbolId),
-      ),
+      ...applicabilityField(applicability.reasonsBySymbolId.get(cell.symbolId)),
     };
   }
   const output = execution.authoring?.outputs.find(
@@ -580,9 +584,7 @@ const presentedCell = (
     symbolId: cell.symbolId,
     value: output.value,
     numericKind: output.numericKind as 'int' | 'float',
-    ...applicabilityField(
-      deriveApplicability(execution).reasonsBySymbolId.get(cell.symbolId),
-    ),
+    ...applicabilityField(applicability.reasonsBySymbolId.get(cell.symbolId)),
   };
 };
 
@@ -625,7 +627,7 @@ const presentMethodContent = (
         localId: item.localId,
         explanation: declared.explanation,
         predicateText: declared.predicateText,
-        predicateSymbolId: notation.conditionId(owner, declared.id),
+        predicateSymbolId: notation.conditionId(owner, item.kind, declared.id),
       };
     }
     if (item.kind === 'quantity') {
@@ -769,6 +771,7 @@ const comparisonPlacement = (
   item: CalculationSourceSectionItem,
   sectionId: string,
   index: number,
+  applicability: Applicability,
 ): PreparedDocumentItem => {
   if (item.kind !== 'method' && item.kind !== 'table') {
     fail('UNKNOWN_METHOD', 'Expected a method or table placement');
@@ -842,7 +845,7 @@ const comparisonPlacement = (
           if (!cell) {
             fail('CELL_BINDING_MISMATCH', `Missing cell for '${name}'`);
           }
-          return presentedCell(execution, cell);
+          return presentedCell(execution, cell, applicability);
         }),
       };
     });
@@ -853,7 +856,6 @@ const comparisonPlacement = (
       (binding) => ({ ...binding, heading: caseItem.heading }),
     ),
   );
-  const applicability = deriveApplicability(execution);
   const checkPlans = new Map(bindings.map(({ plan }) => [plan.id, plan]));
   const engineeringChecks = [...checkPlans.values()].flatMap((plan) =>
     (plan.checks ?? []).flatMap((check) => {
@@ -1013,6 +1015,7 @@ export const prepareExecutionDocument = (
       );
     }
   }
+  const applicability = deriveApplicability(execution);
   const grouped = groupedInvocationIds(execution);
   const sectionsById = new Map(
     cso.sections.map((section) => [section.id, section]),
@@ -1035,21 +1038,33 @@ export const prepareExecutionDocument = (
       invocationId: section.metadata?.invocationId,
       location: section.metadata?.location,
       metadata: retainedMetadata(section.metadata, true),
-      ...sectionChecks(execution, section.metadata?.invocationId),
+      ...sectionChecks(
+        execution,
+        section.metadata?.invocationId,
+        applicability,
+      ),
       items: section.items.flatMap((item, index) => {
         if (item.kind === 'section') {
           const target = sectionsById.get(item.id);
           if (target && replaced(target)) return [];
         }
         if (item.kind === 'method' || item.kind === 'table') {
-          return [comparisonPlacement(execution, item, section.id, index)];
+          return [
+            comparisonPlacement(
+              execution,
+              item,
+              section.id,
+              index,
+              applicability,
+            ),
+          ];
         }
         return [
           {
             ...itemFields(item),
             ...applicabilityField(
               item.kind === 'symbol' || item.kind === 'symbolRef'
-                ? deriveApplicability(execution).reasonsBySymbolId.get(
+                ? applicability.reasonsBySymbolId.get(
                     item.kind === 'symbol' ? item.symbol.id : item.id,
                   )
                 : undefined,

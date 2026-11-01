@@ -202,8 +202,14 @@ export const methodNotation = (
       }
     }
     for (const condition of [
-      ...(owner.checks ?? []),
-      ...(owner.applicability ?? []),
+      ...(owner.checks ?? []).map((condition) => ({
+        ...condition,
+        kind: 'check',
+      })),
+      ...(owner.applicability ?? []).map((condition) => ({
+        ...condition,
+        kind: 'applicability',
+      })),
     ]) {
       const targetName = condition.targets[0] ?? '';
       const target =
@@ -214,7 +220,7 @@ export const methodNotation = (
         ) ?? fail(`Condition '${condition.id}' has no target quantity`);
       add(
         symbolFor(
-          notationId(owner.id, 'condition', condition.id),
+          notationId(owner.id, condition.kind, condition.id),
           target,
           tree(owner, condition.nodes),
         ),
@@ -227,8 +233,11 @@ export const methodNotation = (
       quantitySymbolId(owner, variableName),
     callInputId: (owner: Owner, binding: string, name: string): string =>
       notationId(owner.id, binding, 'input', name),
-    conditionId: (owner: Owner, id: string): string =>
-      notationId(owner.id, 'condition', id),
+    conditionId: (
+      owner: Owner,
+      kind: 'check' | 'applicability',
+      id: string,
+    ): string => notationId(owner.id, kind, id),
     /** The branch a conditional chose and the test that chose it. */
     branch: (
       owner: Owner,

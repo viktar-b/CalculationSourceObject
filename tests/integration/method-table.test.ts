@@ -492,6 +492,13 @@ def compare() -> CalculationResults:
       'from _cso_bindings.oversized_row import rectangle',
     ),
   );
+  writeFileSync(
+    join(directory, 'quoted_rows.cso.py'),
+    readFileSync(join(directory, 'tall_rows.cso.py'), 'utf8').replaceAll(
+      'Case 64',
+      JSON.stringify('Case "64"').slice(1, -1),
+    ),
+  );
   const bindings = spawnSync(
     python,
     ['-I', '-m', 'cso_python', 'bindings', directory],
@@ -1360,6 +1367,11 @@ test('repeats comparison context across vertical page breaks', () => {
     .update(readFileSync(rowsPdf))
     .digest('hex');
   expect(rowHash).toMatch(/^[a-f0-9]{64}$/);
+
+  const quotedPdf = join(directory, 'quoted-rows.pdf');
+  const quoted = publish('pdf', 'quoted_rows.cso.py', 'compare', quotedPdf);
+  expect(quoted.status, quoted.stdout || quoted.stderr).toBe(0);
+  expect(pdfPageTexts(quotedPdf).join('\n')).toContain('Case "64"');
 
   const columnsPdf = join(directory, 'tall-columns.pdf');
   const columns = publish(

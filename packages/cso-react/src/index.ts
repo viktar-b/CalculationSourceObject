@@ -6,6 +6,7 @@ export {
   type FormulaSheetPrintOptions,
 } from './formula-sheet/print.ts';
 export {
+  partitionRowAxis,
   measureComparisons,
   planComparisonParts,
   renderComparisonParts,

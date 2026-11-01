@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import ast
+import builtins
+import math
+
+from .function_calls import FUNCTION_CALLS
 import hashlib
 from pathlib import Path
 
 from .annotations import symbol_annotation
 from .source import Json, SourceError, authoring_name, identity, kwargs, span
 from .source_plan import _describe_call, lower_expression
+
+_NUMERIC_CALLS = {call.function_id: getattr(math if call.module == "math" else builtins, call.name) for call in FUNCTION_CALLS}
 
 _OPERATORS = {
     "fg.add": "+",
@@ -875,53 +881,30 @@ def _string_tuple(planner, inv, keyword: ast.keyword) -> list[str]:
 
 
 def collect_applicability_outcomes(planner) -> list[Json]:
-    """Record applicability predicates from the single captured execution."""
-    outcomes: list[Json] = []
-    invocations = list(planner.invocations)
-
-    def walk(plan: Json) -> None:
-        for condition in plan.get("applicability") or []:
-            for invocation in invocations:
-                if invocation.function.name != plan["function"] or invocation.module.id != plan["moduleId"]:
-                    continue
-                value, used = _check_value(condition["nodes"], _named_values(invocation))
-                outcomes.append(
-                    {
-                        "methodId": plan["id"],
-                        "invocationId": invocation.id,
-                        "applicabilityId": condition["id"],
-                        "value": value,
-                        "usedKeys": sorted(used),
-                    }
-                )
-        for helper in plan.get("helpers") or []:
-            walk(helper)
-
-    for method in planner.methods:
-        walk(method)
-    return outcomes
+    return _collect_condition_outcomes(planner, "applicability", "applicabilityId")
 
 
 def collect_check_outcomes(planner) -> list[Json]:
-    """Record engineering-check results from the single captured execution."""
+    return _collect_condition_outcomes(planner, "checks", "checkId")
+
+
+def _collect_condition_outcomes(planner, field: str, identity_field: str) -> list[Json]:
+    """Record declared predicates using the single captured execution."""
     outcomes: list[Json] = []
-    invocations = list(planner.invocations)
 
     def walk(plan: Json) -> None:
-        for check in plan.get("checks") or []:
-            for invocation in invocations:
+        for condition in plan.get(field) or []:
+            for invocation in planner.invocations:
                 if invocation.function.name != plan["function"] or invocation.module.id != plan["moduleId"]:
                     continue
-                value, used = _check_value(check["nodes"], _named_values(invocation))
-                outcomes.append(
-                    {
-                        "methodId": plan["id"],
-                        "invocationId": invocation.id,
-                        "checkId": check["id"],
-                        "value": value,
-                        "usedKeys": sorted(used),
-                    }
-                )
+                value, used = _check_value(condition["nodes"], _named_values(invocation))
+                outcomes.append({
+                    "methodId": plan["id"],
+                    "invocationId": invocation.id,
+                    identity_field: condition["id"],
+                    "value": value,
+                    "usedKeys": sorted(used),
+                })
         for helper in plan.get("helpers") or []:
             walk(helper)
 
@@ -983,6 +966,8 @@ def _check_value(nodes: list[Json], values: dict[str, int | float]) -> tuple[boo
         arguments = [argument["key"] for argument in node["funcArgs"]]
         if function_id == "fg.uminus":
             return -number(arguments[0])
+        if function_id in _NUMERIC_CALLS:
+            return _NUMERIC_CALLS[function_id](*(number(key) for key in arguments))
         left = number(arguments[0])
         right = number(arguments[1])
         if function_id == "fg.add":
@@ -1157,6 +1142,8 @@ def _number_value(nodes, values, key: str, used: set[str]) -> int | float:
         return _number_value(nodes, values, arguments[1] if selected else arguments[2], used)
     if function_id == "fg.uminus":
         return -_number_value(nodes, values, arguments[0], used)
+    if function_id in _NUMERIC_CALLS:
+        return _NUMERIC_CALLS[function_id](*(_number_value(nodes, values, key, used) for key in arguments))
     if function_id in _OPERATORS and len(arguments) == 2:
         left = _number_value(nodes, values, arguments[0], used)
         right = _number_value(nodes, values, arguments[1], used)

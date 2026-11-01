@@ -1,3 +1,4 @@
+import { evaluateOperation } from './numeric.ts';
 type FormulaNode = {
   readonly key: string;
   readonly mode?: string;
@@ -173,15 +174,14 @@ export function reproduceBranches(
       const value = numberValue(keys[0] ?? '', used);
       return value === undefined ? undefined : -value;
     }
-    const left = numberValue(keys[0] ?? '', used);
-    const right = numberValue(keys[1] ?? '', used);
-    if (left === undefined || right === undefined) return undefined;
-    if (operation === 'fg.add') return left + right;
-    if (operation === 'fg.subtract') return left - right;
-    if (operation === 'fg.multiply') return left * right;
-    if (operation === 'fg.divide') return left / right;
-    if (operation === 'fg.pow') return left ** right;
-    return undefined;
+    const operands = keys.map((key) => numberValue(key, used));
+    if (operands.some((value) => value === undefined) || !operation)
+      return undefined;
+    const result = evaluateOperation(
+      operation,
+      operands.filter((value): value is number => value !== undefined),
+    );
+    return result.ok ? result.value : undefined;
   };
   const markEvaluated = (key: string, used: Set<string>): boolean => {
     const node = byKey.get(key);
@@ -262,15 +262,14 @@ export function reproducePredicate(
       const value = numberValue(keys[0] ?? '');
       return value === undefined ? undefined : -value;
     }
-    const left = numberValue(keys[0] ?? '');
-    const right = numberValue(keys[1] ?? '');
-    if (left === undefined || right === undefined) return undefined;
-    if (operation === 'fg.add') return left + right;
-    if (operation === 'fg.subtract') return left - right;
-    if (operation === 'fg.multiply') return left * right;
-    if (operation === 'fg.divide') return left / right;
-    if (operation === 'fg.pow') return left ** right;
-    return undefined;
+    const operands = keys.map((key) => numberValue(key));
+    if (operands.some((value) => value === undefined) || !operation)
+      return undefined;
+    const result = evaluateOperation(
+      operation,
+      operands.filter((value): value is number => value !== undefined),
+    );
+    return result.ok ? result.value : undefined;
   };
   const value = predicate(rootKey);
   return value === undefined
@@ -336,17 +335,14 @@ const usedDependencies = (
       return value === undefined ? undefined : -value;
     }
     if (!operation) return undefined;
-    const left = numberValue(keys[0] ?? '');
-    const right = numberValue(keys[1] ?? '');
-    if (left === undefined || right === undefined) return undefined;
-    if (operation === 'fg.add') return left + right;
-    if (operation === 'fg.subtract') return left - right;
-    if (operation === 'fg.multiply') return left * right;
-    if (operation === 'fg.divide') return left / right;
-    if (operation === 'fg.pow') return left ** right;
-    return keys.every((argument) => numberValue(argument) !== undefined)
-      ? 0
-      : undefined;
+    const operands = keys.map((key) => numberValue(key));
+    if (operands.some((value) => value === undefined) || !operation)
+      return undefined;
+    const result = evaluateOperation(
+      operation,
+      operands.filter((value): value is number => value !== undefined),
+    );
+    return result.ok ? result.value : undefined;
   };
   const visit = (key: string): boolean => {
     const node = byKey.get(key);

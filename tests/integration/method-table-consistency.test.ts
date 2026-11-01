@@ -113,6 +113,24 @@ beforeAll(() => {
       .replace('height=3.0', 'height=2.0')
       .replace('width=3.0, height=1.0', 'width=2.0, height=2.0'),
   );
+  writeFileSync(
+    join(directory, 'qualified.cso.py'),
+    leaf
+      .replace('calculation, check,', 'calculation, applicable, check,')
+      .replace(
+        'width if width > height else height',
+        'width if abs(width) > abs(height) else height',
+      )
+      .replace('predicate=area <= 4', 'predicate=abs(area) <= 4')
+      .replace(
+        '    return {"area": area',
+        '    applicable(id="area-limit", targets=("area",), explanation="Width limit", predicate=abs(width) < 100)\n    return {"area": area',
+      ),
+  );
+  writeFileSync(
+    join(directory, 'qualified_compare.cso.py'),
+    source('leaf').replace('_cso_bindings.leaf', '_cso_bindings.qualified'),
+  );
   const result = spawnSync(
     python,
     ['-I', '-m', 'cso_python', 'bindings', directory],
@@ -299,4 +317,31 @@ test('keeps source context and validates method structure without evaluating an 
   if (!node?.funcArgs) throw new Error('Missing method formula');
   node.funcArgs[0] = { key: 'missing' };
   expect(verifyExecution({ execution }).ok).toBe(false);
+});
+
+test('numeric helpers preserve qualifications and same-name conditions retain distinct formulas', () => {
+  const execution = capture('qualified_compare.cso.py');
+  expect(execution.checkOutcomes?.map((item) => item.value)).toEqual([
+    false,
+    true,
+  ]);
+  expect(execution.applicabilityOutcomes?.map((item) => item.value)).toEqual([
+    true,
+    true,
+  ]);
+  const document = prepareExecutionDocument({ execution, assets: [] });
+  const method = document.sections
+    .flatMap((section) => section.items)
+    .find((item) => item.kind === 'method');
+  if (method?.kind !== 'method') throw new Error('Missing method');
+  const conditions = method.content.filter(
+    (item) => item.kind === 'check' || item.kind === 'applicability',
+  );
+  expect(new Set(conditions.map((item) => item.predicateSymbolId)).size).toBe(
+    2,
+  );
+  const html = renderToStaticMarkup(
+    createElement(PreparedFormulaSheet, { document }),
+  );
+  expect(html).toContain('Width limit');
 });

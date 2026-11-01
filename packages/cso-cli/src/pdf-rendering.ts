@@ -1,5 +1,6 @@
 import type { Diagnostic, PreparedDocument } from '@cs-object/core';
 import {
+  partitionRowAxis,
   measureComparisons,
   planComparisonParts,
   renderComparisonParts,
@@ -427,7 +428,9 @@ async function withPreparedPage<T>(
       }
       if (media === 'print') {
         diagnostics.push(
-          ...(await page.evaluate(renderComparisonParts, comparisonPlans)),
+          ...(await page.evaluate<ReturnType<typeof renderComparisonParts>>(
+            `(${renderComparisonParts.toString()})(${JSON.stringify(comparisonPlans)}, undefined, ${partitionRowAxis.toString()})`
+          )),
         );
       }
       diagnostics.push(...(await page.evaluate(inspectLayoutInPage, media)));
