@@ -27,10 +27,11 @@ def generate(directory: Path, *, check: bool = False) -> dict:
             "INVALID_DEPENDENCY_PATH",
             "Generated bindings cannot contain symbolic links",
         )
-    files: dict[Path, bytes] = {output / "__init__.py": b"", output / "py.typed": b""}
+    modules: dict[Path, tuple[str, ...]] = {}
+    packages: dict[tuple[str, ...], Path] = {}
     for source in sources:
         relative = source.relative_to(root)
-        parts = [*relative.parts[:-1], relative.name[:-7]]
+        parts = (*relative.parts[:-1], relative.name[:-7])
         if parts[0] == "_external":
             raise SourceError(
                 "BINDING_OUTPUT_CONFLICT",
@@ -46,6 +47,21 @@ def generate(directory: Path, *, check: bool = False) -> dict:
                 "INVALID_BINDING_NAME",
                 f"Binding module needs identifier path components: {relative}",
             )
+        modules[source] = parts
+        for length in range(1, len(parts)):
+            packages.setdefault(parts[:length], source)
+    # Python prefers a package over a module with the same import name. Check
+    # the complete plan before capturing definitions or touching existing files.
+    for source, parts in modules.items():
+        if parts in packages:
+            child = packages[parts].relative_to(root)
+            raise SourceError(
+                "BINDING_OUTPUT_CONFLICT",
+                f"Binding module {source.relative_to(root)} conflicts with "
+                f"package {'/'.join(parts)}/ required by {child}",
+            )
+    files: dict[Path, bytes] = {output / "__init__.py": b"", output / "py.typed": b""}
+    for source, parts in modules.items():
         capture = Capture(source)
         capture.root = root
         capture.for_bindings = True

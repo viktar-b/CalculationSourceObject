@@ -3,13 +3,13 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   copyFileSync,
-  existsSync,
   cpSync,
+  existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
-  readFileSync,
   readdirSync,
+  readFileSync,
   realpathSync,
   writeFileSync,
 } from 'node:fs';
@@ -107,7 +107,11 @@ function consumer(name: string, dependencies: string[]): string {
   }
   for (const name of ['core', 'react', 'cli']) {
     const directoryPath = join(directory, 'node_modules/@cs-object', name);
-    if (dependencies.some((dependency) => dependency.includes(`cs-object-${name}-`)))
+    if (
+      dependencies.some((dependency) =>
+        dependency.includes(`cs-object-${name}-`),
+      )
+    )
       assert(!lstatSync(directoryPath).isSymbolicLink());
   }
   return directory;
@@ -168,9 +172,7 @@ try {
       `Unexpected package content in ${archive}`,
     );
     assert(
-      !files.some((path) =>
-        /(?:apps\/demo|node_modules|\.cso\.py)/.test(path),
-      ),
+      !files.some((path) => /(?:apps\/demo|node_modules|\.cso\.py)/.test(path)),
     );
   }
   const builder = join(root, 'wheel builder');
@@ -228,6 +230,13 @@ try {
     join(copiedRepo, 'packages/cso-python/tests'),
     { recursive: true, filter: (path) => !path.includes('__pycache__') },
   );
+  run(pythonOnly, python, [
+    '-m',
+    'pip',
+    'install',
+    '-r',
+    join(copiedRepo, 'packages/cso-python/tests/requirements.txt'),
+  ]);
   const testOutput = run(pythonOnly, python, [
     join(copiedRepo, 'packages/cso-python/tests/run.py'),
   ]);
@@ -401,6 +410,60 @@ try {
     '--input',
     'height=3',
   ];
+  // Exercise the installed CLI's permitted warning-based math-only preview.
+  const proseSource = `from typing import Annotated
+from cso_python import calculation, section, symbol, text
+
+@calculation(id="rectangle-prose", title="Rectangle with assumptions")
+@section(id="rectangle", title="Rectangle", root=True)
+def rectangle(
+    width: Annotated[float, symbol(glyph="w_{rect}", description="Width", unit="m")],
+    height: Annotated[float, symbol(glyph="h_{rect}", description="Height", unit="m")],
+):
+    text(id="assumptions", content="Assume perpendicular rectangle sides.")
+    text(id="reference", content="Reference: area equals width multiplied by height.")
+    area: Annotated[float, symbol(glyph="A_{rect}", description="Area", unit="m^2")] = width * height
+    return {"area": area}
+`;
+  writeFileSync(join(full, 'prose.cso.py'), proseSource);
+  const previewArgs = [
+    entry,
+    'dev-render',
+    '--source',
+    'prose.cso.py',
+    '--function',
+    functionName,
+    '--input',
+    'width=4',
+    '--input',
+    'height=3',
+    '--out',
+    'output/prose.pdf',
+  ];
+  const preview = spawnSync(process.execPath, previewArgs, {
+    cwd: full,
+    env: environment,
+    encoding: 'utf8',
+  });
+  commands.push({
+    cwd: full,
+    command: process.execPath,
+    args: previewArgs,
+    status: preview.status,
+  });
+  writeFileSync(
+    join(root, 'development-content-warning.log'),
+    `${preview.stdout}\n${preview.stderr}`,
+  );
+  if (preview.error) throw preview.error;
+  assert.equal(preview.status, 0, preview.stderr);
+  assert.match(
+    preview.stderr,
+    /math-only preview.*omits authored document content \(text: 2\)/,
+  );
+  assert.match(preview.stderr, /cso html or cso pdf/);
+  assert.match(preview.stderr, /numerically unverified/);
+  assert(existsSync(join(full, 'output/prose.pdf')));
   for (const width of [2, 4]) {
     run(full, process.execPath, [
       entry,

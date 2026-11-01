@@ -1,19 +1,19 @@
-import { z } from 'zod';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 /** Build/test disposable copies with no workspace ancestors or example data. */
 import {
   cpSync,
   mkdirSync,
   mkdtempSync,
-  readFileSync,
   readdirSync,
+  readFileSync,
   realpathSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { z } from 'zod';
 
 const repository = fileURLToPath(new URL('..', import.meta.url));
 const output = realpathSync(
@@ -150,6 +150,13 @@ run('python', directory, installedPython, [
   '--no-index',
   '--no-deps',
   join(archives, wheel),
+]);
+run('python', directory, installedPython, [
+  '-m',
+  'pip',
+  'install',
+  '-r',
+  'tests/requirements.txt',
 ]);
 run('python', directory, installedPython, ['-I', 'tests/run.py']);
 const identity = realpathSync(

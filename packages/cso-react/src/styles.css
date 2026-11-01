@@ -52,6 +52,14 @@ math {
     "Times New Roman", serif;
 }
 
+/* Size scripts relative to their parent without shrinking nested notation
+   below 8px. CSS transforms move ink without updating MathML layout bounds. */
+[data-formula-sheet] :is(msup, msub, msubsup) > :nth-child(2),
+[data-formula-sheet] msubsup > :nth-child(3),
+[data-formula-sheet] mfrac > * {
+  font-size: max(0.71em, 8px);
+}
+
 [data-formula-sheet-print-root] {
   display: none;
 }

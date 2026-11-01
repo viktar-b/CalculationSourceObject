@@ -7,7 +7,6 @@
  */
 
 import type { ReactElement, ReactNode } from 'react';
-import { MATHML_FONT_SIZE } from './constants.ts';
 
 interface SpecialValueFunctionRenderProps {
   readonly functionId: string;
@@ -20,8 +19,8 @@ interface ConditionalFunctionMathmlProps {
   readonly argFalse: ReactNode;
 }
 
-const baseStyle = { fontSize: MATHML_FONT_SIZE, textAlign: 'left' as const };
-const fontSizeStyle = { fontSize: MATHML_FONT_SIZE };
+const baseStyle = { textAlign: 'left' as const };
+const branchStyle = { ...baseStyle, paddingBlock: '0.3em' };
 
 const ConditionalFunctionMathml = ({
   argCnd,
@@ -30,20 +29,22 @@ const ConditionalFunctionMathml = ({
 }: ConditionalFunctionMathmlProps): ReactElement => {
   return (
     <mrow style={baseStyle}>
-      <mo style={fontSizeStyle}>{'{'}</mo>
+      <mo>{'{'}</mo>
       <mtable columnalign={'left'} style={baseStyle}>
-        <mtr style={fontSizeStyle}>
-          <mtd style={{ ...baseStyle, paddingRight: '0.5em' }}>{argTrue}</mtd>
-          <mtd style={baseStyle}>
-            <mtext style={fontSizeStyle}>{'if '}</mtext>
+        <mtr>
+          <mtd style={{ ...branchStyle, paddingRight: '0.5em' }}>{argTrue}</mtd>
+          <mtd style={branchStyle}>
+            <mtext>{'if '}</mtext>
             <mspace width={'5px'} />
             {argCnd}
           </mtd>
         </mtr>
-        <mtr style={fontSizeStyle}>
-          <mtd style={{ ...baseStyle, paddingRight: '0.5em' }}>{argFalse}</mtd>
-          <mtd style={baseStyle}>
-            <mtext style={fontSizeStyle}>otherwise.</mtext>
+        <mtr>
+          <mtd style={{ ...branchStyle, paddingRight: '0.5em' }}>
+            {argFalse}
+          </mtd>
+          <mtd style={branchStyle}>
+            <mtext>otherwise.</mtext>
           </mtd>
         </mtr>
       </mtable>
@@ -60,8 +61,8 @@ const FractionFunctionMathml = ({
 }): ReactElement => {
   return (
     <mfrac>
-      <mstyle style={{ fontSize: MATHML_FONT_SIZE }}>{numerator}</mstyle>
-      <mstyle style={{ fontSize: MATHML_FONT_SIZE }}>{denominator}</mstyle>
+      <mrow>{numerator}</mrow>
+      <mrow>{denominator}</mrow>
     </mfrac>
   );
 };
@@ -75,8 +76,8 @@ const PowerFunctionMathml = ({
 }): ReactElement => {
   return (
     <msup>
-      <mstyle style={{ fontSize: MATHML_FONT_SIZE }}>{base}</mstyle>
-      <mstyle style={{ scale: '0.8' }}>{exponent}</mstyle>
+      <mrow>{base}</mrow>
+      <mrow>{exponent}</mrow>
     </msup>
   );
 };
@@ -88,9 +89,7 @@ const SquareRootFunctionMathml = ({
 }): ReactElement => {
   return (
     <msqrt>
-      <mstyle style={{ padding: '3px', fontSize: MATHML_FONT_SIZE }}>
-        {value}
-      </mstyle>
+      <mstyle style={{ padding: '0.2em' }}>{value}</mstyle>
     </msqrt>
   );
 };
@@ -101,7 +100,7 @@ const AbsoluteValueFunctionMathml = ({
   readonly value: ReactNode;
 }): ReactElement => {
   return (
-    <mrow style={fontSizeStyle}>
+    <mrow>
       <mo fence="true" stretchy="true">
         |
       </mo>
@@ -119,8 +118,8 @@ const UnaryMinusFunctionMathml = ({
   readonly value: ReactNode;
 }): ReactElement => {
   return (
-    <mrow style={{ fontSize: MATHML_FONT_SIZE }}>
-      <mo style={{ fontSize: MATHML_FONT_SIZE }}>{'-'}</mo>
+    <mrow>
+      <mo>{'-'}</mo>
       {value}
     </mrow>
   );

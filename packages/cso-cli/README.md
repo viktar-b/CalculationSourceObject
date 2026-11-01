@@ -5,6 +5,13 @@
 `cso bindings` generates typed calculation handles. `dev-export` and `dev-render`
 retain the unverified development paths.
 
+`dev-render` is a math-only preview. It omits standalone text, figures, methods,
+tables and unknown document items, and warns on stderr when these are present.
+Assumptions and reference text therefore require `cso html` or `cso pdf` for a
+complete report. The omission warning is separate from the command's unverified
+numerical status; a successful development render establishes neither numerical
+verification nor full document retention.
+
 ## Run
 
 Follow [setup](../../docs/development.md#setup). In the workspace use

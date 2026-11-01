@@ -11,7 +11,6 @@ import { assertNever, formatNumerical } from '@cs-object/core';
 import { isValidElement, type ReactElement, type ReactNode } from 'react';
 import { AsciiMathView } from '../../ascii-math/AsciiMathView.tsx';
 import type { MathMLGlobalAttributes } from '../attributes.ts';
-import { MATHML_FONT_SIZE } from '../constants.ts';
 
 interface SymbolValueBinaryOperatorMathmlViewProps {
   readonly operator: SheetBinaryOperator;
@@ -89,19 +88,14 @@ export const SymbolValueDraftMathmlView = ({
   draft,
   position,
 }: SymbolValueDraftMathmlViewProps): ReactElement => {
-  const textStyle = { fontSize: MATHML_FONT_SIZE };
   return position !== undefined && isDraftPositionValid({ draft, position }) ? (
-    <mrow style={{ fontSize: MATHML_FONT_SIZE }}>
-      {position > 0 && (
-        <mtext style={textStyle}>{draft.substring(0, position)}</mtext>
-      )}
-      {position < draft.length && (
-        <mtext style={textStyle}>{draft.substring(position)}</mtext>
-      )}
+    <mrow>
+      {position > 0 && <mtext>{draft.substring(0, position)}</mtext>}
+      {position < draft.length && <mtext>{draft.substring(position)}</mtext>}
     </mrow>
   ) : (
-    <mrow style={{ fontSize: MATHML_FONT_SIZE }}>
-      <mtext style={textStyle}>{draft}</mtext>
+    <mrow>
+      <mtext>{draft}</mtext>
     </mrow>
   );
 };
@@ -109,19 +103,16 @@ export const SymbolValueDraftMathmlView = ({
 export const SymbolValueLiteralMathmlView = ({
   literal,
 }: SymbolValueLiteralMathmlViewProps): ReactElement => {
-  const mathProps: MathMLGlobalAttributes = {
-    style: { fontSize: MATHML_FONT_SIZE },
-  };
   switch (literal?.kind) {
     case undefined:
     case 'empty':
-      return <mi {...mathProps}>{'▢'}</mi>;
+      return <mi>{'▢'}</mi>;
     case 'boolean':
-      return <mi {...mathProps}>{literal.value ? 'true' : 'false'}</mi>;
+      return <mi>{literal.value ? 'true' : 'false'}</mi>;
     case 'number':
-      return <mn {...mathProps}>{formatNumerical(literal.value)}</mn>;
+      return <mn>{formatNumerical(literal.value)}</mn>;
     case 'string':
-      return <mtext {...mathProps}>{literal.value}</mtext>;
+      return <mtext>{literal.value}</mtext>;
     default:
       return assertNever(literal);
   }

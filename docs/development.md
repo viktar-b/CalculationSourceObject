@@ -89,6 +89,10 @@ Run package behavior tests for the changed project, then the affected
 root commands; package manifests define their local commands.
 
 `npm test`, `npm run typecheck` and `npm run lint` cover the workspace.
+Before running Python tests locally, install their declared test tools with
+`"$PYTHON" -m pip install -r packages/cso-python/tests/requirements.txt`.
+`npm run test:python` includes real mypy consumers of generated bindings. CI,
+isolation and installed-package suites install the same test-only requirements.
 `npm run test:isolation` builds/tests projects without root fixtures.
 `npm run test:packages` installs actual archives and a wheel into fresh external
 consumers. These installation checks need build prerequisites and dependency
