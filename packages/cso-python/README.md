@@ -107,7 +107,10 @@ Use full captured execution or prepared HTML/PDF instead.
 [execution](src/cso_python/execution.py) and [bindings](src/cso_python/bindings.py)
 implement the pipeline described in [the code map](../../docs/code-map.md).
 
-With the wheel installed, run `python -I tests/run.py` from this package directory.
+With the wheel installed, run `python -m pip install -r tests/requirements.txt`
+and `python -I tests/run.py` from this package directory. The test-only mypy pin
+checks positive and negative consumers of freshly generated bindings, including
+keyword arguments and typed public result keys. Runtime dependencies stay empty.
 The tests use package-owned synthetic fixtures and temporary bindings; no root
 examples or Node are required. [Workspace integration](../../tests/integration/README.md)
 owns actual example, installed cross-package and PDF acceptance.

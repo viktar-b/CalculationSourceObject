@@ -1,29 +1,30 @@
-import { stringifyJson } from './json.ts';
+import { randomUUID } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
   readFileSync,
-  writeFileSync,
   renameSync,
   rmSync,
+  writeFileSync,
 } from 'node:fs';
-import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { dirname, join, basename } from 'node:path';
+import { basename, dirname, join } from 'node:path';
+import {
+  type CalculationSourceObject,
+  CalculationSourceObjectSchema,
+  createSheetFromCalculationSourceObject,
+  type SheetDocument,
+} from '@cs-object/core';
+import { FormulaSheet } from '@cs-object/react';
 import { chromium } from 'playwright';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { FormulaSheet } from '@cs-object/react';
-import {
-  CalculationSourceObjectSchema,
-  createSheetFromCalculationSourceObject,
-  type CalculationSourceObject,
-  type SheetDocument,
-} from '@cs-object/core';
-import { UsageError, type DevelopmentOptions } from './arguments.ts';
+import { type DevelopmentOptions, UsageError } from './arguments.ts';
+import { stringifyJson } from './json.ts';
 import { runPythonProcess } from './python-process.ts';
-export { isolatedEnvironment } from './python-process.ts';
+
 export { parseCliArgs } from './arguments.ts';
+export { isolatedEnvironment } from './python-process.ts';
 export type AnnotatedPythonPdfOptions = DevelopmentOptions;
 export interface PythonExporterOptions {
   readonly functionName: string;
@@ -168,6 +169,28 @@ export const renderAnnotatedPythonPdf = async (
   options: AnnotatedPythonPdfOptions,
 ): Promise<void> => {
   const source = runPythonExporter(options);
+  const omissions = new Map<string, number>();
+  for (const item of [
+    ...source.sections.flatMap((section) => section.items),
+    ...(source.detachedItems ?? []),
+  ]) {
+    if (
+      item.kind !== 'symbol' &&
+      item.kind !== 'symbolRef' &&
+      item.kind !== 'section'
+    ) {
+      omissions.set(item.kind, (omissions.get(item.kind) ?? 0) + 1);
+    }
+  }
+  if (omissions.size > 0) {
+    const counts = [...omissions]
+      .map(([kind, count]) => `${kind}: ${count}`)
+      .join(', ');
+    process.stderr.write(
+      `Warning: dev-render is a math-only preview and omits authored document content (${counts}). ` +
+        'Use cso html or cso pdf to retain document content. Development output remains numerically unverified.\n',
+    );
+  }
   const calculation = createSheetFromCalculationSourceObject(source, {
     id: source.source.id,
     label: source.title,

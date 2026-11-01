@@ -1014,7 +1014,17 @@ test('publishes verified conditional notes without rerunning dormant branches', 
   expect(pdf.status, pdf.stdout || pdf.stderr).toBe(0);
   const info = spawnSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
   expect(info.status, info.stderr).toBe(0);
-  expect(info.stdout).toContain('Pages:           1');
+  // Readable branch spacing may continue the final result onto a second page.
+  expect(info.stdout).toMatch(/Pages:\s+[12]\b/);
+  const extracted = spawnSync('pdftotext', ['-layout', pdfPath, '-'], {
+    encoding: 'utf8',
+  });
+  expect(extracted.status, extracted.stderr).toBe(0);
+  const pages = extracted.stdout.split('\f').filter((page) => page.trim());
+  expect(pages.length).toBe(Number(info.stdout.match(/Pages:\s+(\d+)/)?.[1]));
+  for (const content of ['Chosen', 'Guarded', 'Narrow', 'Wide', 'Compared']) {
+    expect(extracted.stdout).toContain(content);
+  }
 }, 180_000);
 
 test('keeps a failed engineering check beside the unchanged number', async () => {

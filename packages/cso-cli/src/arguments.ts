@@ -1,5 +1,5 @@
-import { PythonIdentifierSchema } from '@cs-object/core';
 import { resolve } from 'node:path';
+import { PythonIdentifierSchema } from '@cs-object/core';
 
 export class UsageError extends Error {}
 
@@ -168,7 +168,7 @@ Commands:
   dev                    Serve a verified calculation, editable inputs and report on localhost.
   bindings               Generate typed calculation handles; --check reports stale files without writing.
   dev-export             Export CSO JSON using the selected installed Python module.
-  dev-render             Export once and render a development PDF with installed React/CSS.
+  dev-render             Render an unverified math-only PDF; warn about omitted document content.
   verify                 Execute once and verify formulas; use cso verify --help.
   html                   Verify once and publish standalone HTML; --check-layout adds browser checks.
   pdf                    Verify once, retain evidence unless --no-evidence, and atomically publish a PDF.

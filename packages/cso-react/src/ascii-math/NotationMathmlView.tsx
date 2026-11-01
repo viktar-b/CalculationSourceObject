@@ -1,8 +1,7 @@
-import { assertNever } from '@cs-object/core';
 import type { NotationExpression, NotationNode } from '@cs-object/core';
+import { assertNever } from '@cs-object/core';
 import type { ReactElement } from 'react';
 import type { MathMathMLAttributes } from '../mathml/attributes.ts';
-import { MATHML_FONT_SIZE } from '../mathml/constants.ts';
 
 interface NotationRenderOptions {
   readonly identifierMathVariant?: 'normal';
@@ -116,12 +115,8 @@ const NotationNodeMathmlView = ({
     case 'fraction':
       return (
         <mfrac>
-          <mstyle style={{ fontSize: MATHML_FONT_SIZE }}>
-            {renderNode(node.numerator)}
-          </mstyle>
-          <mstyle style={{ fontSize: MATHML_FONT_SIZE }}>
-            {renderNode(node.denominator)}
-          </mstyle>
+          <mrow>{renderNode(node.numerator)}</mrow>
+          <mrow>{renderNode(node.denominator)}</mrow>
         </mfrac>
       );
     case 'subscript':

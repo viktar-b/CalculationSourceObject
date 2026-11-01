@@ -1,0 +1,2 @@
+# Test-only consumer verification. The runtime package has no dependencies.
+mypy==1.18.2

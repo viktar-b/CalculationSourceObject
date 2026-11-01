@@ -110,6 +110,7 @@ jobs:
           python -m venv .venv
           .venv/bin/python -m pip wheel --no-deps ./packages/cso-python --wheel-dir artifacts
           .venv/bin/python -m pip install --no-index --find-links artifacts cs-object
+          .venv/bin/python -m pip install -r packages/cso-python/tests/requirements.txt
           echo "PYTHON=$GITHUB_WORKSPACE/.venv/bin/python" >> "$GITHUB_ENV"
       - run: npx playwright install --with-deps chromium
       - run: npm audit --audit-level=high

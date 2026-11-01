@@ -1,6 +1,8 @@
 """Generated binding bytes must remain portable and detect file drift."""
 
 import runpy
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -71,6 +73,67 @@ def calculate(width: Annotated[float, symbol(glyph="w_{pan}", description="Width
             generate(self.root)
         self.assertEqual(raised.exception.diagnostic["code"], "BINDING_OUTPUT_CONFLICT")
         self.assertEqual(path.read_bytes(), authored)
+
+    def test_module_package_collisions_fail_before_writing_in_both_modes(self):
+        source = self.root / "élément" / "café.cso.py"
+        content = source.read_bytes()
+        for module, child in (
+            ("sample.cso.py", "sample/child.cso.py"),
+            ("group/sample.cso.py", "group/sample/child.cso.py"),
+        ):
+            with self.subTest(module=module):
+                calculation = self.root / module
+                nested = self.root / child
+                calculation.parent.mkdir(parents=True, exist_ok=True)
+                nested.parent.mkdir(parents=True, exist_ok=True)
+                calculation.write_bytes(content)
+                nested.write_bytes(content)
+                for check in (False, True):
+                    with self.assertRaises(SourceError) as raised:
+                        generate(self.root, check=check)
+                    diagnostic = raised.exception.diagnostic
+                    self.assertEqual(diagnostic["code"], "BINDING_OUTPUT_CONFLICT")
+                    self.assertIn(str(Path(module)), diagnostic["message"])
+                    self.assertIn(str(Path(child)), diagnostic["message"])
+                    self.assertFalse((self.root / "_cso_bindings").exists())
+                calculation.unlink()
+                nested.unlink()
+
+    def test_collision_preserves_valid_output_and_valid_imports(self):
+        source = self.root / "élément" / "café.cso.py"
+        flat = self.root / "sample.cso.py"
+        flat.write_bytes(source.read_bytes())
+        generate(self.root)
+        output = self.root / "_cso_bindings"
+        saved = {
+            p.relative_to(output): p.read_bytes()
+            for p in output.rglob("*") if p.is_file()
+        }
+        # Resolve through Python's import machinery, rather than reading stub text.
+        result = subprocess.run(
+            [
+                sys.executable, "-c",
+                "from _cso_bindings.sample import calculate; "
+                "from _cso_bindings.élément.café import calculate as nested; "
+                "assert calculate(width=3) == nested(width=3) == {'café': 9}",
+            ],
+            cwd=self.root,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        nested = self.root / "sample" / "child.cso.py"
+        nested.parent.mkdir()
+        nested.write_bytes(source.read_bytes())
+        for check in (False, True):
+            with self.assertRaises(SourceError):
+                generate(self.root, check=check)
+            current = {
+                p.relative_to(output): p.read_bytes()
+                for p in output.rglob("*")
+                if p.is_file() and "__pycache__" not in p.parts
+            }
+            self.assertEqual(current, saved)
 
 
 if __name__ == "__main__":
