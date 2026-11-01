@@ -41,18 +41,21 @@
     "pretest": "npm run build"
   },
   "overrides": {
-    "esbuild": "0.28.2"
+    "esbuild": "0.28.2",
+    "@tailwindcss/cli": {
+      "@parcel/watcher": "2.6.0"
+    }
   },
   "devDependencies": {
     "typescript": "^5",
     "tsup": "^8.5.1",
-    "vitest": "^5.0.2",
-    "react": "^19.3.0",
+    "vitest": "^5.0.5",
+    "react": "^19.3.1",
     "@types/react": "^19",
     "tailwindcss": "^4.3.3",
     "@types/node": "^26",
-    "@biomejs/biome": "2.5.14",
-    "react-dom": "^19.3.0",
+    "@biomejs/biome": "2.6.2",
+    "react-dom": "^19.3.1",
     "@types/react-dom": "^19",
     "@tailwindcss/cli": "^4.3.3"
   },
