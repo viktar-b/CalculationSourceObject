@@ -36,7 +36,7 @@ writeFileSync(
 from cso_python import external_function, symbol
 Length: TypeAlias = Annotated[float, symbol(glyph="L", description="Length", unit="m")]
 Area: TypeAlias = Annotated[float, symbol(glyph="A", description="Area", unit="m^2")]
-Count: TypeAlias = Annotated[int, symbol(glyph="n", description="Calls", unit="")]
+Count: TypeAlias = Annotated[int, symbol(glyph="n", description="Calls", unit="", comment="Diagnostic call count retained even when unused.")]
 square = external_function(path="adapter.py", function="square", inputs={"length": Length}, outputs={"area": Area, "count": Count}, description="Square the supplied length.")
 `,
 );
@@ -64,7 +64,7 @@ def calculate(length: Length = 3.0):
 `,
 );
 
-const capture = (name = 'root.cso.py') => {
+const capture = (name = 'root.cso.py', inputJson = '{}') => {
   const generated = spawnSync(
     python,
     ['-m', 'cso_python', 'bindings', directory],
@@ -82,6 +82,8 @@ const capture = (name = 'root.cso.py') => {
       'calculate',
       '--supported-execution-protocol',
       '4',
+      '--inputs-json',
+      inputJson,
     ],
     { encoding: 'utf8' },
   );
@@ -124,6 +126,7 @@ test('captured external results supply downstream formula authorities with expli
   );
   expect(html).toContain('data-external-quantity="count"');
   expect(html).toContain('External-result consistency: passed');
+  expect(html).toContain('Diagnostic call count retained even when unused.');
 });
 
 test('external-only capture succeeds with no formula checks and cannot lose evidence in a sheet', () => {
@@ -222,6 +225,99 @@ test('report and document bindings distinguish equal-input runs and reprepare wi
     ).toContain('Square the supplied length.');
   } finally {
     writeFileSync(adapter, original);
+  }
+});
+
+test('a prepared external block cannot change the sign of a captured zero', () => {
+  const execution = capture('root.cso.py', '{"length":-0.0}');
+  const document = prepareExecutionDocument({ execution, assets: [] });
+  const changed = {
+    ...document,
+    sections: document.sections.map((section) => ({
+      ...section,
+      items: section.items.map((item) =>
+        item.kind === 'externalCall'
+          ? {
+              ...item,
+              call: {
+                ...item.call,
+                inputs: item.call.inputs.map((input) => ({
+                  ...input,
+                  value: 0,
+                })),
+              },
+            }
+          : item,
+      ),
+    })),
+  };
+  expect(
+    BoundPreparedDocumentSchema.safeParse({ execution, document: changed })
+      .success,
+  ).toBe(false);
+});
+
+test('a bound report cannot misstate captured call coverage', () => {
+  const execution = capture();
+  const report = verifyExecution({ execution });
+  if (!report.externalCoverage) throw new Error('Missing external coverage');
+  const changed = {
+    ...report,
+    externalCoverage: { ...report.externalCoverage, calls: 2 },
+  };
+  expect(() =>
+    prepareExecutionDocument({
+      execution,
+      assets: [],
+      verificationReport: changed,
+    }),
+  ).toThrow(/coverage/u);
+});
+
+test('declared defaults must agree with resolved default arguments', () => {
+  const methods = join(directory, 'methods.py');
+  const original = readFileSync(methods, 'utf8');
+  const source = readFileSync(join(directory, 'root.cso.py'), 'utf8').replace(
+    'square(length=length)',
+    'square()',
+  );
+  writeFileSync(join(directory, 'defaults.cso.py'), source);
+  try {
+    writeFileSync(
+      methods,
+      original.replace(
+        'description="Square',
+        'defaults={"length": 3.0}, description="Square',
+      ),
+    );
+    const execution = capture('defaults.cso.py');
+    const call = execution.externalCalls?.[0];
+    if (!call) throw new Error('Missing call');
+    const invalidDefaults: (typeof call.declaration.interface.defaults)[] = [
+      [{ name: 'length', value: 99, numericKind: 'float' }],
+      [{ name: 'unknown', value: 3, numericKind: 'float' }],
+      [
+        ...call.declaration.interface.defaults,
+        ...call.declaration.interface.defaults,
+      ],
+    ];
+    for (const defaults of invalidDefaults) {
+      const altered = {
+        ...call,
+        declaration: {
+          ...call.declaration,
+          interface: { ...call.declaration.interface, defaults },
+        },
+      };
+      expect(
+        verifyExecution({
+          execution: { ...execution, externalCalls: [altered] },
+        }).ok,
+      ).toBe(false);
+    }
+  } finally {
+    writeFileSync(methods, original);
+    rmSync(join(directory, 'defaults.cso.py'));
   }
 });
 

@@ -204,6 +204,86 @@ def square(*, length):
             caught.exception.diagnostic["code"], "UNSUPPORTED_ADAPTER_IMPORT"
         )
 
+    def test_same_named_input_and_output_have_distinct_literal_and_default_identities(
+        self,
+    ):
+        declaration = self.root / "methods.py"
+        declaration.write_text(
+            declaration.read_text().replace(
+                'outputs={"area": Area, "count": Count}',
+                'outputs={"length": Area, "count": Count}, defaults={"length": 3.0}',
+            )
+        )
+        self.adapter.write_text(
+            'def square(*, length):\n    return {"length": length * length, "count": 1}\n'
+        )
+        self.source.write_text(
+            self.source.read_text()
+            .replace('first["area"]', 'first["length"]')
+            .replace("square(length=length)", "square(length=3.0)")
+        )
+        generate(self.root)
+        for call in ("square(length=3.0)", "square()"):
+            self.source.write_text(
+                self.source.read_text().replace("square(length=3.0)", call)
+            )
+            response = execute(self.source, "calculate", {})
+            self.assertTrue(response["ok"], response)
+            captured = response["execution"]["externalCalls"][0]
+            self.assertNotEqual(
+                captured["inputs"][0]["symbolId"], captured["outputs"][0]["symbolId"]
+            )
+
+    def test_standard_library_helper_classes_work_and_adapter_modules_are_released(
+        self,
+    ):
+        import sys
+
+        self.adapter.write_text("""from __future__ import annotations
+from dataclasses import dataclass
+@dataclass
+class Measurement:
+    value: float
+def square(*, length):
+    measured = Measurement(length)
+    return {"area": measured.value * measured.value, "count": 1}
+""")
+        generate(self.root)
+        before = {name for name in sys.modules if name.startswith("_cso_external_")}
+        for _ in range(2):
+            response = execute(self.source, "calculate", {})
+            self.assertTrue(response["ok"], response)
+        self.assertEqual(
+            before, {name for name in sys.modules if name.startswith("_cso_external_")}
+        )
+
+    def test_direct_authored_wrapper_releases_its_adapter_modules(self):
+        import sys
+        from unittest.mock import patch
+
+        wrapper = self.root / "wrapper.cso.py"
+        wrapper.write_text("""from cso_python import calculation, section
+from _cso_bindings.root import calculate
+@calculation(id="wrapper", title="Wrapper")
+@section(title="Wrapper", root=True)
+def wrapper():
+    result = calculate()
+    return {"doubled": result["doubled"]}
+""")
+        generate(self.root)
+        before = {name for name in sys.modules if name.startswith("_cso_external_")}
+        with patch.dict(sys.modules):
+            sys.path.insert(0, str(self.root))
+            try:
+                function = runpy.run_path(str(wrapper))["wrapper"]
+                self.assertEqual(function()["doubled"], 18.0)
+                self.assertEqual(
+                    before,
+                    {name for name in sys.modules if name.startswith("_cso_external_")},
+                )
+            finally:
+                sys.path.pop(0)
+
 
 if __name__ == "__main__":
     unittest.main()

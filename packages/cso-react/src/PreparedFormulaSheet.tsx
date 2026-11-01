@@ -292,14 +292,13 @@ export const PreparedFormulaSheet = ({
                   data-external-quantity={quantity.name}
                   data-symbol-id={quantity.symbolId}
                 >
-                  <th scope="row">
-                    {symbol.description}
-                    <br />
-                    <GlyphMathBlock glyph={symbol.glyph} />
-                  </th>
-                  <td>
-                    {numberText(quantity.value)}{' '}
-                    {symbol.unit ? <UnitMathBlock unit={symbol.unit} /> : null}
+                  <td colSpan={2} className="cso-external-quantity-cell">
+                    <FormulaSheetSymbolRow
+                      sheet={sheet}
+                      item={symbol}
+                      sheetItemIndex={symbolIndex++}
+                      showFormula={false}
+                    />
                   </td>
                 </tr>
               );

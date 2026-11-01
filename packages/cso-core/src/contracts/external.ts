@@ -41,7 +41,9 @@ export const ExternalCallSchema = z.strictObject({
       description: z.string().min(1),
       inputs: DeclaredQuantitiesSchema,
       outputs: DeclaredQuantitiesSchema,
-      defaults: z.array(z.tuple([PythonIdentifierSchema, z.number().finite()])),
+      defaults: z.array(
+        NumericValueSchema.safeExtend({ name: PythonIdentifierSchema }),
+      ),
     }),
   }),
   adapter: z.strictObject({
@@ -142,6 +144,37 @@ export function validateExternalCalls(
       execution.authoring?.parameters.filter(
         (item) => item.invocationId === call.id,
       ) ?? [];
+    const defaults = new Map(
+      declared.defaults.map((value) => [value.name, value]),
+    );
+    if (
+      defaults.size !== declared.defaults.length ||
+      declared.defaults.some(
+        (value) =>
+          !declared.inputs.some(
+            (input) =>
+              input[0] === value.name &&
+              (input[1] !== 'int' || value.numericKind === 'int'),
+          ) || value.numericKind === undefined,
+      )
+    )
+      issue(
+        index,
+        'External defaults must have unique declared input names and native numeric kinds',
+      );
+    for (const binding of invocation.inputBindings) {
+      if (binding.kind !== 'parsedDefault') continue;
+      const value = defaults.get(binding.parameterName);
+      if (
+        !value ||
+        !Object.is(binding.value, value.value) ||
+        binding.numericKind !== value.numericKind
+      )
+        issue(
+          index,
+          'Resolved external defaults must match their declaration values and kinds',
+        );
+    }
     const outputs = invocation.symbols.filter(
       (item) => item.kind === 'externalResult',
     );

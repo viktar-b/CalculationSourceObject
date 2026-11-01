@@ -213,6 +213,8 @@ class Execution:
         return namespace
 
     def run(self, invocation: Invocation, inputs: Json) -> Json:
+        active = ACTIVE.get()
+        outermost = active is None or active[0] is not self
         try:
             return self._run(invocation, inputs)
         except SourceError as error:
@@ -232,6 +234,10 @@ class Execution:
                 "location", span(invocation.module.id, invocation.function)
             )
             raise
+        finally:
+            if outermost:
+                for namespace in self.adapter_modules.values():
+                    sys.modules.pop(namespace["__name__"], None)
 
     def _run(self, invocation: Invocation, inputs: Json) -> Json:
         definition = self.planner.definitions.get(
@@ -337,10 +343,11 @@ class Execution:
                 warnings.simplefilter("always")
                 namespace = self.adapter_modules.get(external.path)
                 if namespace is None:
-                    namespace = {
-                        "__name__": "_cso_external_adapter",
-                        "__file__": str(external.path),
-                    }
+                    module_name = f"_cso_external_{self.run_id.replace('-', '')}_{len(self.adapter_modules)}"
+                    adapter_module = types.ModuleType(module_name)
+                    adapter_module.__file__ = str(external.path)
+                    namespace = adapter_module.__dict__
+                    sys.modules[module_name] = adapter_module
                     self.adapter_modules[external.path] = namespace
                     # This is the exact captured adapter, never a new disk read.
                     exec(self.code[external.path], namespace)

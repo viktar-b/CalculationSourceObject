@@ -627,6 +627,22 @@ export const BoundPreparedDocumentSchema = z
     );
     const tableIds = new Set((execution.tables ?? []).map((table) => table.id));
     const externalIds = new Set<string>();
+    if (
+      document.verification?.externalCoverage &&
+      (document.verification.externalCoverage.calls !==
+        (execution.externalCalls?.length ?? 0) ||
+        document.verification.externalCoverage.results !==
+          (execution.externalCalls ?? []).reduce(
+            (total, call) => total + call.outputs.length,
+            0,
+          ))
+    )
+      addIssue(
+        ctx,
+        'DOCUMENT_VERIFICATION_COVERAGE_MISMATCH',
+        'Verification coverage must count the supplied capture calls and results',
+        ['document', 'verification', 'externalCoverage'],
+      );
     const capturedSymbols = new Map(
       collectCsoSymbols(execution.cso).map((symbol) => [symbol.id, symbol]),
     );
@@ -662,7 +678,7 @@ export const BoundPreparedDocumentSchema = z
           if (
             !call ||
             externalIds.has(call.id) ||
-            JSON.stringify(call) !== JSON.stringify(item.call)
+            exactCaptureHash(call) !== exactCaptureHash(item.call)
           )
             addIssue(
               ctx,

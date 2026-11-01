@@ -450,15 +450,15 @@ class Planner:
             "warnings": [],
         }
         self.external_calls.append(record)
-        for name, declared in external.outputs.items():
-            variable = "_result_" + name
-            sid = identity("symbol", inv.id, name)
+        for index, (name, declared) in enumerate(external.outputs.items()):
+            variable = f"__cso_result_{index}"
+            sid = identity("symbol", inv.id, variable)
             spec = declared.metadata
             node = external.node
             self.validate_symbol_notation(inv, node, sid, spec)
             definition = {
                 "symbolId": sid,
-                "localId": name,
+                "localId": variable,
                 "variableName": variable,
                 "definitionLocation": span(inv.module.id, node),
                 "kind": "externalResult",
@@ -491,7 +491,7 @@ class Planner:
                         }
                     ],
                 },
-                "metadata": self.metadata(inv, name, node),
+                "metadata": self.metadata(inv, variable, node),
             }
             symbol = Symbol(
                 variable, spec, node, definition, cso, declared.numeric_type

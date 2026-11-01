@@ -15,6 +15,7 @@ import { FormulaSheetValueTree } from './FormulaSheetValueTree.tsx';
 
 export type FormulaSheetSymbolRowProps = FormulaSheetRowProps<SheetSymbol> & {
   readonly symbolicOnly?: boolean;
+  readonly showFormula?: boolean;
 };
 
 export const FormulaSheetSymbolRow = ({
@@ -22,6 +23,7 @@ export const FormulaSheetSymbolRow = ({
   sheetItemIndex,
   item: symbol,
   symbolicOnly = false,
+  showFormula = true,
 }: FormulaSheetSymbolRowProps): ReactElement => {
   const { glyph: symbolGlyph } = symbol;
   const symbolUnit = symbol.unit ?? '';
@@ -64,25 +66,26 @@ export const FormulaSheetSymbolRow = ({
           </FormulaSheetCommentCell>
         </div>
 
-        {(!symbolIsSolidLiteral ||
-          (symbolicOnly &&
-            rootNode.kind === 'literal' &&
-            rootNode.value.kind !== 'empty')) && (
-          <div className="flex min-w-0">
-            <div className="w-full min-w-0 overflow-visible border-t border-gray-300 text-[14px]">
-              <div className="my-2 flex min-w-0">
-                <FormulaSheetSpacerCell />
-                <div className="min-w-0 max-w-full flex-1 overflow-visible">
-                  <FormulaSheetValueTree
-                    sheet={sheet}
-                    symbol={symbol}
-                    symbolicOnly={symbolicOnly}
-                  />
+        {showFormula &&
+          (!symbolIsSolidLiteral ||
+            (symbolicOnly &&
+              rootNode.kind === 'literal' &&
+              rootNode.value.kind !== 'empty')) && (
+            <div className="flex min-w-0">
+              <div className="w-full min-w-0 overflow-visible border-t border-gray-300 text-[14px]">
+                <div className="my-2 flex min-w-0">
+                  <FormulaSheetSpacerCell />
+                  <div className="min-w-0 max-w-full flex-1 overflow-visible">
+                    <FormulaSheetValueTree
+                      sheet={sheet}
+                      symbol={symbol}
+                      symbolicOnly={symbolicOnly}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
     </div>
   );

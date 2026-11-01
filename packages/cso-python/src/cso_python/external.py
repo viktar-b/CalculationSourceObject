@@ -10,7 +10,16 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .annotations import Annotation, annotation
-from .source import Capture, Json, SourceError, compact, literal, number, span
+from .source import (
+    Capture,
+    Json,
+    SourceError,
+    compact,
+    literal,
+    number,
+    numeric_kind,
+    span,
+)
 
 
 @dataclass(frozen=True)
@@ -126,7 +135,14 @@ def read_declaration(
         "outputs": [
             [key, value.numeric_type, value.metadata] for key, value in outputs.items()
         ],
-        "defaults": [[key, literal(value, module)] for key, value in defaults.items()],
+        "defaults": [
+            {
+                "name": key,
+                "value": literal(value, module),
+                "numericKind": numeric_kind(literal(value, module)),
+            }
+            for key, value in defaults.items()
+        ],
     }
     return ExternalDeclaration(
         node.targets[0].id,
