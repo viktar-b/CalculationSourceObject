@@ -1,1 +1,1 @@
-cs-object==0.1.1
+cs-object==1.0.0

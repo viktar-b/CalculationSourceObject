@@ -6,6 +6,7 @@ import {
   NonemptyStringSchema,
   ProvenanceSchema,
   VersionsSchema,
+  ExecutionBindingSchema,
 } from './common.ts';
 
 function reportIssue(
@@ -105,6 +106,7 @@ const VerificationChecksSchema = z.strictObject({
   inputConsistency: CheckSchema,
   constantConsistency: CheckSchema,
   formulaConsistency: CheckSchema,
+  externalResultConsistency: CheckSchema.optional(),
   outputConsistency: CheckSchema.optional(),
   sourceToDocumentConsistency: CheckSchema,
   independentReferenceAgreement: CheckSchema,
@@ -131,6 +133,9 @@ function validateVerificationChecks(
   const prerequisiteChecks = [
     checks.executionValidity,
     ...(checks.outputConsistency ? [checks.outputConsistency] : []),
+    ...(checks.externalResultConsistency
+      ? [checks.externalResultConsistency]
+      : []),
     ...categories.map((key) => checks[key]),
   ];
   const expectedStatus = prerequisiteChecks.some(
@@ -272,17 +277,121 @@ function validateCheckDiagnostics(
 }
 
 const verificationFields = {
+  verificationVersion: z.literal('2').optional(),
+  executionBinding: ExecutionBindingSchema.optional(),
+  externalCoverage: z
+    .strictObject({
+      calls: z.number().int().nonnegative(),
+      results: z.number().int().nonnegative(),
+      algorithmVerification: z.literal('excluded'),
+    })
+    .optional(),
+  externalReferenceCoverage: z
+    .strictObject({
+      status: z.enum(['pending', 'partial', 'complete', 'not_applicable']),
+      checked: z.array(
+        z.strictObject({
+          externalCallId: NonemptyStringSchema,
+          outputName: NonemptyStringSchema,
+          symbolId: NonemptyStringSchema,
+        }),
+      ),
+      uncovered: z.array(
+        z.strictObject({
+          externalCallId: NonemptyStringSchema,
+          outputName: NonemptyStringSchema,
+          symbolId: NonemptyStringSchema,
+        }),
+      ),
+    })
+    .optional(),
   ok: z.boolean(),
   numericPolicy: NumericPolicySchema,
   checks: VerificationChecksSchema,
   diagnostics: z.array(DiagnosticSchema),
 };
+const VerificationReportObjectSchema = z.strictObject(verificationFields);
+type VerificationData = z.infer<typeof VerificationReportObjectSchema>;
+function validateExternalCoverage(
+  report: VerificationData,
+  ctx: z.RefinementCtx,
+) {
+  const external =
+    report.externalReferenceCoverage !== undefined ||
+    report.externalCoverage !== undefined ||
+    report.verificationVersion !== undefined ||
+    report.checks.externalResultConsistency !== undefined ||
+    report.executionBinding?.captureHash !== undefined;
+  if (!external) return;
+  if (
+    !report.externalCoverage ||
+    report.verificationVersion !== '2' ||
+    !report.executionBinding?.captureHash ||
+    !report.executionBinding.runId ||
+    !report.checks.externalResultConsistency ||
+    report.checks.externalResultConsistency.counts?.checked !==
+      report.externalCoverage.results ||
+    report.externalCoverage.calls > report.externalCoverage.results
+  ) {
+    reportIssue(
+      ctx,
+      ['externalCoverage'],
+      'REPORT_EXTERNAL_COVERAGE_MISMATCH',
+      'External reports require exact capture binding and separate call/result coverage',
+    );
+  }
+  const coverage = report.externalReferenceCoverage;
+  if (!coverage) {
+    reportIssue(
+      ctx,
+      ['externalReferenceCoverage'],
+      'REPORT_REFERENCE_COVERAGE_REQUIRED',
+      'External reports must list checked and uncovered external quantities',
+    );
+  } else {
+    const all = [...coverage.checked, ...coverage.uncovered];
+    const identities = all.map((slot) =>
+      JSON.stringify([slot.externalCallId, slot.outputName]),
+    );
+    const expectedStatus =
+      all.length === 0
+        ? 'not_applicable'
+        : coverage.checked.length === 0
+          ? 'pending'
+          : coverage.uncovered.length === 0
+            ? 'complete'
+            : 'partial';
+    if (
+      new Set(identities).size !== identities.length ||
+      all.length !== report.externalCoverage?.results ||
+      coverage.status !== expectedStatus
+    )
+      reportIssue(
+        ctx,
+        ['externalReferenceCoverage'],
+        'REPORT_REFERENCE_COVERAGE_MISMATCH',
+        'Reference coverage must partition external results exactly and retain pending quantities',
+      );
+  }
+  if (
+    report.checks.externalResultConsistency?.status === 'failed' &&
+    !hasOwningDiagnostic(report.diagnostics, 'externalResultConsistency', [
+      'verification',
+    ])
+  )
+    reportIssue(
+      ctx,
+      ['checks', 'externalResultConsistency'],
+      'REPORT_CHECK_DIAGNOSTIC_REQUIRED',
+      'Failed external consistency requires a verification diagnostic',
+    );
+}
 
-export const VerificationReportSchema = z
-  .strictObject(verificationFields)
-  .superRefine((report, ctx) => {
+export const VerificationReportSchema =
+  VerificationReportObjectSchema.superRefine((report, ctx) => {
     validateVerificationChecks(report.checks, ctx);
     validateCheckDiagnostics(report.checks, report.diagnostics, ctx);
+    validateExternalCoverage(report, ctx);
     if (report.ok !== verificationPassed(report.checks)) {
       reportIssue(
         ctx,
@@ -325,7 +434,7 @@ const OutputSchema = z.strictObject({
 
 const CommandReportObjectSchema = z.strictObject({
   ...verificationFields,
-  reportVersion: z.literal('1'),
+  reportVersion: z.enum(['1', '2']),
   command: z.enum(['verify', 'pdf', 'html']).optional(),
   toolVersion: NonemptyStringSchema,
   provenance: ProvenanceSchema,
@@ -459,6 +568,17 @@ function commandFailureExplained(report: CommandReportData) {
 
 export const CommandReportSchema = CommandReportObjectSchema.superRefine(
   (report, ctx) => {
+    validateExternalCoverage(report, ctx);
+    if (
+      (report.reportVersion === '2') !==
+      (report.externalCoverage !== undefined)
+    )
+      reportIssue(
+        ctx,
+        ['reportVersion'],
+        'INCOMPATIBLE_CONTRACT',
+        'External command reports use report version 2',
+      );
     validateVerificationChecks(report.checks, ctx);
     validateCheckDiagnostics(report.checks, report.diagnostics, ctx);
     validateCommandProvenance(report, ctx);

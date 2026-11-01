@@ -10,6 +10,9 @@ import {
   type ExecutionPayload,
   ExecutionPayloadSchema,
   executionBindingFrom,
+  executionBindingKey,
+  type VerificationReport,
+  VerificationReportSchema,
   methodInvocationBindings,
   type HistoricalReview,
   HistoricalReviewSchema,
@@ -615,6 +618,29 @@ const presentMethodContent = (
   notation: MethodNotation,
 ): PreparedMethodContent[] =>
   content.map((item) => {
+    if (item.kind === 'external') {
+      return {
+        kind: 'external',
+        binding: item.binding,
+        declaration: item.declaration,
+        adapter: item.adapter,
+        inputs: item.declaration.interface.inputs.map(([name]) => ({
+          name,
+          formulaText:
+            item.inputs.find((input) => input.name === name)?.formulaText ??
+            String(
+              item.declaration.interface.defaults.find(
+                (input) => input.name === name,
+              )?.value ?? '',
+            ),
+          symbolId: notation.callInputId(owner, item.binding, name),
+        })),
+        outputs: item.outputs.map((name) => ({
+          name,
+          symbolId: notation.callOutputId(owner, item.binding, name),
+        })),
+      };
+    }
     if (item.kind === 'check' || item.kind === 'applicability') {
       const declared = (
         (item.kind === 'check' ? owner.checks : owner.applicability) ?? []
@@ -984,6 +1010,7 @@ export interface PrepareExecutionDocumentOptions {
   readonly execution: ExecutionPayload;
   readonly assets: readonly ResolvedAsset[];
   readonly historicalReviews?: readonly HistoricalReview[];
+  readonly verificationReport?: VerificationReport;
 }
 
 /** Pure preparation. The caller captures and validates media bytes before this call. */
@@ -991,6 +1018,22 @@ export const prepareExecutionDocument = (
   options: PrepareExecutionDocumentOptions,
 ): PreparedDocument => {
   const execution = parseContent(ExecutionPayloadSchema, options.execution);
+  const verification =
+    options.verificationReport === undefined
+      ? undefined
+      : parseContent(VerificationReportSchema, options.verificationReport);
+  if (
+    verification &&
+    execution.externalCalls &&
+    (!verification.executionBinding ||
+      executionBindingKey(verification.executionBinding) !==
+        executionBindingKey(executionBindingFrom(execution)))
+  ) {
+    fail(
+      'DOCUMENT_VERIFICATION_BINDING_MISMATCH',
+      'Verification must belong to the exact captured execution',
+    );
+  }
   assertExtensionFields(options.execution.cso);
   for (const review of options.historicalReviews ?? [])
     assertDocumentJson(review, '/historicalReview');
@@ -1020,6 +1063,46 @@ export const prepareExecutionDocument = (
   const sectionsById = new Map(
     cso.sections.map((section) => [section.id, section]),
   );
+  const externalByInvocation = new Map(
+    (execution.externalCalls ?? []).map((call) => [call.id, call]),
+  );
+  const externalPlacement = (
+    call: NonNullable<ExecutionPayload['externalCalls']>[number],
+    sectionId: string,
+    index: number,
+    title = call.callBindingName,
+    suffix = '',
+  ): PreparedDocumentItem => ({
+    kind: 'externalCall',
+    id: JSON.stringify([
+      'externalCall',
+      call.parentInvocationId,
+      call.callBindingName,
+    ]),
+    title,
+    call,
+    qualifications: [
+      ...new Set(
+        [...call.inputs, ...call.outputs].map((quantity) => quantity.symbolId),
+      ),
+    ].flatMap((symbolId) => {
+      const reasons = applicability.reasonsBySymbolId.get(symbolId);
+      return reasons?.length
+        ? [
+            {
+              symbolId,
+              state: 'not-applicable' as const,
+              reasons: [...reasons],
+            },
+          ]
+        : [];
+    }),
+    context: [],
+    sourcePlacementId: placementId(sectionId, index) + suffix,
+    localId: call.callBindingName,
+    invocationId: call.parentInvocationId,
+    location: call.callSite,
+  });
   const replaced = (section: (typeof cso.sections)[number]): boolean =>
     replacesInvocation(
       typeof section.metadata?.invocationId === 'string'
@@ -1028,7 +1111,11 @@ export const prepareExecutionDocument = (
       grouped,
     );
   const sections = reachableSections(cso)
-    .filter((section) => !replaced(section))
+    .filter(
+      (section) =>
+        !replaced(section) &&
+        !externalByInvocation.has(String(section.metadata?.invocationId)),
+    )
     .map((section) => ({
       id: section.id,
       title: section.title,
@@ -1046,9 +1133,36 @@ export const prepareExecutionDocument = (
       items: section.items.flatMap((item, index) => {
         if (item.kind === 'section') {
           const target = sectionsById.get(item.id);
+          const call = externalByInvocation.get(
+            String(target?.metadata?.invocationId),
+          );
+          if (call) return [externalPlacement(call, section.id, index)];
           if (target && replaced(target)) return [];
         }
         if (item.kind === 'method' || item.kind === 'table') {
+          const table =
+            item.kind === 'table'
+              ? execution.tables?.find((table) => table.id === item.id)
+              : undefined;
+          const retained =
+            table?.cases.flatMap((caseItem) =>
+              (execution.externalCalls ?? [])
+                .filter((call) =>
+                  call.id.startsWith(`${caseItem.invocationId}/`),
+                )
+                .map((call) =>
+                  externalPlacement(
+                    call,
+                    section.id,
+                    index,
+                    `${caseItem.heading} / ${call.id
+                      .slice(caseItem.invocationId.length + 1)
+                      .split('/')
+                      .join(' / ')}`,
+                    `:external:${encodeURIComponent(call.id)}`,
+                  ),
+                ),
+            ) ?? [];
           return [
             comparisonPlacement(
               execution,
@@ -1057,6 +1171,7 @@ export const prepareExecutionDocument = (
               index,
               applicability,
             ),
+            ...retained,
           ];
         }
         return [
@@ -1095,14 +1210,17 @@ export const prepareExecutionDocument = (
   );
   const { metadata: _sourceMetadata, ...sourceProvenance } = cso.source;
   const document = parseDocument({
-    documentVersion: sections.some((section) =>
-      section.items.some(
-        (item) => item.kind === 'method' || item.kind === 'table',
-      ),
-    )
-      ? '3'
-      : '2',
+    documentVersion: execution.externalCalls
+      ? '4'
+      : sections.some((section) =>
+            section.items.some(
+              (item) => item.kind === 'method' || item.kind === 'table',
+            ),
+          )
+        ? '3'
+        : '2',
     context: [],
+    ...(verification ? { verification } : {}),
     source: {
       kind: 'execution',
       ...executionBindingFrom(execution),

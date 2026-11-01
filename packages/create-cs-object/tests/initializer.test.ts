@@ -72,8 +72,8 @@ test('the installed archive creates a complete project without installing', () =
     .parse(JSON.parse(readFileSync(join(project, 'package.json'), 'utf8')));
   assert.equal(manifest.name, 'area-report');
   assert.equal(manifest.scripts.dev, 'node scripts/dev.ts');
-  assert.equal(manifest.dependencies['@cs-object/cli'], '0.1.2');
-  assert.equal(manifest.dependencies['@cs-object/core'], '0.1.0');
+  assert.equal(manifest.dependencies['@cs-object/cli'], '1.0.0');
+  assert.equal(manifest.dependencies['@cs-object/core'], '1.0.0');
   assert.equal(manifest.dependencies['@base-ui/react'], '^1.8.0');
   assert.equal(manifest.dependencies.vite, '^8');
   assert.equal(manifest.scripts.build, 'tsc -b && vite build');
@@ -115,7 +115,7 @@ test('the installed archive creates a complete project without installing', () =
   assert.match(setup.stderr, /run npm run setup again/);
   assert.equal(
     readFileSync(join(project, 'requirements.txt'), 'utf8'),
-    'cs-object==0.1.1\n',
+    'cs-object==1.0.0\n',
   );
 });
 
@@ -146,7 +146,10 @@ test('the installed template preserves Python bytes with automatic CRLF checkout
   writeFileSync(stub, 'title: str\n', 'utf8');
   const files = [join(project, 'calculations/report.cso.py'), metadata, stub];
   const expected = files.map((path) => readFileSync(path));
-  for (const args of [['init', '--quiet'], ['add', '.']]) {
+  for (const args of [
+    ['init', '--quiet'],
+    ['add', '.'],
+  ]) {
     const git = spawnSync('git', ['-c', 'core.autocrlf=true', ...args], {
       cwd: project,
       encoding: 'utf8',
@@ -160,7 +163,10 @@ test('the installed template preserves Python bytes with automatic CRLF checkout
     { cwd: project, encoding: 'utf8' },
   );
   assert.equal(checkout.status, 0, checkout.stderr);
-  assert.deepEqual(files.map((path) => readFileSync(path)), expected);
+  assert.deepEqual(
+    files.map((path) => readFileSync(path)),
+    expected,
+  );
 });
 
 test('existing files and directories survive unchanged', () => {

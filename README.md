@@ -1,7 +1,7 @@
 <h1 align="center">CalculationSourceObject</h1>
 
 <p align="center">
-  Turn Python calculations into audit-ready engineering reports with formulas, unit tracking, and verified results.
+  Turn Python calculations into engineering reports with documented formulas, units, captured results and explicit verification coverage.
 </p>
 
 <p align="center">
@@ -95,11 +95,18 @@ and results, with figures where they help the reader follow the work.
 Your calculation can combine readable equations with specialised numerical
 methods in one report.
 
+Declare an ordinary Python adapter with named inputs and outputs, then call its
+generated handle from an annotated calculation. CSO captures the actual values
+and method explanation once per invocation. Downstream formulas use those
+captured results; the opaque algorithm remains outside formula verification.
+The [external-function examples](examples/external-functions/README.md) show a
+dependency-free loop and optional SciPy quadrature with an analytic expectation.
+
 ## Create a local report project
 
 The [initializer](packages/create-cs-object/README.md) creates a standalone project
 with a Python calculation and a browser app. It requires Node 24 and Python 3.11+.
-After the `0.1.0` packages are published, create and start a project with:
+For a published release, create and start a project with:
 
 ```sh
 npm create cs-object my-report
@@ -144,9 +151,12 @@ reports. To explore the example locally, run `npm run dev` after setup.
 
 ## Project status and documentation
 
-CSO is a prototype, currently at version `0.1.0`. The `.cso.py` authoring format
-and APIs can change during `0.x` development. Pin package versions and rerun
-verification after upgrades.
+CSO's supported calculation, verification, report and project-initializer
+features are coordinated at version `1.0.0`. The authoring guide defines the
+supported Python subset and the package schemas define the versioned data
+contracts. Pin package versions and rerun verification after upgrades. Source
+consistency and independent numerical agreement remain separate from human
+engineering approval.
 
 - [Authoring guide](docs/authoring.md)
 - [Python library](packages/cso-python/README.md),

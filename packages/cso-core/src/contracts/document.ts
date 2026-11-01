@@ -1,16 +1,26 @@
 import { z } from 'zod';
 import { CalculationSourceSymbolSchema } from '../calculation-source/object-schema.ts';
+import { deriveApplicability } from '../verification/applicability.ts';
 import {
   AssetRecordSchema,
+  collectCsoSymbols,
   ExecutionBindingSchema,
+  exactCaptureHash,
   executionBindingKey,
   HashSchema,
   NonemptyStringSchema,
   SourceSpanSchema,
   sha256Bytes,
 } from './common.ts';
-import { ExecutionPayloadSchema, executionBindingFrom } from './execution.ts';
-import { addSymbolDisplayIssues } from './glyphs.ts';
+import {
+  ExecutionPayloadSchema,
+  executionBindingFrom,
+  type MethodContentItem,
+  type MethodHelperRecord,
+} from './execution.ts';
+import { ExternalCallSchema, methodExternalCalls } from './external.ts';
+import { addSymbolDisplayIssues, scopedGlyph } from './glyphs.ts';
+import { VerificationReportSchema } from './reports.ts';
 
 type HistoricalJsonValue = z.infer<ReturnType<typeof z.json>>;
 
@@ -213,6 +223,14 @@ const PreparedMethodQuantitySchema = z.strictObject({
   symbolId: NonemptyStringSchema,
 });
 export type PreparedMethodContent =
+  | {
+      kind: 'external';
+      binding: string;
+      declaration: z.infer<typeof ExternalCallSchema>['declaration'];
+      adapter: z.infer<typeof ExternalCallSchema>['adapter'];
+      inputs: { name: string; formulaText: string; symbolId: string }[];
+      outputs: { name: string; symbolId: string }[];
+    }
   | ({ kind: 'quantity' } & z.infer<typeof PreparedMethodQuantitySchema>)
   | { kind: 'text'; localId: string; content: string }
   | {
@@ -262,6 +280,27 @@ export type PreparedMethodHelper = {
 const PreparedMethodContentSchema: z.ZodType<PreparedMethodContent> = z.lazy(
   () =>
     z.discriminatedUnion('kind', [
+      z.strictObject({
+        kind: z.literal('external'),
+        binding: NonemptyStringSchema,
+        declaration: ExternalCallSchema.shape.declaration,
+        adapter: ExternalCallSchema.shape.adapter,
+        inputs: z.array(
+          z.strictObject({
+            name: NonemptyStringSchema,
+            formulaText: z.string(),
+            symbolId: NonemptyStringSchema,
+          }),
+        ),
+        outputs: z
+          .array(
+            z.strictObject({
+              name: NonemptyStringSchema,
+              symbolId: NonemptyStringSchema,
+            }),
+          )
+          .min(1),
+      }),
       PreparedMethodQuantitySchema.extend({ kind: z.literal('quantity') }),
       z.strictObject({
         kind: z.literal('text'),
@@ -344,6 +383,23 @@ const PreparedTableRowSchema = z.strictObject({
 });
 
 export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('externalCall'),
+    id: NonemptyStringSchema,
+    title: NonemptyStringSchema,
+    call: ExternalCallSchema,
+    qualifications: z
+      .array(
+        z.strictObject({
+          symbolId: NonemptyStringSchema,
+          state: z.literal('not-applicable'),
+          reasons: z.array(NonemptyStringSchema).min(1),
+        }),
+      )
+      .optional(),
+    contextSource: HistoricalJsonObjectSchema.optional(),
+    ...placementFields,
+  }),
   z.strictObject({
     kind: z.literal('section'),
     id: NonemptyStringSchema,
@@ -502,9 +558,180 @@ export const PreparedDocumentSectionSchema = z.strictObject({
   ...placementFields,
 });
 
+const preparedExternalContent = (
+  content: readonly PreparedMethodContent[],
+): boolean =>
+  content.some(
+    (item) =>
+      item.kind === 'external' ||
+      (item.kind === 'section' && preparedExternalContent(item.content)),
+  );
+const preparedExternalHelpers = (
+  helpers: readonly PreparedMethodHelper[],
+): boolean =>
+  helpers.some(
+    (helper) =>
+      preparedExternalContent(helper.content) ||
+      preparedExternalHelpers(helper.helpers),
+  );
+type ExternalEvidenceOwner = {
+  id: string;
+  content: readonly (PreparedMethodContent | MethodContentItem)[];
+  helpers: readonly ExternalEvidenceOwner[];
+};
+const externalMethodEvidence = (owner: ExternalEvidenceOwner): unknown[] => {
+  const walk = (content: ExternalEvidenceOwner['content']): unknown[] =>
+    content.flatMap((item) =>
+      item.kind === 'external'
+        ? [
+            {
+              ownerId: owner.id,
+              binding: item.binding,
+              declaration: item.declaration,
+              adapter: item.adapter,
+              outputs: item.outputs.map((output) =>
+                typeof output === 'string'
+                  ? {
+                      name: output,
+                      symbolId: JSON.stringify([
+                        owner.id,
+                        item.binding,
+                        'output',
+                        output,
+                      ]),
+                    }
+                  : output,
+              ),
+            },
+          ]
+        : item.kind === 'section'
+          ? walk(item.content)
+          : [],
+    );
+  return [
+    ...walk(owner.content),
+    ...owner.helpers.flatMap(externalMethodEvidence),
+  ];
+};
+
+const methodInputTree = (
+  owner: MethodHelperRecord,
+  nodes: MethodHelperRecord['quantities'][number]['nodes'],
+) => ({
+  rootKey: nodes[0]?.key,
+  nodes: nodes.map((node) => {
+    const draft = node.draft === undefined ? {} : { draft: node.draft };
+    if (node.mode === 'LITERAL')
+      return {
+        key: node.key,
+        mode: node.mode,
+        ...draft,
+        literal: node.literal,
+      };
+    if (node.mode === 'FUNCTION')
+      return {
+        key: node.key,
+        mode: node.mode,
+        ...draft,
+        funcSpec: node.funcSpec,
+        funcArgs: node.funcArgs ?? [],
+      };
+    const variable =
+      node.mode === 'GIVEN_PARAMETER'
+        ? owner.quantities.find(
+            (quantity) =>
+              quantity.nodes[0]?.mode === 'GIVEN_PARAMETER' &&
+              quantity.nodes[0].parameter === node.parameter,
+          )?.variableName
+        : node.ref?.name;
+    const id =
+      node.ref?.kind === 'output'
+        ? JSON.stringify([owner.id, node.ref.call, 'output', node.ref.output])
+        : JSON.stringify([owner.id, variable]);
+    return { key: node.key, mode: 'SYMBOL', ...draft, symbol: { id } };
+  }),
+});
+
+const externalMethodInputsMatch = (
+  captured: MethodHelperRecord,
+  prepared: Extract<PreparedDocumentItem, { kind: 'method' }>,
+): boolean => {
+  const symbols = new Map(
+    prepared.symbols?.map((symbol) => [symbol.id, symbol]),
+  );
+  const preparedOwners = (
+    candidate: typeof prepared | PreparedMethodHelper,
+  ): (typeof prepared | PreparedMethodHelper)[] => [
+    candidate,
+    ...candidate.helpers.flatMap(preparedOwners),
+  ];
+  const owners = new Map(
+    preparedOwners(prepared).map((owner) => [owner.id, owner]),
+  );
+  const leaves = (
+    content: readonly PreparedMethodContent[],
+  ): Extract<PreparedMethodContent, { kind: 'external' }>[] =>
+    content.flatMap((item) =>
+      item.kind === 'external'
+        ? [item]
+        : item.kind === 'section'
+          ? leaves(item.content)
+          : [],
+    );
+  const visit = (owner: MethodHelperRecord): boolean => {
+    const target = owners.get(owner.id);
+    for (const leaf of methodExternalCalls(owner.content)) {
+      const actual =
+        target &&
+        leaves(target.content).find((item) => item.binding === leaf.binding);
+      if (!actual) return false;
+      for (const [name] of leaf.declaration.interface.inputs) {
+        const input = leaf.inputs.find((input) => input.name === name);
+        const fallback = leaf.declaration.interface.defaults.find(
+          (input) => input.name === name,
+        );
+        const expectedTree = input
+          ? methodInputTree(owner, input.nodes)
+          : {
+              rootKey: 'value',
+              nodes: [
+                {
+                  key: 'value',
+                  mode: 'LITERAL',
+                  literal: {
+                    kind: 'number',
+                    value: fallback?.value,
+                    numericKind: fallback?.numericKind,
+                  },
+                },
+              ],
+            };
+        const symbolId = JSON.stringify([
+          owner.id,
+          leaf.binding,
+          'input',
+          name,
+        ]);
+        const supplied = actual.inputs.find((input) => input.name === name);
+        if (
+          supplied?.symbolId !== symbolId ||
+          supplied.formulaText !==
+            (input?.formulaText ?? String(fallback?.value ?? '')) ||
+          exactCaptureHash(symbols.get(symbolId)?.valueTree) !==
+            exactCaptureHash(expectedTree)
+        )
+          return false;
+      }
+    }
+    return owner.helpers.every(visit);
+  };
+  return visit(captured);
+};
+
 export const PreparedDocumentSchema = z
   .strictObject({
-    documentVersion: z.enum(['2', '3']),
+    documentVersion: z.enum(['2', '3', '4']),
+    verification: VerificationReportSchema.optional(),
     context: ContextSchema,
     source: z.discriminatedUnion('kind', [
       ExecutionBindingSchema.safeExtend({ kind: z.literal('execution') }),
@@ -528,7 +755,44 @@ export const PreparedDocumentSchema = z
         (item) => item.kind === 'method' || item.kind === 'table',
       ),
     );
-    if ((document.documentVersion === '3') !== comparison) {
+    const external = document.sections.some((section) =>
+      section.items.some(
+        (item) =>
+          item.kind === 'externalCall' ||
+          (item.kind === 'method' &&
+            (preparedExternalContent(item.content) ||
+              preparedExternalHelpers(item.helpers))),
+      ),
+    );
+    if (
+      external &&
+      (document.source.kind !== 'execution' ||
+        !document.source.captureHash ||
+        !document.source.runId)
+    )
+      addIssue(
+        ctx,
+        'DOCUMENT_EXECUTION_BINDING_MISMATCH',
+        'External documents require an exact capture binding',
+        ['source'],
+      );
+    if (
+      document.verification &&
+      (document.source.kind !== 'execution' ||
+        !document.verification.executionBinding ||
+        executionBindingKey(document.source) !==
+          executionBindingKey(document.verification.executionBinding))
+    )
+      addIssue(
+        ctx,
+        'DOCUMENT_VERIFICATION_BINDING_MISMATCH',
+        'Verification must belong to the document capture',
+        ['verification'],
+      );
+    if (
+      (document.documentVersion === '4') !== external ||
+      (!external && (document.documentVersion === '3') !== comparison)
+    ) {
       addIssue(
         ctx,
         'INCOMPATIBLE_CONTRACT',
@@ -582,8 +846,174 @@ export const BoundPreparedDocumentSchema = z
       (execution.methods ?? []).map((method) => method.id),
     );
     const tableIds = new Set((execution.tables ?? []).map((table) => table.id));
+    const externalIds = new Set<string>();
+    const applicability = deriveApplicability(execution);
+    if (document.verification?.externalReferenceCoverage) {
+      const key = (item: {
+        externalCallId: string;
+        outputName: string;
+        symbolId: string;
+      }) =>
+        JSON.stringify([item.externalCallId, item.outputName, item.symbolId]);
+      const expectedSlots = new Set(
+        (execution.externalCalls ?? []).flatMap((call) =>
+          call.outputs.map((output) =>
+            key({
+              externalCallId: call.id,
+              outputName: output.name,
+              symbolId: output.symbolId,
+            }),
+          ),
+        ),
+      );
+      const reported = [
+        ...document.verification.externalReferenceCoverage.checked,
+        ...document.verification.externalReferenceCoverage.uncovered,
+      ].map(key);
+      if (
+        reported.length !== expectedSlots.size ||
+        new Set(reported).size !== reported.length ||
+        reported.some((slot) => !expectedSlots.has(slot))
+      )
+        addIssue(
+          ctx,
+          'DOCUMENT_VERIFICATION_COVERAGE_MISMATCH',
+          'Independent external reference coverage must partition every captured output exactly once',
+          ['document', 'verification', 'externalReferenceCoverage'],
+        );
+    }
+    if (
+      document.verification?.externalCoverage &&
+      (document.verification.externalCoverage.calls !==
+        (execution.externalCalls?.length ?? 0) ||
+        document.verification.externalCoverage.results !==
+          (execution.externalCalls ?? []).reduce(
+            (total, call) => total + call.outputs.length,
+            0,
+          ))
+    )
+      addIssue(
+        ctx,
+        'DOCUMENT_VERIFICATION_COVERAGE_MISMATCH',
+        'Verification coverage must count the supplied capture calls and results',
+        ['document', 'verification', 'externalCoverage'],
+      );
+    const capturedSymbols = new Map(
+      collectCsoSymbols(execution.cso).map((symbol) => [symbol.id, symbol]),
+    );
+    const preparedSymbols = new Map(
+      [
+        ...document.detachedSymbols,
+        ...document.sections.flatMap((section) =>
+          section.items.flatMap((item) =>
+            item.kind === 'symbol' ? [item.symbol] : [],
+          ),
+        ),
+      ].map((symbol) => [symbol.id, symbol]),
+    );
+    if (
+      document.verification &&
+      (!document.verification.executionBinding ||
+        executionBindingKey(document.verification.executionBinding) !==
+          executionBindingKey(expected.data))
+    ) {
+      addIssue(
+        ctx,
+        'DOCUMENT_VERIFICATION_BINDING_MISMATCH',
+        'Verification must belong to the exact captured execution',
+        ['document', 'verification'],
+      );
+    }
     for (const [sectionIndex, section] of document.sections.entries()) {
       for (const [itemIndex, item] of section.items.entries()) {
+        if (item.kind === 'method') {
+          const method = execution.methods?.find(
+            (method) => method.id === item.id,
+          );
+          if (
+            method &&
+            (exactCaptureHash(externalMethodEvidence(method)) !==
+              exactCaptureHash(externalMethodEvidence(item)) ||
+              !externalMethodInputsMatch(method, item))
+          )
+            addIssue(
+              ctx,
+              'DOCUMENT_EXTERNAL_CONTENT_MISMATCH',
+              'Static external method leaves must preserve captured declaration, adapter and supplied input identities',
+              ['document', 'sections', sectionIndex, 'items', itemIndex],
+            );
+        }
+        if (item.kind === 'externalCall') {
+          const call = execution.externalCalls?.find(
+            (call) => call.id === item.call.id,
+          );
+          if (
+            !call ||
+            externalIds.has(call.id) ||
+            exactCaptureHash(call) !== exactCaptureHash(item.call)
+          )
+            addIssue(
+              ctx,
+              'DOCUMENT_EXTERNAL_CONTENT_MISMATCH',
+              'Retain exactly one complete block for each captured external call',
+              ['document', 'sections', sectionIndex, 'items', itemIndex],
+            );
+          externalIds.add(item.call.id);
+          const expectedQualifications = [
+            ...new Set(
+              [...item.call.inputs, ...item.call.outputs].map(
+                (quantity) => quantity.symbolId,
+              ),
+            ),
+          ].flatMap((symbolId) => {
+            const reasons = applicability.reasonsBySymbolId.get(symbolId);
+            return reasons?.length
+              ? [{ symbolId, state: 'not-applicable', reasons: [...reasons] }]
+              : [];
+          });
+          const groupedCase = execution.tables
+            ?.flatMap((table) => table.cases)
+            .find((caseItem) =>
+              item.call.id.startsWith(`${caseItem.invocationId}/`),
+            );
+          const expectedTitle = groupedCase
+            ? `${groupedCase.heading} / ${item.call.id
+                .slice(groupedCase.invocationId.length + 1)
+                .split('/')
+                .join(' / ')}`
+            : item.call.callBindingName;
+          if (
+            exactCaptureHash(item.qualifications ?? []) !==
+              exactCaptureHash(expectedQualifications) ||
+            item.title !== expectedTitle ||
+            item.invocationId !== item.call.parentInvocationId ||
+            item.localId !== item.call.callBindingName ||
+            exactCaptureHash(item.location) !==
+              exactCaptureHash(item.call.callSite)
+          )
+            addIssue(
+              ctx,
+              'DOCUMENT_EXTERNAL_CONTENT_MISMATCH',
+              'External blocks must retain captured case/call context and derived qualifications',
+              ['document', 'sections', sectionIndex, 'items', itemIndex],
+            );
+          for (const quantity of [...item.call.inputs, ...item.call.outputs]) {
+            const expectedSymbol = capturedSymbols.get(quantity.symbolId);
+            const actualSymbol = preparedSymbols.get(quantity.symbolId);
+            if (
+              !expectedSymbol ||
+              !actualSymbol ||
+              exactCaptureHash(expectedSymbol) !==
+                exactCaptureHash(actualSymbol)
+            )
+              addIssue(
+                ctx,
+                'DOCUMENT_EXTERNAL_CONTENT_MISMATCH',
+                'External quantities must preserve captured values and metadata',
+                ['document', 'sections', sectionIndex, 'items', itemIndex],
+              );
+          }
+        }
         if (
           (item.kind === 'method' && !methodIds.has(item.id)) ||
           (item.kind === 'table' && !tableIds.has(item.id))
@@ -597,6 +1027,13 @@ export const BoundPreparedDocumentSchema = z
         }
       }
     }
+    if (externalIds.size !== (execution.externalCalls?.length ?? 0))
+      addIssue(
+        ctx,
+        'DOCUMENT_EXTERNAL_CONTENT_MISMATCH',
+        'Every external call must remain visible in the prepared document',
+        ['document', 'sections'],
+      );
   });
 
 const addIssue = (
@@ -780,6 +1217,10 @@ const methodNotationIds = (content: PreparedMethodContent[]): string[] =>
   content.flatMap((item) => {
     if (item.kind === 'quantity') return [item.symbolId];
     if (item.kind === 'call') return item.inputs.map((input) => input.symbolId);
+    if (item.kind === 'external')
+      return [...item.inputs, ...item.outputs].map(
+        (quantity) => quantity.symbolId,
+      );
     if (item.kind === 'check' || item.kind === 'applicability') {
       return [item.predicateSymbolId];
     }
@@ -810,6 +1251,77 @@ const validateNotation = (document: PreparedDocument, ctx: z.RefinementCtx) => {
             ]);
       const declared = item.symbols ?? [];
       const symbols = new Set(declared.map((symbol) => symbol.id));
+      if (item.kind === 'method') {
+        const checkExternal = (
+          content: readonly PreparedMethodContent[],
+        ): void => {
+          for (const leaf of content) {
+            if (leaf.kind === 'section') checkExternal(leaf.content);
+            if (leaf.kind !== 'external') continue;
+            for (const [role, quantities, declaration] of [
+              ['input', leaf.inputs, leaf.declaration.interface.inputs],
+              ['output', leaf.outputs, leaf.declaration.interface.outputs],
+            ] as const) {
+              if (
+                quantities.length !== declaration.length ||
+                quantities.some(
+                  (quantity, index) =>
+                    quantity.name !== declaration[index]?.[0],
+                )
+              )
+                addIssue(
+                  ctx,
+                  'DOCUMENT_EXTERNAL_CONTENT_MISMATCH',
+                  'Static external leaves must retain every declared quantity in order',
+                  ['sections', sectionIndex, 'items', itemIndex, 'content'],
+                );
+              for (const [index, quantity] of quantities.entries()) {
+                const symbol = declared.find(
+                  (symbol) => symbol.id === quantity.symbolId,
+                );
+                const metadata = declaration[index]?.[2];
+                if (
+                  !symbol ||
+                  !metadata ||
+                  symbol.description !== metadata.description ||
+                  symbol.glyph !== scopedGlyph(metadata.glyph, leaf.binding) ||
+                  symbol.unit !== metadata.unit ||
+                  (symbol.comment ?? '') !== (metadata.comment ?? '')
+                )
+                  addIssue(
+                    ctx,
+                    'DOCUMENT_EXTERNAL_CONTENT_MISMATCH',
+                    'Static external quantity notation must preserve declared metadata',
+                    ['sections', sectionIndex, 'items', itemIndex, 'symbols'],
+                  );
+                if (
+                  role === 'output' &&
+                  symbol &&
+                  (symbol.valueTree.result !== undefined ||
+                    symbol.valueTree.nodes.length !== 1 ||
+                    symbol.valueTree.nodes[0]?.literal?.kind !== 'empty')
+                )
+                  addIssue(
+                    ctx,
+                    'DOCUMENT_EXTERNAL_CONTENT_MISMATCH',
+                    'Static external outputs must not invent numerical results',
+                    ['sections', sectionIndex, 'items', itemIndex, 'symbols'],
+                  );
+              }
+            }
+          }
+        };
+        checkExternal(item.content);
+        const visitHelpers = (
+          helpers: readonly PreparedMethodHelper[],
+        ): void => {
+          for (const helper of helpers) {
+            checkExternal(helper.content);
+            visitHelpers(helper.helpers);
+          }
+        };
+        visitHelpers(item.helpers);
+      }
       if (symbols.size !== declared.length) {
         addIssue(
           ctx,

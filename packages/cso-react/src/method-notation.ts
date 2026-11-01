@@ -36,9 +36,9 @@ const reachableNodes = (
 
 const calls = (
   content: readonly Content[],
-): Extract<Content, { kind: 'call' }>[] =>
+): Extract<Content, { kind: 'call' | 'external' }>[] =>
   content.flatMap((item) =>
-    item.kind === 'call'
+    item.kind === 'call' || item.kind === 'external'
       ? [item]
       : item.kind === 'section'
         ? calls(item.content)
@@ -76,13 +76,30 @@ export const methodNotation = (
   const callHelper = (owner: Owner, binding: string): HelperRecord => {
     const call = calls(owner.content).find((item) => item.binding === binding);
     return (
-      helpers.get(call?.helperId ?? '') ??
+      helpers.get(call?.kind === 'call' ? call.helperId : '') ??
       fail(`Call '${binding}' has no helper in '${owner.id}'`)
     );
   };
   const outputSymbolId = (owner: Owner, binding: string, output: string) => {
     const id = notationId(owner.id, binding, 'output', output);
     if (symbols.has(id)) return id;
+    const external = calls(owner.content).find(
+      (item) => item.kind === 'external' && item.binding === binding,
+    );
+    if (external?.kind === 'external') {
+      const declared =
+        external.declaration.interface.outputs.find(
+          (item) => item[0] === output,
+        )?.[2] ?? fail(`Call '${binding}' has no external output '${output}'`);
+      return add({
+        id,
+        glyph: scopedGlyph(declared.glyph, binding),
+        description: declared.description,
+        unit: declared.unit,
+        comment: declared.comment ?? '',
+        valueTree: emptyTree,
+      });
+    }
     const quantity =
       callHelper(owner, binding).quantities.find(
         (candidate) =>
@@ -188,6 +205,43 @@ export const methodNotation = (
   }
   for (const owner of owners) {
     for (const call of calls(owner.content)) {
+      if (call.kind === 'external') {
+        for (const [name, , declared] of call.declaration.interface.inputs) {
+          const supplied = call.inputs.find((input) => input.name === name);
+          const fallback = call.declaration.interface.defaults.find(
+            (input) => input.name === name,
+          );
+          const valueTree = supplied
+            ? tree(owner, supplied.nodes)
+            : fallback
+              ? {
+                  rootKey: 'value',
+                  nodes: [
+                    {
+                      key: 'value',
+                      mode: 'LITERAL' as const,
+                      literal: {
+                        kind: 'number' as const,
+                        value: fallback.value,
+                        numericKind: fallback.numericKind,
+                      },
+                    },
+                  ],
+                }
+              : emptyTree;
+          add({
+            id: notationId(owner.id, call.binding, 'input', name),
+            glyph: scopedGlyph(declared.glyph, call.binding),
+            description: declared.description,
+            unit: declared.unit,
+            comment: declared.comment ?? '',
+            valueTree,
+          });
+        }
+        for (const name of call.outputs)
+          outputSymbolId(owner, call.binding, name);
+        continue;
+      }
       const helper = callHelper(owner, call.binding);
       for (const input of call.inputs) {
         const parameter = ownerQuantity(helper, input.name);
@@ -233,6 +287,8 @@ export const methodNotation = (
       quantitySymbolId(owner, variableName),
     callInputId: (owner: Owner, binding: string, name: string): string =>
       notationId(owner.id, binding, 'input', name),
+    callOutputId: (owner: Owner, binding: string, name: string): string =>
+      outputSymbolId(owner, binding, name),
     conditionId: (
       owner: Owner,
       kind: 'check' | 'applicability',

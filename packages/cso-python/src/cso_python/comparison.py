@@ -11,10 +11,13 @@ import hashlib
 from pathlib import Path
 
 from .annotations import symbol_annotation
-from .source import Json, SourceError, authoring_name, identity, kwargs, span
+from .source import Json, SourceError, authoring_name, compact, identity, kwargs, span
 from .source_plan import _describe_call, lower_expression
 
-_NUMERIC_CALLS = {call.function_id: getattr(math if call.module == "math" else builtins, call.name) for call in FUNCTION_CALLS}
+_NUMERIC_CALLS = {
+    call.function_id: getattr(math if call.module == "math" else builtins, call.name)
+    for call in FUNCTION_CALLS
+}
 
 _OPERATORS = {
     "fg.add": "+",
@@ -33,7 +36,9 @@ _COMPARISONS = {
 }
 
 
-def place_comparison(planner, inv, statement: ast.Expr, section: Json, ids: set[str]) -> None:
+def place_comparison(
+    planner, inv, statement: ast.Expr, section: Json, ids: set[str]
+) -> None:
     call = statement.value
     if not isinstance(call, ast.Call):
         return
@@ -69,7 +74,9 @@ def _keywords(planner, inv, call: ast.Call) -> dict[str, ast.keyword]:
     return found
 
 
-def _require(planner, inv, found: dict[str, ast.keyword], allowed: set[str], required: set[str]) -> None:
+def _require(
+    planner, inv, found: dict[str, ast.keyword], allowed: set[str], required: set[str]
+) -> None:
     unknown = found.keys() - allowed
     missing = required - found.keys()
     if unknown or missing:
@@ -83,21 +90,41 @@ def _require(planner, inv, found: dict[str, ast.keyword], allowed: set[str], req
 
 def _text(planner, inv, keyword: ast.keyword) -> str:
     value = keyword.value
-    if not isinstance(value, ast.Constant) or not isinstance(value.value, str) or not value.value:
-        planner.error(inv, keyword, "INVALID_METHOD", f"{keyword.arg} must be a nonempty literal string")
+    if (
+        not isinstance(value, ast.Constant)
+        or not isinstance(value.value, str)
+        or not value.value
+    ):
+        planner.error(
+            inv,
+            keyword,
+            "INVALID_METHOD",
+            f"{keyword.arg} must be a nonempty literal string",
+        )
     return value.value
 
 
 def _place_method(planner, inv, call: ast.Call, section: Json, ids: set[str]) -> None:
     found = _keywords(planner, inv, call)
-    _require(planner, inv, found, {"id", "calculation", "title"}, {"id", "calculation", "title"})
+    _require(
+        planner,
+        inv,
+        found,
+        {"id", "calculation", "title"},
+        {"id", "calculation", "title"},
+    )
     local_id = _text(planner, inv, found["id"])
     title = _text(planner, inv, found["title"])
     method_id = identity("method", inv.id, local_id)
     if method_id in ids or (inv.id, local_id) in planner.method_index:
-        planner.error(inv, call, "DUPLICATE_IDENTITY", "Duplicate method or table identity")
+        planner.error(
+            inv, call, "DUPLICATE_IDENTITY", "Duplicate method or table identity"
+        )
     handle_name = found["calculation"].value
-    if not isinstance(handle_name, ast.Name) or handle_name.id not in inv.module.handles:
+    if (
+        not isinstance(handle_name, ast.Name)
+        or handle_name.id not in inv.module.handles
+    ):
         planner.error(
             inv,
             found["calculation"],
@@ -108,10 +135,15 @@ def _place_method(planner, inv, call: ast.Call, section: Json, ids: set[str]) ->
     target = planner.capture.load(handle["path"], span(inv.module.id, call))
     function_name = handle["function"]
     if function_name not in target.functions:
-        planner.error(inv, call, "MISSING_FUNCTION", f"Missing calculation {function_name}")
+        planner.error(
+            inv, call, "MISSING_FUNCTION", f"Missing calculation {function_name}"
+        )
     _reject_deferred_content(planner, inv, target, function_name, call)
     definition = planner.definitions.get(target.path, function_name)
-    if handle["fingerprint"] is not None and handle["fingerprint"] != definition.fingerprint:
+    if (
+        handle["fingerprint"] is not None
+        and handle["fingerprint"] != definition.fingerprint
+    ):
         planner.error(
             inv,
             call,
@@ -141,7 +173,7 @@ def _place_method(planner, inv, call: ast.Call, section: Json, ids: set[str]) ->
         "function": function_name,
         "sourceHash": plan.source_hash,
         "interfaceFingerprint": plan.fingerprint,
-        "revision": plan.revision,
+        "revision": _method_revision(plan.revision, content, helpers),
         "parameterNames": list(definition.parameters),
         "outputNames": list(definition.outputs),
         "quantities": quantities,
@@ -177,15 +209,49 @@ def _unique_helpers(helpers: list[Json], seen: set[str]) -> list[Json]:
     return unique
 
 
+def _method_revision(revision: str, content: list[Json], helpers: list[Json]) -> str:
+    external = []
+
+    def walk(items):
+        for item in items:
+            if item["kind"] == "external":
+                external.append(item)
+            elif item["kind"] == "section":
+                walk(item["content"])
+
+    walk(content)
+
+    def visit(records):
+        for helper in records:
+            walk(helper["content"])
+            visit(helper["helpers"])
+
+    visit(helpers)
+    return (
+        hashlib.sha256(
+            compact({"sourcePlan": revision, "external": external}).encode()
+        ).hexdigest()
+        if external
+        else revision
+    )
+
+
 def _section_metadata(module, function: ast.FunctionDef) -> Json:
     for decorator in function.decorator_list:
-        if isinstance(decorator, ast.Call) and authoring_name(decorator.func) == "section":
-            config = kwargs(decorator, module.id, {"id", "title", "root", "metadata"}, {"title"})
+        if (
+            isinstance(decorator, ast.Call)
+            and authoring_name(decorator.func) == "section"
+        ):
+            config = kwargs(
+                decorator, module.id, {"id", "title", "root", "metadata"}, {"title"}
+            )
             return config.get("metadata", {})
     return {}
 
 
-def _reject_deferred_content(planner, inv, module, function_name: str, at: ast.AST) -> None:
+def _reject_deferred_content(
+    planner, inv, module, function_name: str, at: ast.AST
+) -> None:
     function = module.functions[function_name]
     for node in ast.walk(ast.Module(body=function.body, type_ignores=[])):
         if isinstance(node, ast.With) and not _is_document_section(node):
@@ -220,7 +286,12 @@ def _quantities(planner, inv, module, definition, plan, at: ast.AST) -> list[Jso
             continue
         metadata = spec.declared.metadata
         if metadata is None:
-            planner.error(inv, at, "UNDOCUMENTED_INPUT", f"Parameter {name!r} needs symbol metadata")
+            planner.error(
+                inv,
+                at,
+                "UNDOCUMENTED_INPUT",
+                f"Parameter {name!r} needs symbol metadata",
+            )
         glyphs[name] = metadata["glyph"]
         quantities.append(_quantity(name, name, "input", "input", metadata, [], glyphs))
     for quantity in plan.quantities:
@@ -228,11 +299,25 @@ def _quantities(planner, inv, module, definition, plan, at: ast.AST) -> list[Jso
         nodes = quantity["nodes"]
         assignment = _declared_assignment(plan.steps, variable)
         if not isinstance(assignment, ast.AnnAssign):
-            planner.error(inv, at, "UNSUPPORTED_METHOD_CONTENT", f"Missing declaration for {variable!r}")
+            planner.error(
+                inv,
+                at,
+                "UNSUPPORTED_METHOD_CONTENT",
+                f"Missing declaration for {variable!r}",
+            )
         metadata = symbol_annotation(assignment, module.id, module.aliases).metadata
         if metadata is None:
-            planner.error(inv, at, "INVALID_METHOD", f"Missing symbol metadata for {variable!r}")
-        given = next((node.get("parameter") for node in nodes if node.get("mode") == "GIVEN_PARAMETER"), None)
+            planner.error(
+                inv, at, "INVALID_METHOD", f"Missing symbol metadata for {variable!r}"
+            )
+        given = next(
+            (
+                node.get("parameter")
+                for node in nodes
+                if node.get("mode") == "GIVEN_PARAMETER"
+            ),
+            None,
+        )
         if given is not None:
             role = "input"
             selection = given
@@ -244,12 +329,16 @@ def _quantities(planner, inv, module, definition, plan, at: ast.AST) -> list[Jso
             selection = variable
         glyphs[variable] = metadata["glyph"]
         quantities.append(
-            _quantity(variable, selection, quantity["kind"], role, metadata, nodes, glyphs)
+            _quantity(
+                variable, selection, quantity["kind"], role, metadata, nodes, glyphs
+            )
         )
     # A public return can forward a parameter or a child output without a
     # local assignment. Describe that selection, but keep the table bound to
     # the original captured symbol through child.outputs.
-    represented = {item["selectionName"] for item in quantities if item["role"] == "output"}
+    represented = {
+        item["selectionName"] for item in quantities if item["role"] == "output"
+    }
     occupied = {item["variableName"] for item in quantities}
     for index, (name, output) in enumerate(definition.outputs.items()):
         if name in represented:
@@ -261,13 +350,21 @@ def _quantities(planner, inv, module, definition, plan, at: ast.AST) -> list[Jso
         nodes = [
             {key: value for key, value in node.items() if key != "_ast"}
             for node in lower_expression(
-                module, definition.function, set(definition.parameters), output.selection, given=False,
+                module,
+                definition.function,
+                set(definition.parameters),
+                output.selection,
+                given=False,
             )
         ]
         metadata = output.annotation.metadata
         if metadata is None:
-            planner.error(inv, at, "INVALID_METHOD", f"Output {name!r} needs symbol metadata")
-        quantities.append(_quantity(variable, name, "formula", "output", metadata, nodes, glyphs))
+            planner.error(
+                inv, at, "INVALID_METHOD", f"Output {name!r} needs symbol metadata"
+            )
+        quantities.append(
+            _quantity(variable, name, "formula", "output", metadata, nodes, glyphs)
+        )
     inputs = {item["selectionName"] for item in quantities if item["role"] == "input"}
     outputs = {item["selectionName"] for item in quantities if item["role"] == "output"}
     if inputs != set(definition.parameters) or outputs != set(definition.outputs):
@@ -280,7 +377,15 @@ def _quantities(planner, inv, module, definition, plan, at: ast.AST) -> list[Jso
     return quantities
 
 
-def _quantity(variable: str, selection: str, kind: str, role: str, metadata: Json, nodes: list[Json], glyphs: dict[str, str]) -> Json:
+def _quantity(
+    variable: str,
+    selection: str,
+    kind: str,
+    role: str,
+    metadata: Json,
+    nodes: list[Json],
+    glyphs: dict[str, str],
+) -> Json:
     return {
         "variableName": variable,
         "localId": metadata.get("id", variable),
@@ -295,7 +400,9 @@ def _quantity(variable: str, selection: str, kind: str, role: str, metadata: Jso
     }
 
 
-def _formula_text(nodes: list[Json], glyphs: dict[str, str], key: str | None = None) -> str:
+def _formula_text(
+    nodes: list[Json], glyphs: dict[str, str], key: str | None = None
+) -> str:
     if not nodes:
         return ""
     by_key = {node["key"]: node for node in nodes}
@@ -349,7 +456,9 @@ def _method_content(
     cache: dict[tuple[str, str], Json],
 ) -> tuple[list[Json], list[Json], list[Json], list[Json]]:
     glyphs = {
-        item["selectionName"] if item["role"] == "input" else item["variableName"]: item["glyph"]
+        (
+            item["selectionName"] if item["role"] == "input" else item["variableName"]
+        ): item["glyph"]
         for item in quantities
     }
     for item in quantities:
@@ -422,8 +531,16 @@ def _walk_steps(
             content.append({"kind": "quantity", "variableName": node.target.id})
             continue
         if isinstance(node, ast.With):
-            if not _is_document_section(node) or "document_section" not in module.imported:
-                planner.error(inv, node, "UNSUPPORTED_METHOD_CONTENT", "Only document sections can group method content")
+            if (
+                not _is_document_section(node)
+                or "document_section" not in module.imported
+            ):
+                planner.error(
+                    inv,
+                    node,
+                    "UNSUPPORTED_METHOD_CONTENT",
+                    "Only document sections can group method content",
+                )
             config = kwargs(
                 node.items[0].context_expr,
                 module.id,
@@ -460,7 +577,47 @@ def _walk_steps(
             continue
         described = _describe_call(node)
         if described is not None:
-            helper = _helper(planner, inv, module, described, owner_id, stack, cache, node)
+            if described.get("kind") == "external":
+                declaration_module = planner.capture.load(
+                    module.path.parent / described["path"], span(module.id, node)
+                )
+                declaration = declaration_module.externals.get(described["function"])
+                if declaration is None:
+                    planner.error(
+                        inv,
+                        node,
+                        "INVALID_METHOD",
+                        "External method leaf must resolve to a static declaration",
+                    )
+                adapter = planner.capture.modules[declaration.path]
+                content.append(
+                    {
+                        "kind": "external",
+                        "binding": described["binding"],
+                        "callSite": span(module.id, node),
+                        "declaration": {
+                            "moduleId": declaration_module.id,
+                            "name": declaration.name,
+                            "fingerprint": declaration.fingerprint,
+                            "location": span(declaration_module.id, declaration.node),
+                            "interface": declaration.interface,
+                        },
+                        "declarationSourceHash": hashlib.sha256(
+                            declaration_module.data
+                        ).hexdigest(),
+                        "adapter": {
+                            "moduleId": adapter.id,
+                            "sha256": hashlib.sha256(adapter.data).hexdigest(),
+                            "function": declaration.function,
+                        },
+                        "inputs": _call_formulas(module, definition, node, glyphs),
+                        "outputs": list(declaration.outputs),
+                    }
+                )
+                continue
+            helper = _helper(
+                planner, inv, module, described, owner_id, stack, cache, node
+            )
             if not any(item["id"] == helper["id"] for item in helpers):
                 helpers.append(helper)
             content.append(
@@ -478,8 +635,12 @@ def _walk_steps(
             if name in {"method", "table"}:
                 continue
             if name == "text":
-                data = kwargs(node.value, module.id, {"id", "content"}, {"id", "content"})
-                content.append({"kind": "text", "localId": data["id"], "content": data["content"]})
+                data = kwargs(
+                    node.value, module.id, {"id", "content"}, {"id", "content"}
+                )
+                content.append(
+                    {"kind": "text", "localId": data["id"], "content": data["content"]}
+                )
                 continue
             if name in {"check", "applicable"}:
                 declared = _check_declaration(
@@ -510,7 +671,9 @@ def _walk_steps(
                     {
                         "kind": "figure",
                         "localId": data["id"],
-                        "assetId": _remember_figure(planner, module, data, owner_id, node),
+                        "assetId": _remember_figure(
+                            planner, module, data, owner_id, node
+                        ),
                         "caption": data["caption"],
                         "alt": data["alt"],
                     }
@@ -524,7 +687,9 @@ def _walk_steps(
         )
 
 
-def _call_formulas(module, definition, node: ast.Assign, glyphs: dict[str, str]) -> list[Json]:
+def _call_formulas(
+    module, definition, node: ast.Assign, glyphs: dict[str, str]
+) -> list[Json]:
     keywords = {keyword.arg: keyword.value for keyword in node.value.keywords}
     mapping = keywords.get("inputs")
     if not isinstance(mapping, ast.Dict):
@@ -534,7 +699,11 @@ def _call_formulas(module, definition, node: ast.Assign, glyphs: dict[str, str])
         if not isinstance(key, ast.Constant) or not isinstance(key.value, str):
             continue
         nodes = [
-            {item_key: item_value for item_key, item_value in item.items() if item_key != "_ast"}
+            {
+                item_key: item_value
+                for item_key, item_value in item.items()
+                if item_key != "_ast"
+            }
             for item in lower_expression(
                 module,
                 definition.function,
@@ -553,17 +722,25 @@ def _call_formulas(module, definition, node: ast.Assign, glyphs: dict[str, str])
     return formulas
 
 
-def _helper(planner, inv, module, described: Json, owner_id: str, stack, cache, at: ast.AST) -> Json:
-    loaded = planner.capture.load(module.path.parent / described["path"], span(module.id, at))
+def _helper(
+    planner, inv, module, described: Json, owner_id: str, stack, cache, at: ast.AST
+) -> Json:
+    loaded = planner.capture.load(
+        module.path.parent / described["path"], span(module.id, at)
+    )
     function_name = described["function"]
     key = (loaded.id, function_name)
     cached = cache.get(key)
     if cached is not None:
         return cached
     if key in stack:
-        planner.error(inv, at, "UNSUPPORTED_METHOD_CONTENT", "Method dependencies must not cycle")
+        planner.error(
+            inv, at, "UNSUPPORTED_METHOD_CONTENT", "Method dependencies must not cycle"
+        )
     if function_name not in loaded.functions:
-        planner.error(inv, at, "MISSING_FUNCTION", f"Missing calculation {function_name}")
+        planner.error(
+            inv, at, "MISSING_FUNCTION", f"Missing calculation {function_name}"
+        )
     _reject_deferred_content(planner, inv, loaded, function_name, at)
     definition = planner.definitions.get(loaded.path, function_name)
     plan = planner.ensure_plan(inv, loaded, function_name)
@@ -587,7 +764,7 @@ def _helper(planner, inv, module, described: Json, owner_id: str, stack, cache, 
         "moduleId": loaded.id,
         "function": function_name,
         "sourceHash": plan.source_hash,
-        "revision": plan.revision,
+        "revision": _method_revision(plan.revision, content, nested),
         "parameterNames": list(definition.parameters),
         "outputNames": list(definition.outputs),
         "quantities": quantities,
@@ -672,22 +849,43 @@ def _place_table(planner, inv, call: ast.Call, section: Json, ids: set[str]) -> 
         planner,
         inv,
         found,
-        {"id", "method", "title", "cases", "inputs", "outputs", "cases_axis", "column_cap"},
+        {
+            "id",
+            "method",
+            "title",
+            "cases",
+            "inputs",
+            "outputs",
+            "cases_axis",
+            "column_cap",
+        },
         {"id", "method", "title", "cases"},
     )
     local_id = _text(planner, inv, found["id"])
     title = _text(planner, inv, found["title"])
     table_id = identity("table", inv.id, local_id)
     if table_id in ids:
-        planner.error(inv, call, "DUPLICATE_IDENTITY", "Duplicate method or table identity")
+        planner.error(
+            inv, call, "DUPLICATE_IDENTITY", "Duplicate method or table identity"
+        )
     method = planner.method_index.get((inv.id, _text(planner, inv, found["method"])))
     if method is None:
-        planner.error(inv, found["method"], "UNKNOWN_METHOD", "Table method must be an earlier declaration")
+        planner.error(
+            inv,
+            found["method"],
+            "UNKNOWN_METHOD",
+            "Table method must be an earlier declaration",
+        )
     axis = "columns"
     if "cases_axis" in found:
         axis = _text(planner, inv, found["cases_axis"])
         if axis not in {"columns", "rows"}:
-            planner.error(inv, found["cases_axis"], "INVALID_METHOD", "cases_axis must be columns or rows")
+            planner.error(
+                inv,
+                found["cases_axis"],
+                "INVALID_METHOD",
+                "cases_axis must be columns or rows",
+            )
     inputs = (
         _names(planner, inv, found["inputs"], method["parameterNames"])
         if "inputs" in found
@@ -733,37 +931,75 @@ def _column_cap(planner, inv, keyword: ast.keyword) -> int:
         or not isinstance(value.value, int)
         or value.value < 1
     ):
-        planner.error(inv, keyword, "INVALID_METHOD", "column_cap must be a positive integer")
+        planner.error(
+            inv, keyword, "INVALID_METHOD", "column_cap must be a positive integer"
+        )
     return value.value
 
 
 def _names(planner, inv, keyword: ast.keyword, known: list[str]) -> list[str]:
     node = keyword.value
     if not isinstance(node, ast.Tuple):
-        planner.error(inv, keyword, "INVALID_METHOD", f"{keyword.arg} must be a literal tuple")
+        planner.error(
+            inv, keyword, "INVALID_METHOD", f"{keyword.arg} must be a literal tuple"
+        )
     names: list[str] = []
     for item in node.elts:
-        if not isinstance(item, ast.Constant) or not isinstance(item.value, str) or not item.value:
-            planner.error(inv, item, "UNKNOWN_QUANTITY", "Quantity selections must be nonempty literal names")
+        if (
+            not isinstance(item, ast.Constant)
+            or not isinstance(item.value, str)
+            or not item.value
+        ):
+            planner.error(
+                inv,
+                item,
+                "UNKNOWN_QUANTITY",
+                "Quantity selections must be nonempty literal names",
+            )
         if item.value in names:
-            planner.error(inv, item, "DUPLICATE_QUANTITY", f"Duplicate quantity {item.value!r}")
+            planner.error(
+                inv, item, "DUPLICATE_QUANTITY", f"Duplicate quantity {item.value!r}"
+            )
         if item.value not in known:
-            planner.error(inv, item, "UNKNOWN_QUANTITY", f"Unknown quantity {item.value!r}")
+            planner.error(
+                inv, item, "UNKNOWN_QUANTITY", f"Unknown quantity {item.value!r}"
+            )
         names.append(item.value)
     return names
 
 
-def _cases(planner, inv, node: ast.AST, method: Json, inputs: list[str], outputs: list[str]) -> tuple[list[Json], list[Json]]:
+def _cases(
+    planner, inv, node: ast.AST, method: Json, inputs: list[str], outputs: list[str]
+) -> tuple[list[Json], list[Json]]:
     if not isinstance(node, ast.Dict):
-        planner.error(inv, node, "AMBIGUOUS_CASE_REFERENCE", "Cases must be a literal heading mapping")
+        planner.error(
+            inv,
+            node,
+            "AMBIGUOUS_CASE_REFERENCE",
+            "Cases must be a literal heading mapping",
+        )
     cases: list[Json] = []
     cells: list[Json] = []
     headings: set[str] = set()
     for key, value in zip(node.keys, node.values):
-        if not isinstance(key, ast.Constant) or not isinstance(key.value, str) or not key.value:
-            planner.error(inv, key or node, "INVALID_METHOD", "Case headings must be nonempty literal strings")
+        if (
+            not isinstance(key, ast.Constant)
+            or not isinstance(key.value, str)
+            or not key.value
+        ):
+            planner.error(
+                inv,
+                key or node,
+                "INVALID_METHOD",
+                "Case headings must be nonempty literal strings",
+            )
         if key.value in headings:
-            planner.error(inv, key, "DUPLICATE_CASE_HEADING", f"Duplicate case heading {key.value!r}")
+            planner.error(
+                inv,
+                key,
+                "DUPLICATE_CASE_HEADING",
+                f"Duplicate case heading {key.value!r}",
+            )
         headings.add(key.value)
         if not isinstance(value, ast.Name) or value.id not in inv.calls:
             planner.error(
@@ -773,19 +1009,37 @@ def _cases(planner, inv, node: ast.AST, method: Json, inputs: list[str], outputs
                 "Case values must be direct earlier child invocations",
             )
         child = inv.calls[value.id]
-        if child.id in planner.grouped_invocations or _overlaps(planner.grouped_invocations, child.id):
-            planner.error(inv, value, "OVERLAPPING_TABLE", "A grouped invocation has one table owner")
+        if child.id in planner.grouped_invocations or _overlaps(
+            planner.grouped_invocations, child.id
+        ):
+            planner.error(
+                inv,
+                value,
+                "OVERLAPPING_TABLE",
+                "A grouped invocation has one table owner",
+            )
         if any(
-            record["invocationId"] == child.id or record["invocationId"].startswith(child.id + "/")
+            record["invocationId"] == child.id
+            or record["invocationId"].startswith(child.id + "/")
             for record in [*planner.methods, *planner.tables]
         ):
-            planner.error(inv, value, "OVERLAPPING_TABLE", "A grouped invocation has one table owner")
+            planner.error(
+                inv,
+                value,
+                "OVERLAPPING_TABLE",
+                "A grouped invocation has one table owner",
+            )
         if (
             child.module.id != method["moduleId"]
             or child.function.name != method["function"]
             or hashlib.sha256(child.module.data).hexdigest() != method["sourceHash"]
         ):
-            planner.error(inv, value, "CASE_SOURCE_MISMATCH", "Cases must share the method source revision")
+            planner.error(
+                inv,
+                value,
+                "CASE_SOURCE_MISMATCH",
+                "Cases must share the method source revision",
+            )
         cases.append(
             {
                 "heading": key.value,
@@ -795,7 +1049,11 @@ def _cases(planner, inv, node: ast.AST, method: Json, inputs: list[str], outputs
         )
         for role, names in (("input", inputs), ("output", outputs)):
             for name in names:
-                symbol = child.parameter_symbols[name] if role == "input" else child.outputs[name]
+                symbol = (
+                    child.parameter_symbols[name]
+                    if role == "input"
+                    else child.outputs[name]
+                )
                 quantity = next(
                     item
                     for item in method["quantities"]
@@ -831,7 +1089,16 @@ def _overlaps(owned: set[str], invocation_id: str) -> bool:
     )
 
 
-def _check_declaration(planner, inv, module, definition, glyphs, call: ast.Call, names: set[str], checks: list[Json]) -> Json:
+def _check_declaration(
+    planner,
+    inv,
+    module,
+    definition,
+    glyphs,
+    call: ast.Call,
+    names: set[str],
+    checks: list[Json],
+) -> Json:
     found = _keywords(planner, inv, call)
     _require(
         planner,
@@ -842,11 +1109,18 @@ def _check_declaration(planner, inv, module, definition, glyphs, call: ast.Call,
     )
     local_id = _text(planner, inv, found["id"])
     if any(item["id"] == local_id for item in checks):
-        planner.error(inv, found["id"], "DUPLICATE_IDENTITY", "Duplicate check identity")
+        planner.error(
+            inv, found["id"], "DUPLICATE_IDENTITY", "Duplicate check identity"
+        )
     targets = _string_tuple(planner, inv, found["targets"])
     unknown = [name for name in targets if name not in names]
     if unknown or len(targets) != len(set(targets)):
-        planner.error(inv, found["targets"], "UNKNOWN_QUANTITY", "Check targets must name known quantities")
+        planner.error(
+            inv,
+            found["targets"],
+            "UNKNOWN_QUANTITY",
+            "Check targets must name known quantities",
+        )
     explanation = _text(planner, inv, found["explanation"])
     nodes = [
         {key: value for key, value in node.items() if key != "_ast"}
@@ -871,11 +1145,25 @@ def _check_declaration(planner, inv, module, definition, glyphs, call: ast.Call,
 def _string_tuple(planner, inv, keyword: ast.keyword) -> list[str]:
     value = keyword.value
     if not isinstance(value, ast.Tuple) or not value.elts:
-        planner.error(inv, keyword, "INVALID_METHOD", "targets must be a nonempty tuple of quantity names")
+        planner.error(
+            inv,
+            keyword,
+            "INVALID_METHOD",
+            "targets must be a nonempty tuple of quantity names",
+        )
     names: list[str] = []
     for item in value.elts:
-        if not isinstance(item, ast.Constant) or not isinstance(item.value, str) or not item.value:
-            planner.error(inv, item, "INVALID_METHOD", "targets must be a nonempty tuple of quantity names")
+        if (
+            not isinstance(item, ast.Constant)
+            or not isinstance(item.value, str)
+            or not item.value
+        ):
+            planner.error(
+                inv,
+                item,
+                "INVALID_METHOD",
+                "targets must be a nonempty tuple of quantity names",
+            )
         names.append(item.value)
     return names
 
@@ -895,16 +1183,23 @@ def _collect_condition_outcomes(planner, field: str, identity_field: str) -> lis
     def walk(plan: Json) -> None:
         for condition in plan.get(field) or []:
             for invocation in planner.invocations:
-                if invocation.function.name != plan["function"] or invocation.module.id != plan["moduleId"]:
+                if (
+                    invocation.function.name != plan["function"]
+                    or invocation.module.id != plan["moduleId"]
+                ):
                     continue
-                value, used = _check_value(condition["nodes"], _named_values(invocation))
-                outcomes.append({
-                    "methodId": plan["id"],
-                    "invocationId": invocation.id,
-                    identity_field: condition["id"],
-                    "value": value,
-                    "usedKeys": sorted(used),
-                })
+                value, used = _check_value(
+                    condition["nodes"], _named_values(invocation)
+                )
+                outcomes.append(
+                    {
+                        "methodId": plan["id"],
+                        "invocationId": invocation.id,
+                        identity_field: condition["id"],
+                        "value": value,
+                        "usedKeys": sorted(used),
+                    }
+                )
         for helper in plan.get("helpers") or []:
             walk(helper)
 
@@ -915,14 +1210,19 @@ def _collect_condition_outcomes(planner, field: str, identity_field: str) -> lis
 
 def _named_values(invocation) -> dict[str, int | float]:
     values: dict[str, int | float] = {}
-    for name, symbol in (*invocation.parameter_symbols.items(), *invocation.symbols.items()):
+    for name, symbol in (
+        *invocation.parameter_symbols.items(),
+        *invocation.symbols.items(),
+    ):
         result = symbol.cso["valueTree"].get("result")
         if isinstance(result, dict) and isinstance(result.get("value"), (int, float)):
             values[name] = result["value"]
     return values
 
 
-def _check_value(nodes: list[Json], values: dict[str, int | float]) -> tuple[bool, set[str]]:
+def _check_value(
+    nodes: list[Json], values: dict[str, int | float]
+) -> tuple[bool, set[str]]:
     by_key = {node["key"]: node for node in nodes}
     used: set[str] = set()
 
@@ -960,7 +1260,9 @@ def _check_value(nodes: list[Json], values: dict[str, int | float]) -> tuple[boo
         if node["mode"] == "SYMBOL":
             name = (node.get("ref") or {}).get("name")
             if name not in values:
-                raise SourceError("INVALID_CHECK", "Check evidence is missing a captured operand")
+                raise SourceError(
+                    "INVALID_CHECK", "Check evidence is missing a captured operand"
+                )
             return values[name]
         function_id = node["funcSpec"]["id"]
         arguments = [argument["key"] for argument in node["funcArgs"]]
@@ -990,6 +1292,7 @@ def collect_branch_outcomes(planner) -> list[Json]:
     invocations = {invocation.id: invocation for invocation in planner.invocations}
     values = _symbol_values(planner)
     outcomes: list[Json] = []
+
     def calls(content):
         for item in content:
             if item["kind"] == "call":
@@ -1003,7 +1306,10 @@ def collect_branch_outcomes(planner) -> list[Json]:
             yield from helpers(helper)
 
     def visit(plan, child, plans):
-        glyphs = {quantity["variableName"]: quantity["glyph"] for quantity in plan["quantities"]}
+        glyphs = {
+            quantity["variableName"]: quantity["glyph"]
+            for quantity in plan["quantities"]
+        }
         for quantity in plan["quantities"]:
             glyphs.setdefault(quantity["selectionName"], quantity["glyph"])
         for quantity in plan["quantities"]:
@@ -1013,12 +1319,22 @@ def collect_branch_outcomes(planner) -> list[Json]:
             if symbol is None:
                 continue
             nodes = {node["key"]: node for node in symbol.cso["valueTree"]["nodes"]}
-            _visit_formula(child, quantity, glyphs, nodes, values, symbol.cso["valueTree"]["rootKey"], outcomes)
+            _visit_formula(
+                child,
+                quantity,
+                glyphs,
+                nodes,
+                values,
+                symbol.cso["valueTree"]["rootKey"],
+                outcomes,
+            )
         for call in calls(plan["content"]):
             visit(plans[call["helperId"]], child.calls[call["binding"]], plans)
 
     for table in planner.tables:
-        method = next(item for item in planner.methods if item["id"] == table["methodId"])
+        method = next(
+            item for item in planner.methods if item["id"] == table["methodId"]
+        )
         plans = {plan["id"]: plan for plan in helpers(method)}
         for case in table["cases"]:
             visit(method, invocations[case["invocationId"]], plans)
@@ -1039,7 +1355,9 @@ def _symbol_values(planner) -> dict[str, int | float]:
     return values
 
 
-def _visit_formula(invocation, quantity, glyphs, nodes, values, key: str, outcomes: list[Json]) -> None:
+def _visit_formula(
+    invocation, quantity, glyphs, nodes, values, key: str, outcomes: list[Json]
+) -> None:
     node = nodes[key]
     if node.get("mode") != "FUNCTION":
         return
@@ -1052,13 +1370,17 @@ def _visit_formula(invocation, quantity, glyphs, nodes, values, key: str, outcom
         _visit_formula(invocation, quantity, glyphs, nodes, values, argument, outcomes)
 
 
-def _record_conditional(invocation, quantity, glyphs, nodes, values, key: str, outcomes: list[Json]) -> set[str]:
+def _record_conditional(
+    invocation, quantity, glyphs, nodes, values, key: str, outcomes: list[Json]
+) -> set[str]:
     node = nodes[key]
     arguments = [argument["key"] for argument in node["funcArgs"]]
     used: set[str] = set()
     selected = _predicate_value(nodes, values, arguments[0], used)
     chosen = arguments[1] if selected else arguments[2]
-    used.update(_evaluated_keys(invocation, quantity, glyphs, nodes, values, chosen, outcomes))
+    used.update(
+        _evaluated_keys(invocation, quantity, glyphs, nodes, values, chosen, outcomes)
+    )
     used.add(key)
     outcomes.append(
         {
@@ -1073,10 +1395,17 @@ def _record_conditional(invocation, quantity, glyphs, nodes, values, key: str, o
     return used
 
 
-def _evaluated_keys(invocation, quantity, glyphs, nodes, values, key: str, outcomes: list[Json]) -> set[str]:
+def _evaluated_keys(
+    invocation, quantity, glyphs, nodes, values, key: str, outcomes: list[Json]
+) -> set[str]:
     node = nodes[key]
-    if node.get("mode") == "FUNCTION" and node.get("funcSpec", {}).get("id") == "fg.cnd":
-        return _record_conditional(invocation, quantity, glyphs, nodes, values, key, outcomes)
+    if (
+        node.get("mode") == "FUNCTION"
+        and node.get("funcSpec", {}).get("id") == "fg.cnd"
+    ):
+        return _record_conditional(
+            invocation, quantity, glyphs, nodes, values, key, outcomes
+        )
     used = {key}
     for argument in node.get("funcArgs") or []:
         used.update(
@@ -1139,11 +1468,15 @@ def _number_value(nodes, values, key: str, used: set[str]) -> int | float:
     arguments = [argument["key"] for argument in node["funcArgs"]]
     if function_id == "fg.cnd":
         selected = _predicate_value(nodes, values, arguments[0], used)
-        return _number_value(nodes, values, arguments[1] if selected else arguments[2], used)
+        return _number_value(
+            nodes, values, arguments[1] if selected else arguments[2], used
+        )
     if function_id == "fg.uminus":
         return -_number_value(nodes, values, arguments[0], used)
     if function_id in _NUMERIC_CALLS:
-        return _NUMERIC_CALLS[function_id](*(_number_value(nodes, values, key, used) for key in arguments))
+        return _NUMERIC_CALLS[function_id](
+            *(_number_value(nodes, values, key, used) for key in arguments)
+        )
     if function_id in _OPERATORS and len(arguments) == 2:
         left = _number_value(nodes, values, arguments[0], used)
         right = _number_value(nodes, values, arguments[1], used)

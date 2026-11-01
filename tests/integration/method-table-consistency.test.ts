@@ -14,6 +14,7 @@ import {
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterAll, beforeAll, expect, test } from 'vitest';
+import { writeExternalMethodProject } from './fixtures/method-external-project.ts';
 
 const directory = mkdtempSync(join(tmpdir(), 'cso-method-consistency-'));
 const python =
@@ -150,6 +151,8 @@ function capture(file: string) {
       join(directory, file),
       '--function',
       'compare',
+      '--supported-execution-protocol',
+      '4',
     ],
     { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
   );
@@ -344,4 +347,34 @@ test('numeric helpers preserve qualifications and same-name conditions retain di
     createElement(PreparedFormulaSheet, { document }),
   );
   expect(html).toContain('Width limit');
+});
+
+test('binds opaque external method leaves by exact declaration and call identity', () => {
+  writeExternalMethodProject(directory, 'columns');
+  const generated = spawnSync(
+    python,
+    ['-I', '-m', 'cso_python', 'bindings', directory],
+    { encoding: 'utf8' },
+  );
+  expect(generated.status, generated.stdout + generated.stderr).toBe(0);
+  const execution = capture('external_compare.cso.py');
+  const changed = structuredClone(execution);
+  const leaf = changed.methods?.[0]?.content.find(
+    (item) => item.kind === 'external',
+  );
+  if (!leaf || leaf.kind !== 'external')
+    throw new Error('Missing static external leaf');
+  leaf.declaration.fingerprint = 'a'.repeat(64);
+  const report = verifyExecution({ execution: changed });
+  expect(report.ok).toBe(false);
+  expect(
+    report.diagnostics.some(
+      (diagnostic) => diagnostic.code === 'METHOD_FORMULA_MISMATCH',
+    ),
+  ).toBe(true);
+  const omitted = structuredClone(execution);
+  const method = omitted.methods?.[0];
+  if (!method) throw new Error('Missing method');
+  method.content = method.content.filter((item) => item.kind !== 'external');
+  expect(verifyExecution({ execution: omitted }).ok).toBe(false);
 });

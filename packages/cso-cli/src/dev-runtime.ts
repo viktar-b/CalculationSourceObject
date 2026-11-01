@@ -21,7 +21,7 @@ import type { VerifiedOptions } from './verified-arguments.ts';
 
 export type DevTarget = Pick<
   VerifiedOptions,
-  'sourcePath' | 'functionName' | 'referencePath'
+  'sourcePath' | 'functionName' | 'referencePath' | 'executionTimeoutMs'
 >;
 type Invocation = {
   definition: CalculationDefinition;
@@ -184,7 +184,7 @@ export function createDevRuntime(
     assertOpen();
     const verified = executeAndVerify(
       { ...options, command: 'verify', inputs },
-      30_000,
+      options.executionTimeoutMs ?? 30_000,
     );
     if (verified.kind === 'failed')
       throw new HttpError(
@@ -236,6 +236,7 @@ export function createDevRuntime(
     const { verified, execution, outputs } = execute(invocation);
     try {
       const document = prepareExecutionDocument({
+        ...(execution.externalCalls ? {verificationReport: verified.capture.verification} : {}),
         execution,
         assets: captureAssets(options.sourcePath, execution),
       });

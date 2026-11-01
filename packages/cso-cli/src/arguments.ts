@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 export class UsageError extends Error {}
 
 export interface DevelopmentOptions {
+  readonly executionTimeoutMs?: number;
   readonly sourcePath: string;
   readonly functionName: string;
   readonly inputs: Record<string, number>;
@@ -78,6 +79,7 @@ export function parseCliArgs(args: readonly string[]): DevelopmentOptions {
     inputs.set(name, value);
   };
   const allowed = new Set([
+    '--timeout',
     '--source',
     '--function',
     '--out',
@@ -122,11 +124,36 @@ export function parseCliArgs(args: readonly string[]): DevelopmentOptions {
   }
   if (!out) throw new UsageError('--out is required');
   return {
+    ...(values.has('--timeout')
+      ? { executionTimeoutMs: executionTimeout(values.get('--timeout') ?? '') }
+      : {}),
     sourcePath: resolve(source),
     functionName: normalizedFunction,
     outPath: resolve(out),
     inputs: Object.fromEntries(inputs),
   };
+}
+
+export function executionTimeout(value: string): number {
+  const seconds = Number(value);
+  const coefficient = value.split(/[eE]/u)[0] ?? '';
+  const zeroSpelling = !/[1-9]/u.test(coefficient);
+  const milliseconds = zeroSpelling
+    ? 0
+    : seconds === 0
+      ? 1
+      : Math.ceil(seconds * 1000);
+  if (
+    !numericPattern.test(value) ||
+    !Number.isFinite(seconds) ||
+    seconds < 0 ||
+    (value.startsWith('-') && !zeroSpelling) ||
+    !Number.isSafeInteger(milliseconds)
+  )
+    throw new UsageError(
+      '--timeout requires a nonnegative duration in seconds; zero disables the deadline',
+    );
+  return milliseconds;
 }
 
 export const help = `Usage: cso <verify|html|pdf|bindings|dev|dev-export|dev-render> [arguments]

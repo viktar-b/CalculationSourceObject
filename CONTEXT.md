@@ -13,6 +13,18 @@ returned results.
 The declared parameters, defaults and named public output selections of an
 annotated calculation, independent of a particular invocation or numerical result.
 
+**External function declaration**:
+The reusable description of an ordinary Python function's numeric inputs,
+named numeric outputs and method, separate from its implementation.
+
+**External invocation**:
+One authored call to an external function, with its own supplied inputs and
+returned results. Separate calls retain distinct identities even with equal inputs.
+
+**External result**:
+A named numeric output of an external invocation, available to subsequent
+documented formulas. Capturing it does not independently verify the external algorithm.
+
 **Calculation method**:
 The shared explanation of an annotated calculation's inputs, formulas,
 relationships, outputs and authored engineering context, independent of case values.
@@ -69,7 +81,8 @@ PDF can present the same report; the verification report is a separate record.
 
 **Source-to-document consistency**:
 Agreement between the authored calculation's runtime results and the values
-obtained by evaluating the documented formulas.
+obtained by evaluating documented formulas or matching captured external results.
+External-result consistency excludes the external algorithm from formula verification.
 _Avoid_: treating structural validation as numerical agreement.
 
 **Independent numerical reference case**:

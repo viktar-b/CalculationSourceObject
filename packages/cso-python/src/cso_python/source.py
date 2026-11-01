@@ -20,6 +20,8 @@ HELPERS = {
     "symbol",
     "given",
     "load_calculation",
+    "external_function",
+    "load_external",
     "method",
     "table",
     "check",
@@ -97,6 +99,7 @@ class SourceError(Exception):
     ):
         super().__init__(message)
         self.diagnostic = {"code": code, "message": message, "stage": stage, **details}
+        self.additional_diagnostics: list[Json] = []
         if location is not None:
             self.diagnostic["location"] = location
         if related:
@@ -244,6 +247,8 @@ class CapturedModule:
     aliases: dict[str, Any] = field(default_factory=dict)
     handles: dict[str, Any] = field(default_factory=dict)
     local_imports: dict[str, Path] = field(default_factory=dict)
+    externals: dict[str, Any] = field(default_factory=dict)
+    adapter: bool = False
 
 
 @dataclass
@@ -276,6 +281,7 @@ class Invocation:
     output_records: list[Json] = field(default_factory=list)
     signature_inputs: set[str] = field(default_factory=set)
     parameter_symbols: dict[str, Symbol] = field(default_factory=dict)
+    external: Any = None
 
 
 class Capture:
@@ -359,6 +365,7 @@ class Capture:
         functions = {}
         aliases = {}
         handles = {}
+        externals = {}
         local_imports = {}
         imported = set()
         bound = set()
@@ -383,17 +390,26 @@ class Capture:
                 folder = path.parent if node.level else self.root
                 for _ in range(max(0, node.level - 1)):
                     folder = folder.parent
-                target = folder.joinpath(*node.module.split(".")).with_suffix(".py")
+                module_path = folder.joinpath(*node.module.split("."))
+                target = module_path.with_suffix(".py")
+                if not target.exists() and (module_path / "__init__.py").exists():
+                    target = module_path / "__init__.py"
                 if self.for_bindings and node.module.startswith("_cso_bindings."):
+                    external = node.module.startswith("_cso_bindings._external.")
                     target_source = self.root.joinpath(
-                        *node.module.split(".")[1:]
-                    ).with_suffix(".cso.py")
+                        *node.module.split(".")[2 if external else 1 :]
+                    ).with_suffix(".py" if external else ".cso.py")
+                    if external and not target_source.exists():
+                        initializer = target_source.with_suffix("") / "__init__.py"
+                        if initializer.exists():
+                            target_source = initializer
                     self.resolve(target_source, span(module, node))
                     for entry in node.names:
                         handles[entry.asname or entry.name] = {
                             "path": target_source,
                             "function": entry.name,
                             "fingerprint": None,
+                            **({"kind": "external"} if external else {}),
                         }
                 else:
                     # Python imports package initializers too. Capture and preflight
@@ -454,12 +470,13 @@ class Capture:
             elif (
                 isinstance(node, ast.Assign)
                 and isinstance(node.value, ast.Call)
-                and authoring_name(node.value.func) == "load_calculation"
+                and authoring_name(node.value.func)
+                in {"load_calculation", "load_external"}
             ):
                 if not (
                     len(node.targets) == 1
                     and isinstance(node.targets[0], ast.Name)
-                    and "load_calculation" in imported
+                    and authoring_name(node.value.func) in imported
                     and len(node.value.args) == 1
                 ):
                     self.unsupported(module, node, "Bind one named calculation handle")
@@ -478,7 +495,11 @@ class Capture:
                 if (
                     not isinstance(target, str)
                     or Path(target).is_absolute()
-                    or not target.endswith(".cso.py")
+                    or not target.endswith(
+                        ".py"
+                        if authoring_name(node.value.func) == "load_external"
+                        else ".cso.py"
+                    )
                 ):
                     self.unsupported(
                         module,
@@ -489,8 +510,29 @@ class Capture:
                     "path": self.resolve(path.parent / target, span(module, node)),
                     "function": settings["function"],
                     "fingerprint": settings.get("fingerprint"),
+                    **(
+                        {"kind": "external"}
+                        if authoring_name(node.value.func) == "load_external"
+                        else {}
+                    ),
                 }
                 names = [node.targets[0].id]
+            elif (
+                isinstance(node, ast.Assign)
+                and isinstance(node.value, ast.Call)
+                and authoring_name(node.value.func) == "external_function"
+            ):
+                if "external_function" not in imported:
+                    self.unsupported(
+                        module,
+                        node,
+                        "Import external_function before declaring an adapter",
+                    )
+                from .external import read_declaration
+
+                declaration = read_declaration(self, path, node, aliases)
+                externals[declaration.name] = declaration
+                names = [declaration.name]
             elif (
                 isinstance(node, ast.Import)
                 and len(node.names) == 1
@@ -570,10 +612,73 @@ class Capture:
             aliases,
             handles,
             local_imports,
+            externals,
         )
         self.loading.remove(path)
         self.modules[path] = captured
         return captured
+
+    def capture_adapter(self, path: Path, location: Json) -> CapturedModule:
+        path = self.resolve(path, location)
+        if path in self.loading or path.name.endswith(".cso.py"):
+            raise SourceError(
+                "INVALID_ADAPTER",
+                "Use a separate ordinary Python adapter file",
+                location=location,
+            )
+        if path in self.modules:
+            if not self.modules[path].adapter:
+                raise SourceError(
+                    "INVALID_ADAPTER",
+                    "An adapter cannot also be a metadata or calculation module",
+                    location=location,
+                )
+            return self.modules[path]
+        data = path.read_bytes()
+        try:
+            tree = ast.parse(data.decode("utf-8"), filename=str(path))
+        except (SyntaxError, UnicodeError) as error:
+            raise SourceError(
+                "INVALID_ADAPTER", str(error), location=location
+            ) from error
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                imported_names = (
+                    [entry.name for entry in node.names]
+                    if isinstance(node, ast.Import)
+                    else [node.module or ""]
+                )
+                if isinstance(node, ast.ImportFrom) and node.level:
+                    raise SourceError(
+                        "UNSUPPORTED_ADAPTER_IMPORT",
+                        "Project-local adapter imports are unsupported; install a package or use one file",
+                        location=location,
+                    )
+                for name in imported_names:
+                    parts = name.split(".")
+                    for folder in (self.root, path.parent):
+                        for length in range(1, len(parts) + 1):
+                            candidate = folder.joinpath(*parts[:length])
+                            if (
+                                candidate.with_suffix(".py").exists()
+                                or candidate.is_dir()
+                            ):
+                                raise SourceError(
+                                    "UNSUPPORTED_ADAPTER_IMPORT",
+                                    f"Project-local adapter import {name!r} is unsupported",
+                                    location=location,
+                                )
+        module = CapturedModule(
+            path,
+            path.relative_to(self.root).as_posix(),
+            data,
+            tree,
+            {},
+            set(),
+            adapter=True,
+        )
+        self.modules[path] = module
+        return module
 
     @staticmethod
     def main_guard(node: ast.AST) -> bool:

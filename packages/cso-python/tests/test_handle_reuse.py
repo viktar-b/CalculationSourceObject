@@ -163,6 +163,24 @@ def calculate(amount: float):
         fresh.run_root({"amount": 5})
         self.assert_run_state_matches(execution, fresh)
 
+    def test_self_input_works_for_top_level_and_nested_generated_handles(self):
+        self.edit("defaulted_step.cso.py", "amount", "self")
+        self.edit("forwarded_output.cso.py", "adjust(amount=", "adjust(self=")
+        generate(self.root)
+        stub = (self.root / "_cso_bindings/defaulted_step.pyi").read_text()
+        self.assertIn("def adjust(*, self: float", stub)
+
+        for module, function, inputs, expected in (
+            ("defaulted_step", "adjust", {"self": 2}, {"adjusted": 5, "original": 2}),
+            ("forwarded_output", "forward", {"amount": 2}, {"total": 10}),
+        ):
+            with self.subTest(module=module):
+                handle = self.handle(module, function)
+                self.assertEqual(handle(**inputs), expected)
+                execution = handle._execution
+                self.assertEqual(handle(**inputs), expected)
+                self.assertIs(handle._execution, execution)
+
     def test_reuse_refreshes_numeric_kinds_in_root_and_child_inputs(self):
         handle = self.handle("forwarded_output", "forward")
         handle(amount=2)

@@ -1,6 +1,6 @@
 {
   "name": "create-cs-object",
-  "version": "0.1.4",
+  "version": "1.0.0",
   "description": "Create a local CalculationSourceObject report project.",
   "license": "Apache-2.0",
   "type": "module",
@@ -30,7 +30,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.2",
-    "@cs-object/core": "0.1.0",
+    "@cs-object/core": "1.0.0",
     "@types/node": "^26",
     "tsup": "^8.5.1",
     "typescript": "^5",

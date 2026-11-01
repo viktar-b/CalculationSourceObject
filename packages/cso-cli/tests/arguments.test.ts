@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import { parseCliArgs } from '../src/arguments.ts';
+import { parseVerifiedArgs } from '../src/verified-arguments.ts';
+import { parseDevArgs } from '../src/dev-server.ts';
 import { usageReport } from '../src/reports.ts';
-import {
-  CommandReportSchema,
-} from '@cs-object/core';
+import { CommandReportSchema } from '@cs-object/core';
 
 const base = [
   '--source',
@@ -14,6 +14,63 @@ const base = [
   'output with spaces.pdf',
 ];
 describe('development command boundaries', () => {
+  test('preserves unlimited defaults and normalizes finite calculation deadlines', () => {
+    expect(
+      parseVerifiedArgs('verify', ['input.cso.py', '--function', 'calculate'])
+        .executionTimeoutMs,
+    ).toBeUndefined();
+    expect(
+      parseDevArgs(['input.cso.py', '--function', 'calculate'])
+        .executionTimeoutMs,
+    ).toBeUndefined();
+    for (const [seconds, milliseconds] of [
+      ['0', 0],
+      ['-0.0', 0],
+      ['0.0001', 1],
+      ['1e-3', 1],
+      ['1e-400', 1],
+      ['2.5', 2500],
+      ['2147483.648', 2147483648],
+    ] satisfies [string, number][]) {
+      expect(
+        parseVerifiedArgs('verify', [
+          'input.cso.py',
+          '--function',
+          'calculate',
+          '--timeout',
+          seconds,
+        ]).executionTimeoutMs,
+      ).toBe(milliseconds);
+      expect(
+        parseDevArgs([
+          'input.cso.py',
+          '--function',
+          'calculate',
+          '--timeout',
+          seconds,
+        ]).executionTimeoutMs,
+      ).toBe(milliseconds);
+    }
+    for (const seconds of [
+      '-1',
+      '-1e-400',
+      'NaN',
+      'Infinity',
+      '1e309',
+      '  ',
+      '0x10',
+    ]) {
+      expect(() =>
+        parseVerifiedArgs('verify', [
+          'input.cso.py',
+          '--function',
+          'calculate',
+          '--timeout',
+          seconds,
+        ]),
+      ).toThrow();
+    }
+  });
   test('preserves repeated numeric inputs and caller-relative paths', () => {
     const parsed = parseCliArgs([
       ...base,

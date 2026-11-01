@@ -208,6 +208,66 @@ for each invocation. See the
 
 ## Supported source and document content
 
+### External functions
+
+Declare an ordinary single-file Python adapter in a local metadata module with
+`external_function(path=..., function=..., inputs=..., outputs=...,
+description=..., defaults=...)`. Inputs map Python parameter names and outputs
+map nonempty public string keys to shared numeric metadata aliases. Defaults are
+optional finite numeric literals. The method
+description must be nonempty. Adapter paths resolve relative to the declaration
+module and remain within the calculation project.
+
+For example, a declaration named `square` in `methods.py` generates
+`from _cso_bindings._external.methods import square`. Generate bindings with the
+existing bindings command, then use it inside an annotated calculation:
+
+```python
+first = square(length=length)
+doubled: DoubledArea = 2.0 * first["area"]
+```
+
+The adapter returns a native Python number for one declared output, or a plain
+dictionary containing exactly every declared output. Booleans, library scalar
+objects, containers, nonfinite values and unsafe integers fail. Adapters convert
+library-specific objects and raise on numerical failure or nonconvergence.
+
+Each authored call executes once. Selecting several outputs shares that call;
+equal-input calls remain separate. Adapter state is shared within a run and
+starts fresh for the next run. CSO executes captured adapter bytes and records
+their identity, actual inputs, all outputs, warnings and bounded environment
+provenance. Static description and binding generation do not import adapters.
+Project-local imports inside an adapter are unsupported; install a dependency
+as a package or keep the implementation in one file.
+
+Generated external handles require an active top-level CSO execution. Ordinary
+Python can call a generated calculation containing external calls. Calling an
+external handle alone raises a context error. Changes to the declaration require
+regenerating bindings; adapter-only edits require a fresh capture.
+
+The report preserves the complete input/method/output block, including
+unused outputs. External-result consistency and formula checks have separate
+counts. The external algorithm is excluded from formula verification. Preserve
+full execution evidence or prepared HTML/PDF; standalone CSO and math-only exports
+reject external calculations before dropping evidence.
+
+An annotated wrapper containing external calls can be used by `method` and
+`table`. The shared method explains the opaque boundary without importing or
+running the adapter, including when there are zero cases. Grouped cases retain
+their complete external blocks with case/call labels, even when table rows omit
+some results. Every supplied quantity contributes applicability dependencies to
+every external output; downstream formulas continue to follow their used branch.
+Failed engineering checks retain their numbers and outcomes. Numerical failures
+stop execution.
+
+Scoped independent reference cases can check selected external outputs. Their
+identity includes source, declarations, adapters, resolved inputs and environment,
+without run IDs or returned answers. Uncovered diagnostics remain visible and
+pending. See the [examples](../examples/external-functions/README.md) and
+[reference contract](../packages/cso-core/src/contracts/reference.ts).
+
+### Formulas and document content
+
 Supported formulas include numeric literals, references, unary minus, arithmetic
 `+`, `-`, `*`, `/`, `**`, `sqrt` / `math.sqrt`, `math.pi` (or imported `pi`),
 `ceil` / `math.ceil`, `floor` / `math.floor`, `exp` / `math.exp`,

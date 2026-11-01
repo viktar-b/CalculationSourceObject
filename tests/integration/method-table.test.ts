@@ -10,6 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  BoundPreparedDocumentSchema,
   deriveApplicability,
   ExecutionResponseSchema,
   verifyExecution,
@@ -21,6 +22,7 @@ import {
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterAll, beforeAll, expect, test } from 'vitest';
+import { writeExternalMethodProject } from './fixtures/method-external-project.ts';
 
 const repoRoot = join(import.meta.dirname, '../..');
 const directory = mkdtempSync(join(tmpdir(), 'cso-method-table-'));
@@ -514,7 +516,17 @@ afterAll(() => rmSync(directory, { recursive: true, force: true }));
 function capture(source: string, name: string) {
   const result = spawnSync(
     python,
-    ['-I', '-m', 'cso_python', 'execute', source, '--function', name],
+    [
+      '-I',
+      '-m',
+      'cso_python',
+      'execute',
+      source,
+      '--function',
+      name,
+      '--supported-execution-protocol',
+      '4',
+    ],
     { cwd: directory, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
   );
   expect(result.status, result.stderr).toBe(0);
@@ -1450,4 +1462,266 @@ test('composed method returns keep exact case bindings in both orientations', ()
   expect(captures[0].tables?.[0]?.cells).toEqual(
     captures[1].tables?.[0]?.cells,
   );
+});
+
+function writeExternalComparison(
+  axis: 'columns' | 'rows',
+  empty = false,
+  firstLength = 3,
+  target = 'external_case',
+) {
+  writeExternalMethodProject(directory, axis, empty, firstLength, target);
+  const generated = spawnSync(
+    python,
+    ['-I', '-m', 'cso_python', 'bindings', directory],
+    { encoding: 'utf8' },
+  );
+  expect(generated.status, generated.stdout + generated.stderr).toBe(0);
+}
+
+test('mixed external methods retain complete case-specific indexed blocks in both orientations', () => {
+  for (const axis of ['columns', 'rows'] as const) {
+    writeExternalComparison(axis, false, 3, 'outer');
+    const execution = capture('external_compare.cso.py', 'compare');
+    expect(execution.cso.schemaVersion).toBe('1.2.0');
+    const report = verifyExecution({ execution });
+    expect(report.ok, JSON.stringify(report)).toBe(true);
+    expect(
+      execution.externalCalls?.map(
+        (call) => call.outputs.find((output) => output.name === 'count')?.value,
+      ),
+    ).toEqual([1, 2]);
+    const document = prepareExecutionDocument({
+      execution,
+      assets: [],
+      verificationReport: report,
+    });
+    expect(document.documentVersion).toBe('4');
+    const blocks = document.sections.flatMap((section) =>
+      section.items.filter((item) => item.kind === 'externalCall'),
+    );
+    expect(blocks.map((block) => block.title)).toEqual([
+      'First / inner_case / searched',
+      'Second / inner_case / searched',
+    ]);
+    const html = renderToStaticMarkup(
+      createElement(PreparedFormulaSheet, { document }),
+    );
+    expect(html.match(/data-external-quantity="count"/gu)).toHaveLength(2);
+    expect(html).toContain(
+      'Keep this diagnostic even when the comparison omits it.',
+    );
+    expect(html).toContain(
+      'Return the diagnostic call count as a separate output.',
+    );
+    expect(html).toContain('data-method-external="searched"');
+    expect(html).toContain('cso-symbol-row');
+    expect(execution.externalCalls).toHaveLength(2);
+    const changed = structuredClone(document);
+    const block = changed.sections
+      .flatMap((section) => section.items)
+      .find((item) => item.kind === 'externalCall');
+    if (!block || block.kind !== 'externalCall')
+      throw new Error('Missing external block');
+    block.title = 'Wrong case';
+    expect(
+      BoundPreparedDocumentSchema.safeParse({ execution, document: changed })
+        .success,
+    ).toBe(false);
+    for (const mutation of ['formula', 'notation'] as const) {
+      const changedInput = structuredClone(document);
+      const method = changedInput.sections
+        .flatMap((section) => section.items)
+        .find((item) => item.kind === 'method');
+      const leaf = method?.helpers
+        .flatMap((helper) => helper.content)
+        .find((item) => item.kind === 'external');
+      if (!method || !leaf || leaf.kind !== 'external' || !leaf.inputs[0])
+        throw new Error('Missing prepared external input');
+      if (mutation === 'formula') leaf.inputs[0].formulaText = '999.0';
+      else {
+        const symbol = method.symbols?.find(
+          (symbol) => symbol.id === leaf.inputs[0]?.symbolId,
+        );
+        if (!symbol)
+          throw new Error('Missing prepared external input notation');
+        symbol.valueTree = {
+          rootKey: 'value',
+          nodes: [
+            {
+              key: 'value',
+              mode: 'LITERAL',
+              literal: { kind: 'number', value: 999, numericKind: 'float' },
+            },
+          ],
+        };
+      }
+      expect(
+        BoundPreparedDocumentSchema.safeParse({
+          execution,
+          document: changedInput,
+        }).success,
+      ).toBe(false);
+    }
+    const calls = execution.externalCalls ?? [];
+    const first = calls[0];
+    const second = calls[1];
+    const area = first?.outputs.find((output) => output.name === 'area');
+    const otherArea = second?.outputs.find((output) => output.name === 'area');
+    if (!area || !otherArea)
+      throw new Error('Missing equal-valued external results');
+    const swapped = structuredClone(execution);
+    const formula = swapped.cso.sections
+      .flatMap((section) => section.items)
+      .find(
+        (item) =>
+          item.kind === 'symbol' && item.symbol.description === 'Double area',
+      );
+    if (!formula || formula.kind !== 'symbol')
+      throw new Error('Missing downstream formula');
+    const reference = formula.symbol.valueTree.nodes.find(
+      (node) => node.mode === 'SYMBOL' && node.symbol?.id === area.symbolId,
+    );
+    if (!reference?.symbol)
+      throw new Error('Missing external formula reference');
+    reference.symbol.id = otherArea.symbolId;
+    expect(verifyExecution({ execution: swapped }).ok).toBe(false);
+    const changedMethod = structuredClone(execution);
+    const leaf = changedMethod.methods?.[0]?.helpers
+      .flatMap((helper) => helper.content)
+      .find((item) => item.kind === 'external');
+    if (!leaf || leaf.kind !== 'external')
+      throw new Error('Missing static external leaf');
+    leaf.adapter.function = 'different_callable';
+    expect(verifyExecution({ execution: changedMethod }).ok).toBe(false);
+  }
+});
+
+test('empty external tables describe unimportable adapters without running representative cases', () => {
+  writeExternalComparison('columns', true);
+  writeFileSync(
+    join(directory, 'external_adapter.py'),
+    'import missing_optional_scientific_library\nraise RuntimeError("must not execute")\n',
+  );
+  const execution = capture('external_compare.cso.py', 'compare');
+  expect(execution.externalCalls).toEqual([]);
+  expect(execution.invocations).toHaveLength(1);
+  const report = verifyExecution({ execution });
+  expect(report.ok, JSON.stringify(report)).toBe(true);
+  expect(report.externalCoverage?.calls).toBe(0);
+  const document = prepareExecutionDocument({
+    execution,
+    assets: [],
+    verificationReport: report,
+  });
+  const html = renderToStaticMarkup(
+    createElement(PreparedFormulaSheet, { document }),
+  );
+  expect(html).toContain('data-method-external="searched"');
+  expect(html).toContain('Unused diagnostic count');
+  expect(html).toContain('No cases evaluated');
+  expect(document.documentVersion).toBe('4');
+  const methodsPath = join(directory, 'external_methods.py');
+  writeFileSync(
+    methodsPath,
+    readFileSync(methodsPath, 'utf8').replace(
+      'description="""Square',
+      'defaults={"length": 3.0}, description="""Square',
+    ),
+  );
+  const casePath = join(directory, 'external_case.cso.py');
+  writeFileSync(
+    casePath,
+    readFileSync(casePath, 'utf8').replace(
+      'square(length=limited)',
+      'square()',
+    ),
+  );
+  const regenerated = spawnSync(
+    python,
+    ['-I', '-m', 'cso_python', 'bindings', directory],
+    { encoding: 'utf8' },
+  );
+  expect(regenerated.status, regenerated.stdout + regenerated.stderr).toBe(0);
+  const defaultExecution = capture('external_compare.cso.py', 'compare');
+  const withDefault = prepareExecutionDocument({
+    execution: defaultExecution,
+    assets: [],
+  });
+  expect(
+    BoundPreparedDocumentSchema.safeParse({
+      execution: defaultExecution,
+      document: withDefault,
+    }).success,
+  ).toBe(true);
+  expect(
+    withDefault.sections
+      .flatMap((section) => section.items)
+      .find((item) => item.kind === 'method')
+      ?.content.find((item) => item.kind === 'external')?.inputs[0]
+      ?.formulaText,
+  ).toBe('3');
+});
+
+test('external applicability propagates across every input and follows downstream used branches', () => {
+  writeExternalComparison('rows', false, -3);
+  const execution = capture('external_compare.cso.py', 'compare');
+  const report = verifyExecution({ execution });
+  expect(report.ok, JSON.stringify(report)).toBe(true);
+  const reasons = deriveApplicability(execution).reasonsBySymbolId;
+  const firstCall = execution.externalCalls?.[0];
+  if (!firstCall) throw new Error('Missing external call');
+  for (const output of firstCall.outputs)
+    expect(reasons.get(output.symbolId)).toContain('Length must be positive.');
+  const firstSelected = execution.authoring?.outputs.find(
+    (output) =>
+      output.invocationId === 'root/first_case' && output.name === 'selected',
+  );
+  if (!firstSelected) throw new Error('Missing selected output');
+  expect(firstSelected.value).toBe(42);
+  expect(reasons.get(firstSelected.symbolId)).toBeUndefined();
+  const document = prepareExecutionDocument({
+    execution,
+    assets: [],
+    verificationReport: report,
+  });
+  const html = renderToStaticMarkup(
+    createElement(PreparedFormulaSheet, { document }),
+  );
+  const firstBlock = elementWith(
+    html,
+    'data-external-call="root/first_case/searched"',
+  );
+  expect(firstBlock).toContain('Not applicable. Length must be positive.');
+  expect(html).toContain('Fail. Double area must be below one square metre.');
+  writeFileSync(
+    join(directory, 'external_adapter.py'),
+    'raise RuntimeError("changed adapter must not run during preparation")\n',
+  );
+  const retained = prepareExecutionDocument({
+    execution,
+    assets: [],
+    verificationReport: report,
+  });
+  expect(
+    renderToStaticMarkup(
+      createElement(PreparedFormulaSheet, { document: retained }),
+    ),
+  ).toBe(html);
+  const fresh = spawnSync(
+    python,
+    [
+      '-I',
+      '-m',
+      'cso_python',
+      'execute',
+      'external_compare.cso.py',
+      '--function',
+      'compare',
+      '--supported-execution-protocol',
+      '4',
+    ],
+    { cwd: directory, encoding: 'utf8' },
+  );
+  expect(JSON.parse(fresh.stdout).ok).toBe(false);
 });

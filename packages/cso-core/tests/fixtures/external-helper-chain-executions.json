@@ -1,0 +1,2448 @@
+[
+  {
+    "authoring": {
+      "version": "2",
+      "parameters": [
+        {
+          "invocationId": "root/first",
+          "parameterName": "value",
+          "symbolId": "[\"symbol\",\"root/first\",\"value\"]",
+          "numericType": "float",
+          "unit": "",
+          "location": {
+            "moduleId": "methods.py",
+            "start": {
+              "line": 5,
+              "column": 78
+            },
+            "end": {
+              "line": 5,
+              "column": 83
+            }
+          },
+          "origin": {
+            "kind": "local"
+          }
+        },
+        {
+          "invocationId": "root/forwarded",
+          "parameterName": "value",
+          "symbolId": "[\"symbol\",\"root\",\"shifted\"]",
+          "numericType": "float",
+          "unit": "",
+          "location": {
+            "moduleId": "forward.cso.py",
+            "start": {
+              "line": 6,
+              "column": 12
+            },
+            "end": {
+              "line": 6,
+              "column": 24
+            }
+          },
+          "origin": {
+            "kind": "symbol",
+            "symbolId": "[\"symbol\",\"root\",\"shifted\"]"
+          }
+        },
+        {
+          "invocationId": "root/forwarded/second",
+          "parameterName": "value",
+          "symbolId": "[\"symbol\",\"root\",\"shifted\"]",
+          "numericType": "float",
+          "unit": "",
+          "location": {
+            "moduleId": "methods.py",
+            "start": {
+              "line": 5,
+              "column": 78
+            },
+            "end": {
+              "line": 5,
+              "column": 83
+            }
+          },
+          "origin": {
+            "kind": "parameter",
+            "invocationId": "root/forwarded",
+            "parameterName": "value"
+          }
+        }
+      ],
+      "uses": [],
+      "outputDeclarations": [
+        {
+          "invocationId": "root",
+          "name": "value",
+          "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+          "source": {
+            "kind": "output",
+            "invocationId": "root/forwarded",
+            "outputName": "value"
+          },
+          "location": {
+            "moduleId": "calculate.cso.py",
+            "start": {
+              "line": 11,
+              "column": 21
+            },
+            "end": {
+              "line": 11,
+              "column": 39
+            }
+          }
+        },
+        {
+          "invocationId": "root/first",
+          "name": "value",
+          "symbolId": "[\"symbol\",\"root/first\",\"__cso_result_0\"]",
+          "source": {
+            "kind": "symbol",
+            "symbolId": "[\"symbol\",\"root/first\",\"__cso_result_0\"]"
+          },
+          "location": {
+            "moduleId": "methods.py",
+            "start": {
+              "line": 5,
+              "column": 104
+            },
+            "end": {
+              "line": 5,
+              "column": 110
+            }
+          }
+        },
+        {
+          "invocationId": "root/forwarded",
+          "name": "value",
+          "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+          "source": {
+            "kind": "output",
+            "invocationId": "root/forwarded/second",
+            "outputName": "value"
+          },
+          "location": {
+            "moduleId": "forward.cso.py",
+            "start": {
+              "line": 8,
+              "column": 21
+            },
+            "end": {
+              "line": 8,
+              "column": 36
+            }
+          }
+        },
+        {
+          "invocationId": "root/forwarded/second",
+          "name": "value",
+          "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+          "source": {
+            "kind": "symbol",
+            "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]"
+          },
+          "location": {
+            "moduleId": "methods.py",
+            "start": {
+              "line": 5,
+              "column": 104
+            },
+            "end": {
+              "line": 5,
+              "column": 110
+            }
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "invocationId": "root",
+          "name": "value",
+          "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+          "source": {
+            "kind": "output",
+            "invocationId": "root/forwarded",
+            "outputName": "value"
+          },
+          "location": {
+            "moduleId": "calculate.cso.py",
+            "start": {
+              "line": 11,
+              "column": 21
+            },
+            "end": {
+              "line": 11,
+              "column": 39
+            }
+          },
+          "value": 4.0,
+          "numericKind": "float"
+        },
+        {
+          "invocationId": "root/first",
+          "name": "value",
+          "symbolId": "[\"symbol\",\"root/first\",\"__cso_result_0\"]",
+          "source": {
+            "kind": "symbol",
+            "symbolId": "[\"symbol\",\"root/first\",\"__cso_result_0\"]"
+          },
+          "location": {
+            "moduleId": "methods.py",
+            "start": {
+              "line": 5,
+              "column": 104
+            },
+            "end": {
+              "line": 5,
+              "column": 110
+            }
+          },
+          "value": 3.0,
+          "numericKind": "float"
+        },
+        {
+          "invocationId": "root/forwarded",
+          "name": "value",
+          "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+          "source": {
+            "kind": "output",
+            "invocationId": "root/forwarded/second",
+            "outputName": "value"
+          },
+          "location": {
+            "moduleId": "forward.cso.py",
+            "start": {
+              "line": 8,
+              "column": 21
+            },
+            "end": {
+              "line": 8,
+              "column": 36
+            }
+          },
+          "value": 4.0,
+          "numericKind": "float"
+        },
+        {
+          "invocationId": "root/forwarded/second",
+          "name": "value",
+          "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+          "source": {
+            "kind": "symbol",
+            "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]"
+          },
+          "location": {
+            "moduleId": "methods.py",
+            "start": {
+              "line": 5,
+              "column": 104
+            },
+            "end": {
+              "line": 5,
+              "column": 110
+            }
+          },
+          "value": 4.0,
+          "numericKind": "float"
+        }
+      ]
+    },
+    "cso": {
+      "schemaVersion": "1.2.0",
+      "title": "Formula and helper chain",
+      "source": {
+        "id": "chain",
+        "metadata": {}
+      },
+      "rootSectionIds": [
+        "[\"section\",\"root\",\"wssa06ce60c29\"]"
+      ],
+      "sections": [
+        {
+          "id": "[\"section\",\"root\",\"wssa06ce60c29\"]",
+          "title": "Formula and helper chain",
+          "items": [
+            {
+              "kind": "section",
+              "id": "[\"section\",\"root/first\",\"step\"]",
+              "metadata": {
+                "invocationId": "root",
+                "location": {
+                  "moduleId": "calculate.cso.py",
+                  "start": {
+                    "line": 8,
+                    "column": 4
+                  },
+                  "end": {
+                    "line": 8,
+                    "column": 27
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root\",\"shifted\"]",
+                "glyph": "y",
+                "glyphPlaintext": "y",
+                "description": "Shifted value",
+                "unit": "",
+                "comment": "",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "metadata": {
+                        "invocationId": "root",
+                        "location": {
+                          "moduleId": "calculate.cso.py",
+                          "start": {
+                            "line": 9,
+                            "column": 89
+                          },
+                          "end": {
+                            "line": 9,
+                            "column": 109
+                          }
+                        }
+                      },
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.add"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n2"
+                        },
+                        {
+                          "key": "n3"
+                        }
+                      ]
+                    },
+                    {
+                      "key": "n2",
+                      "metadata": {
+                        "invocationId": "root",
+                        "location": {
+                          "moduleId": "calculate.cso.py",
+                          "start": {
+                            "line": 9,
+                            "column": 89
+                          },
+                          "end": {
+                            "line": 9,
+                            "column": 103
+                          }
+                        },
+                        "outputInvocationId": "root/first",
+                        "outputName": "value"
+                      },
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/first\",\"__cso_result_0\"]"
+                      }
+                    },
+                    {
+                      "key": "n3",
+                      "metadata": {
+                        "invocationId": "root",
+                        "location": {
+                          "moduleId": "calculate.cso.py",
+                          "start": {
+                            "line": 9,
+                            "column": 106
+                          },
+                          "end": {
+                            "line": 9,
+                            "column": 109
+                          }
+                        }
+                      },
+                      "draft": "1.0",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "numericKind": "float",
+                        "value": 1.0
+                      }
+                    }
+                  ],
+                  "result": {
+                    "kind": "number",
+                    "value": 4.0,
+                    "numericKind": "float"
+                  }
+                },
+                "metadata": {
+                  "localId": "shifted",
+                  "invocationId": "root",
+                  "location": {
+                    "moduleId": "calculate.cso.py",
+                    "start": {
+                      "line": 9,
+                      "column": 4
+                    },
+                    "end": {
+                      "line": 9,
+                      "column": 109
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "section",
+              "id": "[\"section\",\"root/forwarded\",\"wsse21fcadb1f\"]",
+              "metadata": {
+                "invocationId": "root",
+                "location": {
+                  "moduleId": "calculate.cso.py",
+                  "start": {
+                    "line": 10,
+                    "column": 4
+                  },
+                  "end": {
+                    "line": 10,
+                    "column": 38
+                  }
+                }
+              }
+            }
+          ],
+          "metadata": {
+            "localId": "wssa06ce60c29",
+            "invocationId": "root",
+            "location": {
+              "moduleId": "calculate.cso.py",
+              "start": {
+                "line": 6,
+                "column": 1
+              },
+              "end": {
+                "line": 6,
+                "column": 53
+              }
+            }
+          }
+        },
+        {
+          "id": "[\"section\",\"root/first\",\"step\"]",
+          "title": "step",
+          "items": [
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/first\",\"value\"]",
+                "glyph": "x",
+                "glyphPlaintext": "x",
+                "description": "Input",
+                "unit": "",
+                "comment": "",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 3.0,
+                        "numericKind": "float"
+                      }
+                    }
+                  ],
+                  "result": {
+                    "kind": "number",
+                    "value": 3.0,
+                    "numericKind": "float"
+                  }
+                },
+                "metadata": {
+                  "localId": "value",
+                  "invocationId": "root/first",
+                  "location": {
+                    "moduleId": "methods.py",
+                    "start": {
+                      "line": 5,
+                      "column": 78
+                    },
+                    "end": {
+                      "line": 5,
+                      "column": 83
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/first\",\"__cso_result_0\"]",
+                "glyph": "v_{first}",
+                "glyphPlaintext": "v_{first}",
+                "description": "Output",
+                "unit": "",
+                "comment": "",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 3.0,
+                        "numericKind": "float"
+                      }
+                    }
+                  ],
+                  "result": {
+                    "kind": "number",
+                    "value": 3.0,
+                    "numericKind": "float"
+                  }
+                },
+                "metadata": {
+                  "localId": "__cso_result_0",
+                  "invocationId": "root/first",
+                  "location": {
+                    "moduleId": "methods.py",
+                    "start": {
+                      "line": 5,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 5,
+                      "column": 147
+                    }
+                  },
+                  "authoredGlyph": "v",
+                  "glyphScope": "first"
+                }
+              }
+            }
+          ],
+          "metadata": {
+            "localId": "step",
+            "invocationId": "root/first",
+            "location": {
+              "moduleId": "methods.py",
+              "start": {
+                "line": 5,
+                "column": 0
+              },
+              "end": {
+                "line": 5,
+                "column": 147
+              }
+            },
+            "externalCallId": "root/first"
+          }
+        },
+        {
+          "id": "[\"section\",\"root/forwarded\",\"wsse21fcadb1f\"]",
+          "title": "Forward value",
+          "items": [
+            {
+              "kind": "section",
+              "id": "[\"section\",\"root/forwarded/second\",\"step\"]",
+              "metadata": {
+                "invocationId": "root/forwarded",
+                "location": {
+                  "moduleId": "forward.cso.py",
+                  "start": {
+                    "line": 7,
+                    "column": 4
+                  },
+                  "end": {
+                    "line": 7,
+                    "column": 30
+                  }
+                }
+              }
+            }
+          ],
+          "metadata": {
+            "localId": "wsse21fcadb1f",
+            "invocationId": "root/forwarded",
+            "location": {
+              "moduleId": "forward.cso.py",
+              "start": {
+                "line": 5,
+                "column": 1
+              },
+              "end": {
+                "line": 5,
+                "column": 42
+              }
+            }
+          }
+        },
+        {
+          "id": "[\"section\",\"root/forwarded/second\",\"step\"]",
+          "title": "step",
+          "items": [
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+                "glyph": "v_{forwarded,second}",
+                "glyphPlaintext": "v_{forwarded,second}",
+                "description": "Output",
+                "unit": "",
+                "comment": "",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 4.0,
+                        "numericKind": "float"
+                      }
+                    }
+                  ],
+                  "result": {
+                    "kind": "number",
+                    "value": 4.0,
+                    "numericKind": "float"
+                  }
+                },
+                "metadata": {
+                  "localId": "__cso_result_0",
+                  "invocationId": "root/forwarded/second",
+                  "location": {
+                    "moduleId": "methods.py",
+                    "start": {
+                      "line": 5,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 5,
+                      "column": 147
+                    }
+                  },
+                  "authoredGlyph": "v",
+                  "glyphScope": "forwarded,second"
+                }
+              }
+            }
+          ],
+          "metadata": {
+            "localId": "step",
+            "invocationId": "root/forwarded/second",
+            "location": {
+              "moduleId": "methods.py",
+              "start": {
+                "line": 5,
+                "column": 0
+              },
+              "end": {
+                "line": 5,
+                "column": 147
+              }
+            },
+            "externalCallId": "root/forwarded/second"
+          }
+        }
+      ]
+    },
+    "entry": {
+      "moduleId": "calculate.cso.py",
+      "sourceHash": "ef40bc1508ed59308cc6cecd33b6a22bf84a52bba3764431f2737ef639edd431",
+      "function": "calculate",
+      "invocationId": "root",
+      "resolvedInputs": {},
+      "resolvedInputKinds": {}
+    },
+    "sourceManifest": [
+      {
+        "moduleId": "_cso_bindings/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "moduleId": "_cso_bindings/_external/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "moduleId": "_cso_bindings/_external/methods.py",
+        "sha256": "9b208bfa0cc88f1a6fa74ee92dfa485aa25ee86cf535d903ea63f4f8c896493a"
+      },
+      {
+        "moduleId": "_cso_bindings/forward.py",
+        "sha256": "64ba918f1c1e787798fd59ddbddcd4f6ce3a869721d34a2cb8fe60badc325ea3"
+      },
+      {
+        "moduleId": "adapter.py",
+        "sha256": "efef41c9b9019a36e4b821e7a353a81b4f8c795a2f71ec1142fa9c391db8a07d"
+      },
+      {
+        "moduleId": "calculate.cso.py",
+        "sha256": "ef40bc1508ed59308cc6cecd33b6a22bf84a52bba3764431f2737ef639edd431"
+      },
+      {
+        "moduleId": "forward.cso.py",
+        "sha256": "8a8da00409d781143a1dda5294b2bc431733b995ce929bc2823e395cd6fe7e5d"
+      },
+      {
+        "moduleId": "methods.py",
+        "sha256": "2d44b1e21148e8a717fafccd699cdafbf6d45813b20c52e62b3db82159a0311a"
+      }
+    ],
+    "sourceClosureHash": "ff048910d495cedc57b4c29d0460392f13b34130f93c030971731e6dd4b7c1c5",
+    "invocations": [
+      {
+        "id": "root",
+        "moduleId": "calculate.cso.py",
+        "function": "calculate",
+        "resolvedInputs": {},
+        "inputBindings": [],
+        "symbols": [
+          {
+            "symbolId": "[\"symbol\",\"root\",\"shifted\"]",
+            "localId": "shifted",
+            "variableName": "shifted",
+            "definitionLocation": {
+              "moduleId": "calculate.cso.py",
+              "start": {
+                "line": 9,
+                "column": 4
+              },
+              "end": {
+                "line": 9,
+                "column": 109
+              }
+            },
+            "kind": "formula",
+            "address": {
+              "symbolId": "[\"symbol\",\"root\",\"shifted\"]",
+              "nodeKey": "n1"
+            }
+          }
+        ],
+        "resolvedInputKinds": {}
+      },
+      {
+        "id": "root/first",
+        "moduleId": "methods.py",
+        "function": "step",
+        "resolvedInputs": {
+          "value": 3.0
+        },
+        "inputBindings": [
+          {
+            "parameterName": "value",
+            "parameterLocation": {
+              "moduleId": "methods.py",
+              "start": {
+                "line": 5,
+                "column": 78
+              },
+              "end": {
+                "line": 5,
+                "column": 83
+              }
+            },
+            "kind": "callerLiteral",
+            "value": 3.0,
+            "callerLocation": {
+              "moduleId": "calculate.cso.py",
+              "start": {
+                "line": 8,
+                "column": 23
+              },
+              "end": {
+                "line": 8,
+                "column": 26
+              }
+            },
+            "numericKind": "float"
+          }
+        ],
+        "symbols": [
+          {
+            "symbolId": "[\"symbol\",\"root/first\",\"value\"]",
+            "localId": "value",
+            "variableName": "value",
+            "definitionLocation": {
+              "moduleId": "methods.py",
+              "start": {
+                "line": 5,
+                "column": 78
+              },
+              "end": {
+                "line": 5,
+                "column": 83
+              }
+            },
+            "kind": "input",
+            "givenSource": {
+              "kind": "parameter",
+              "parameterName": "value"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root/first\",\"__cso_result_0\"]",
+            "localId": "__cso_result_0",
+            "variableName": "__cso_result_0",
+            "definitionLocation": {
+              "moduleId": "methods.py",
+              "start": {
+                "line": 5,
+                "column": 0
+              },
+              "end": {
+                "line": 5,
+                "column": 147
+              }
+            },
+            "kind": "externalResult",
+            "externalCallId": "root/first",
+            "outputName": "value"
+          }
+        ],
+        "parentInvocationId": "root",
+        "callBindingName": "first",
+        "callSite": {
+          "moduleId": "calculate.cso.py",
+          "start": {
+            "line": 8,
+            "column": 4
+          },
+          "end": {
+            "line": 8,
+            "column": 27
+          }
+        },
+        "resolvedInputKinds": {
+          "value": "float"
+        }
+      },
+      {
+        "id": "root/forwarded",
+        "moduleId": "forward.cso.py",
+        "function": "forward",
+        "resolvedInputs": {
+          "value": 4.0
+        },
+        "inputBindings": [
+          {
+            "parameterName": "value",
+            "parameterLocation": {
+              "moduleId": "forward.cso.py",
+              "start": {
+                "line": 6,
+                "column": 12
+              },
+              "end": {
+                "line": 6,
+                "column": 24
+              }
+            },
+            "kind": "callerSymbol",
+            "source": {
+              "symbolId": "[\"symbol\",\"root\",\"shifted\"]",
+              "nodeKey": "n1"
+            },
+            "callerLocation": {
+              "moduleId": "calculate.cso.py",
+              "start": {
+                "line": 10,
+                "column": 30
+              },
+              "end": {
+                "line": 10,
+                "column": 37
+              }
+            }
+          }
+        ],
+        "symbols": [],
+        "parentInvocationId": "root",
+        "callBindingName": "forwarded",
+        "callSite": {
+          "moduleId": "calculate.cso.py",
+          "start": {
+            "line": 10,
+            "column": 4
+          },
+          "end": {
+            "line": 10,
+            "column": 38
+          }
+        },
+        "resolvedInputKinds": {
+          "value": "float"
+        }
+      },
+      {
+        "id": "root/forwarded/second",
+        "moduleId": "methods.py",
+        "function": "step",
+        "resolvedInputs": {
+          "value": 4.0
+        },
+        "inputBindings": [
+          {
+            "parameterName": "value",
+            "parameterLocation": {
+              "moduleId": "methods.py",
+              "start": {
+                "line": 5,
+                "column": 78
+              },
+              "end": {
+                "line": 5,
+                "column": 83
+              }
+            },
+            "kind": "callerSymbol",
+            "source": {
+              "symbolId": "[\"symbol\",\"root\",\"shifted\"]",
+              "nodeKey": "n1"
+            },
+            "callerLocation": {
+              "moduleId": "forward.cso.py",
+              "start": {
+                "line": 7,
+                "column": 24
+              },
+              "end": {
+                "line": 7,
+                "column": 29
+              }
+            }
+          }
+        ],
+        "symbols": [
+          {
+            "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+            "localId": "__cso_result_0",
+            "variableName": "__cso_result_0",
+            "definitionLocation": {
+              "moduleId": "methods.py",
+              "start": {
+                "line": 5,
+                "column": 0
+              },
+              "end": {
+                "line": 5,
+                "column": 147
+              }
+            },
+            "kind": "externalResult",
+            "externalCallId": "root/forwarded/second",
+            "outputName": "value"
+          }
+        ],
+        "parentInvocationId": "root/forwarded",
+        "callBindingName": "second",
+        "callSite": {
+          "moduleId": "forward.cso.py",
+          "start": {
+            "line": 7,
+            "column": 4
+          },
+          "end": {
+            "line": 7,
+            "column": 30
+          }
+        },
+        "resolvedInputKinds": {
+          "value": "float"
+        }
+      }
+    ],
+    "observations": [
+      {
+        "symbolId": "[\"symbol\",\"root/first\",\"value\"]",
+        "kind": "input",
+        "definitionLocation": {
+          "moduleId": "methods.py",
+          "start": {
+            "line": 5,
+            "column": 78
+          },
+          "end": {
+            "line": 5,
+            "column": 83
+          }
+        },
+        "invocationId": "root/first",
+        "value": 3.0,
+        "numericKind": "float"
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/first\",\"__cso_result_0\"]",
+        "kind": "externalResult",
+        "definitionLocation": {
+          "moduleId": "methods.py",
+          "start": {
+            "line": 5,
+            "column": 0
+          },
+          "end": {
+            "line": 5,
+            "column": 147
+          }
+        },
+        "invocationId": "root/first",
+        "value": 3.0,
+        "numericKind": "float"
+      },
+      {
+        "symbolId": "[\"symbol\",\"root\",\"shifted\"]",
+        "kind": "formula",
+        "definitionLocation": {
+          "moduleId": "calculate.cso.py",
+          "start": {
+            "line": 9,
+            "column": 4
+          },
+          "end": {
+            "line": 9,
+            "column": 109
+          }
+        },
+        "invocationId": "root",
+        "value": 4.0,
+        "numericKind": "float"
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+        "kind": "externalResult",
+        "definitionLocation": {
+          "moduleId": "methods.py",
+          "start": {
+            "line": 5,
+            "column": 0
+          },
+          "end": {
+            "line": 5,
+            "column": 147
+          }
+        },
+        "invocationId": "root/forwarded/second",
+        "value": 4.0,
+        "numericKind": "float"
+      }
+    ],
+    "assets": [],
+    "versions": {
+      "pythonPackage": "1.0.0",
+      "pythonInterpreter": "python3",
+      "pythonVersion": "3.14.3"
+    },
+    "externalCalls": [
+      {
+        "id": "root/first",
+        "parentInvocationId": "root",
+        "callBindingName": "first",
+        "callSite": {
+          "moduleId": "calculate.cso.py",
+          "start": {
+            "line": 8,
+            "column": 4
+          },
+          "end": {
+            "line": 8,
+            "column": 27
+          }
+        },
+        "declaration": {
+          "moduleId": "methods.py",
+          "name": "step",
+          "fingerprint": "19e36af7d52d4c99d761a05443f630fd1f67fc1cb0dd33edcc748eecc3eb1a68",
+          "location": {
+            "moduleId": "methods.py",
+            "start": {
+              "line": 5,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 147
+            }
+          },
+          "interface": {
+            "path": "adapter.py",
+            "function": "step",
+            "description": "Add external state.",
+            "inputs": [
+              [
+                "value",
+                "float",
+                {
+                  "glyph": "x",
+                  "description": "Input",
+                  "unit": ""
+                }
+              ]
+            ],
+            "outputs": [
+              [
+                "value",
+                "float",
+                {
+                  "glyph": "v",
+                  "description": "Output",
+                  "unit": ""
+                }
+              ]
+            ],
+            "defaults": []
+          }
+        },
+        "adapter": {
+          "moduleId": "adapter.py",
+          "sha256": "efef41c9b9019a36e4b821e7a353a81b4f8c795a2f71ec1142fa9c391db8a07d",
+          "function": "step"
+        },
+        "description": "Add external state.",
+        "inputs": [
+          {
+            "name": "value",
+            "symbolId": "[\"symbol\",\"root/first\",\"value\"]",
+            "numericType": "float",
+            "value": 3.0,
+            "numericKind": "float"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "value",
+            "symbolId": "[\"symbol\",\"root/first\",\"__cso_result_0\"]",
+            "numericType": "float",
+            "value": 3.0,
+            "numericKind": "float"
+          }
+        ],
+        "warnings": []
+      },
+      {
+        "id": "root/forwarded/second",
+        "parentInvocationId": "root/forwarded",
+        "callBindingName": "second",
+        "callSite": {
+          "moduleId": "forward.cso.py",
+          "start": {
+            "line": 7,
+            "column": 4
+          },
+          "end": {
+            "line": 7,
+            "column": 30
+          }
+        },
+        "declaration": {
+          "moduleId": "methods.py",
+          "name": "step",
+          "fingerprint": "19e36af7d52d4c99d761a05443f630fd1f67fc1cb0dd33edcc748eecc3eb1a68",
+          "location": {
+            "moduleId": "methods.py",
+            "start": {
+              "line": 5,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 147
+            }
+          },
+          "interface": {
+            "path": "adapter.py",
+            "function": "step",
+            "description": "Add external state.",
+            "inputs": [
+              [
+                "value",
+                "float",
+                {
+                  "glyph": "x",
+                  "description": "Input",
+                  "unit": ""
+                }
+              ]
+            ],
+            "outputs": [
+              [
+                "value",
+                "float",
+                {
+                  "glyph": "v",
+                  "description": "Output",
+                  "unit": ""
+                }
+              ]
+            ],
+            "defaults": []
+          }
+        },
+        "adapter": {
+          "moduleId": "adapter.py",
+          "sha256": "efef41c9b9019a36e4b821e7a353a81b4f8c795a2f71ec1142fa9c391db8a07d",
+          "function": "step"
+        },
+        "description": "Add external state.",
+        "inputs": [
+          {
+            "name": "value",
+            "symbolId": "[\"symbol\",\"root\",\"shifted\"]",
+            "numericType": "float",
+            "value": 4.0,
+            "numericKind": "float"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "value",
+            "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+            "numericType": "float",
+            "value": 4.0,
+            "numericKind": "float"
+          }
+        ],
+        "warnings": []
+      }
+    ],
+    "runId": "9c849508-d8d3-4c45-a578-157acf7b3483",
+    "environment": {
+      "pythonVersion": "3.14.3",
+      "pythonImplementation": "CPython",
+      "distributions": [
+        [
+          "synthetic-adapter",
+          "1.0"
+        ]
+      ]
+    }
+  },
+  {
+    "authoring": {
+      "version": "2",
+      "parameters": [
+        {
+          "invocationId": "root/first",
+          "parameterName": "value",
+          "symbolId": "[\"symbol\",\"root/first\",\"value\"]",
+          "numericType": "float",
+          "unit": "",
+          "location": {
+            "moduleId": "methods.py",
+            "start": {
+              "line": 5,
+              "column": 78
+            },
+            "end": {
+              "line": 5,
+              "column": 83
+            }
+          },
+          "origin": {
+            "kind": "local"
+          }
+        },
+        {
+          "invocationId": "root/forwarded",
+          "parameterName": "value",
+          "symbolId": "[\"symbol\",\"root\",\"shifted\"]",
+          "numericType": "float",
+          "unit": "",
+          "location": {
+            "moduleId": "forward.cso.py",
+            "start": {
+              "line": 6,
+              "column": 12
+            },
+            "end": {
+              "line": 6,
+              "column": 24
+            }
+          },
+          "origin": {
+            "kind": "symbol",
+            "symbolId": "[\"symbol\",\"root\",\"shifted\"]"
+          }
+        },
+        {
+          "invocationId": "root/forwarded/second",
+          "parameterName": "value",
+          "symbolId": "[\"symbol\",\"root\",\"shifted\"]",
+          "numericType": "float",
+          "unit": "",
+          "location": {
+            "moduleId": "methods.py",
+            "start": {
+              "line": 5,
+              "column": 78
+            },
+            "end": {
+              "line": 5,
+              "column": 83
+            }
+          },
+          "origin": {
+            "kind": "parameter",
+            "invocationId": "root/forwarded",
+            "parameterName": "value"
+          }
+        }
+      ],
+      "uses": [],
+      "outputDeclarations": [
+        {
+          "invocationId": "root",
+          "name": "value",
+          "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+          "source": {
+            "kind": "output",
+            "invocationId": "root/forwarded",
+            "outputName": "value"
+          },
+          "location": {
+            "moduleId": "calculate.cso.py",
+            "start": {
+              "line": 11,
+              "column": 21
+            },
+            "end": {
+              "line": 11,
+              "column": 39
+            }
+          }
+        },
+        {
+          "invocationId": "root/first",
+          "name": "value",
+          "symbolId": "[\"symbol\",\"root/first\",\"__cso_result_0\"]",
+          "source": {
+            "kind": "symbol",
+            "symbolId": "[\"symbol\",\"root/first\",\"__cso_result_0\"]"
+          },
+          "location": {
+            "moduleId": "methods.py",
+            "start": {
+              "line": 5,
+              "column": 104
+            },
+            "end": {
+              "line": 5,
+              "column": 110
+            }
+          }
+        },
+        {
+          "invocationId": "root/forwarded",
+          "name": "value",
+          "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+          "source": {
+            "kind": "output",
+            "invocationId": "root/forwarded/second",
+            "outputName": "value"
+          },
+          "location": {
+            "moduleId": "forward.cso.py",
+            "start": {
+              "line": 8,
+              "column": 21
+            },
+            "end": {
+              "line": 8,
+              "column": 36
+            }
+          }
+        },
+        {
+          "invocationId": "root/forwarded/second",
+          "name": "value",
+          "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+          "source": {
+            "kind": "symbol",
+            "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]"
+          },
+          "location": {
+            "moduleId": "methods.py",
+            "start": {
+              "line": 5,
+              "column": 104
+            },
+            "end": {
+              "line": 5,
+              "column": 110
+            }
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "invocationId": "root",
+          "name": "value",
+          "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+          "source": {
+            "kind": "output",
+            "invocationId": "root/forwarded",
+            "outputName": "value"
+          },
+          "location": {
+            "moduleId": "calculate.cso.py",
+            "start": {
+              "line": 11,
+              "column": 21
+            },
+            "end": {
+              "line": 11,
+              "column": 39
+            }
+          },
+          "value": 6.0,
+          "numericKind": "float"
+        },
+        {
+          "invocationId": "root/first",
+          "name": "value",
+          "symbolId": "[\"symbol\",\"root/first\",\"__cso_result_0\"]",
+          "source": {
+            "kind": "symbol",
+            "symbolId": "[\"symbol\",\"root/first\",\"__cso_result_0\"]"
+          },
+          "location": {
+            "moduleId": "methods.py",
+            "start": {
+              "line": 5,
+              "column": 104
+            },
+            "end": {
+              "line": 5,
+              "column": 110
+            }
+          },
+          "value": 4.0,
+          "numericKind": "float"
+        },
+        {
+          "invocationId": "root/forwarded",
+          "name": "value",
+          "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+          "source": {
+            "kind": "output",
+            "invocationId": "root/forwarded/second",
+            "outputName": "value"
+          },
+          "location": {
+            "moduleId": "forward.cso.py",
+            "start": {
+              "line": 8,
+              "column": 21
+            },
+            "end": {
+              "line": 8,
+              "column": 36
+            }
+          },
+          "value": 6.0,
+          "numericKind": "float"
+        },
+        {
+          "invocationId": "root/forwarded/second",
+          "name": "value",
+          "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+          "source": {
+            "kind": "symbol",
+            "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]"
+          },
+          "location": {
+            "moduleId": "methods.py",
+            "start": {
+              "line": 5,
+              "column": 104
+            },
+            "end": {
+              "line": 5,
+              "column": 110
+            }
+          },
+          "value": 6.0,
+          "numericKind": "float"
+        }
+      ]
+    },
+    "cso": {
+      "schemaVersion": "1.2.0",
+      "title": "Formula and helper chain",
+      "source": {
+        "id": "chain",
+        "metadata": {}
+      },
+      "rootSectionIds": [
+        "[\"section\",\"root\",\"wssa06ce60c29\"]"
+      ],
+      "sections": [
+        {
+          "id": "[\"section\",\"root\",\"wssa06ce60c29\"]",
+          "title": "Formula and helper chain",
+          "items": [
+            {
+              "kind": "section",
+              "id": "[\"section\",\"root/first\",\"step\"]",
+              "metadata": {
+                "invocationId": "root",
+                "location": {
+                  "moduleId": "calculate.cso.py",
+                  "start": {
+                    "line": 8,
+                    "column": 4
+                  },
+                  "end": {
+                    "line": 8,
+                    "column": 27
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root\",\"shifted\"]",
+                "glyph": "y",
+                "glyphPlaintext": "y",
+                "description": "Shifted value",
+                "unit": "",
+                "comment": "",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "metadata": {
+                        "invocationId": "root",
+                        "location": {
+                          "moduleId": "calculate.cso.py",
+                          "start": {
+                            "line": 9,
+                            "column": 89
+                          },
+                          "end": {
+                            "line": 9,
+                            "column": 109
+                          }
+                        }
+                      },
+                      "mode": "FUNCTION",
+                      "funcSpec": {
+                        "id": "fg.add"
+                      },
+                      "funcArgs": [
+                        {
+                          "key": "n2"
+                        },
+                        {
+                          "key": "n3"
+                        }
+                      ]
+                    },
+                    {
+                      "key": "n2",
+                      "metadata": {
+                        "invocationId": "root",
+                        "location": {
+                          "moduleId": "calculate.cso.py",
+                          "start": {
+                            "line": 9,
+                            "column": 89
+                          },
+                          "end": {
+                            "line": 9,
+                            "column": 103
+                          }
+                        },
+                        "outputInvocationId": "root/first",
+                        "outputName": "value"
+                      },
+                      "mode": "SYMBOL",
+                      "symbol": {
+                        "id": "[\"symbol\",\"root/first\",\"__cso_result_0\"]"
+                      }
+                    },
+                    {
+                      "key": "n3",
+                      "metadata": {
+                        "invocationId": "root",
+                        "location": {
+                          "moduleId": "calculate.cso.py",
+                          "start": {
+                            "line": 9,
+                            "column": 106
+                          },
+                          "end": {
+                            "line": 9,
+                            "column": 109
+                          }
+                        }
+                      },
+                      "draft": "1.0",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "numericKind": "float",
+                        "value": 1.0
+                      }
+                    }
+                  ],
+                  "result": {
+                    "kind": "number",
+                    "value": 5.0,
+                    "numericKind": "float"
+                  }
+                },
+                "metadata": {
+                  "localId": "shifted",
+                  "invocationId": "root",
+                  "location": {
+                    "moduleId": "calculate.cso.py",
+                    "start": {
+                      "line": 9,
+                      "column": 4
+                    },
+                    "end": {
+                      "line": 9,
+                      "column": 109
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "section",
+              "id": "[\"section\",\"root/forwarded\",\"wsse21fcadb1f\"]",
+              "metadata": {
+                "invocationId": "root",
+                "location": {
+                  "moduleId": "calculate.cso.py",
+                  "start": {
+                    "line": 10,
+                    "column": 4
+                  },
+                  "end": {
+                    "line": 10,
+                    "column": 38
+                  }
+                }
+              }
+            }
+          ],
+          "metadata": {
+            "localId": "wssa06ce60c29",
+            "invocationId": "root",
+            "location": {
+              "moduleId": "calculate.cso.py",
+              "start": {
+                "line": 6,
+                "column": 1
+              },
+              "end": {
+                "line": 6,
+                "column": 53
+              }
+            }
+          }
+        },
+        {
+          "id": "[\"section\",\"root/first\",\"step\"]",
+          "title": "step",
+          "items": [
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/first\",\"value\"]",
+                "glyph": "x",
+                "glyphPlaintext": "x",
+                "description": "Input",
+                "unit": "",
+                "comment": "",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 3.0,
+                        "numericKind": "float"
+                      }
+                    }
+                  ],
+                  "result": {
+                    "kind": "number",
+                    "value": 3.0,
+                    "numericKind": "float"
+                  }
+                },
+                "metadata": {
+                  "localId": "value",
+                  "invocationId": "root/first",
+                  "location": {
+                    "moduleId": "methods.py",
+                    "start": {
+                      "line": 5,
+                      "column": 78
+                    },
+                    "end": {
+                      "line": 5,
+                      "column": 83
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/first\",\"__cso_result_0\"]",
+                "glyph": "v_{first}",
+                "glyphPlaintext": "v_{first}",
+                "description": "Output",
+                "unit": "",
+                "comment": "",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 4.0,
+                        "numericKind": "float"
+                      }
+                    }
+                  ],
+                  "result": {
+                    "kind": "number",
+                    "value": 4.0,
+                    "numericKind": "float"
+                  }
+                },
+                "metadata": {
+                  "localId": "__cso_result_0",
+                  "invocationId": "root/first",
+                  "location": {
+                    "moduleId": "methods.py",
+                    "start": {
+                      "line": 5,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 5,
+                      "column": 147
+                    }
+                  },
+                  "authoredGlyph": "v",
+                  "glyphScope": "first"
+                }
+              }
+            }
+          ],
+          "metadata": {
+            "localId": "step",
+            "invocationId": "root/first",
+            "location": {
+              "moduleId": "methods.py",
+              "start": {
+                "line": 5,
+                "column": 0
+              },
+              "end": {
+                "line": 5,
+                "column": 147
+              }
+            },
+            "externalCallId": "root/first"
+          }
+        },
+        {
+          "id": "[\"section\",\"root/forwarded\",\"wsse21fcadb1f\"]",
+          "title": "Forward value",
+          "items": [
+            {
+              "kind": "section",
+              "id": "[\"section\",\"root/forwarded/second\",\"step\"]",
+              "metadata": {
+                "invocationId": "root/forwarded",
+                "location": {
+                  "moduleId": "forward.cso.py",
+                  "start": {
+                    "line": 7,
+                    "column": 4
+                  },
+                  "end": {
+                    "line": 7,
+                    "column": 30
+                  }
+                }
+              }
+            }
+          ],
+          "metadata": {
+            "localId": "wsse21fcadb1f",
+            "invocationId": "root/forwarded",
+            "location": {
+              "moduleId": "forward.cso.py",
+              "start": {
+                "line": 5,
+                "column": 1
+              },
+              "end": {
+                "line": 5,
+                "column": 42
+              }
+            }
+          }
+        },
+        {
+          "id": "[\"section\",\"root/forwarded/second\",\"step\"]",
+          "title": "step",
+          "items": [
+            {
+              "kind": "symbol",
+              "symbol": {
+                "id": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+                "glyph": "v_{forwarded,second}",
+                "glyphPlaintext": "v_{forwarded,second}",
+                "description": "Output",
+                "unit": "",
+                "comment": "",
+                "valueTree": {
+                  "rootKey": "n1",
+                  "nodes": [
+                    {
+                      "key": "n1",
+                      "mode": "LITERAL",
+                      "literal": {
+                        "kind": "number",
+                        "value": 6.0,
+                        "numericKind": "float"
+                      }
+                    }
+                  ],
+                  "result": {
+                    "kind": "number",
+                    "value": 6.0,
+                    "numericKind": "float"
+                  }
+                },
+                "metadata": {
+                  "localId": "__cso_result_0",
+                  "invocationId": "root/forwarded/second",
+                  "location": {
+                    "moduleId": "methods.py",
+                    "start": {
+                      "line": 5,
+                      "column": 0
+                    },
+                    "end": {
+                      "line": 5,
+                      "column": 147
+                    }
+                  },
+                  "authoredGlyph": "v",
+                  "glyphScope": "forwarded,second"
+                }
+              }
+            }
+          ],
+          "metadata": {
+            "localId": "step",
+            "invocationId": "root/forwarded/second",
+            "location": {
+              "moduleId": "methods.py",
+              "start": {
+                "line": 5,
+                "column": 0
+              },
+              "end": {
+                "line": 5,
+                "column": 147
+              }
+            },
+            "externalCallId": "root/forwarded/second"
+          }
+        }
+      ]
+    },
+    "entry": {
+      "moduleId": "calculate.cso.py",
+      "sourceHash": "ef40bc1508ed59308cc6cecd33b6a22bf84a52bba3764431f2737ef639edd431",
+      "function": "calculate",
+      "invocationId": "root",
+      "resolvedInputs": {},
+      "resolvedInputKinds": {}
+    },
+    "sourceManifest": [
+      {
+        "moduleId": "_cso_bindings/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "moduleId": "_cso_bindings/_external/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "moduleId": "_cso_bindings/_external/methods.py",
+        "sha256": "9b208bfa0cc88f1a6fa74ee92dfa485aa25ee86cf535d903ea63f4f8c896493a"
+      },
+      {
+        "moduleId": "_cso_bindings/forward.py",
+        "sha256": "64ba918f1c1e787798fd59ddbddcd4f6ce3a869721d34a2cb8fe60badc325ea3"
+      },
+      {
+        "moduleId": "adapter.py",
+        "sha256": "efef41c9b9019a36e4b821e7a353a81b4f8c795a2f71ec1142fa9c391db8a07d"
+      },
+      {
+        "moduleId": "calculate.cso.py",
+        "sha256": "ef40bc1508ed59308cc6cecd33b6a22bf84a52bba3764431f2737ef639edd431"
+      },
+      {
+        "moduleId": "forward.cso.py",
+        "sha256": "8a8da00409d781143a1dda5294b2bc431733b995ce929bc2823e395cd6fe7e5d"
+      },
+      {
+        "moduleId": "methods.py",
+        "sha256": "2d44b1e21148e8a717fafccd699cdafbf6d45813b20c52e62b3db82159a0311a"
+      }
+    ],
+    "sourceClosureHash": "ff048910d495cedc57b4c29d0460392f13b34130f93c030971731e6dd4b7c1c5",
+    "invocations": [
+      {
+        "id": "root",
+        "moduleId": "calculate.cso.py",
+        "function": "calculate",
+        "resolvedInputs": {},
+        "inputBindings": [],
+        "symbols": [
+          {
+            "symbolId": "[\"symbol\",\"root\",\"shifted\"]",
+            "localId": "shifted",
+            "variableName": "shifted",
+            "definitionLocation": {
+              "moduleId": "calculate.cso.py",
+              "start": {
+                "line": 9,
+                "column": 4
+              },
+              "end": {
+                "line": 9,
+                "column": 109
+              }
+            },
+            "kind": "formula",
+            "address": {
+              "symbolId": "[\"symbol\",\"root\",\"shifted\"]",
+              "nodeKey": "n1"
+            }
+          }
+        ],
+        "resolvedInputKinds": {}
+      },
+      {
+        "id": "root/first",
+        "moduleId": "methods.py",
+        "function": "step",
+        "resolvedInputs": {
+          "value": 3.0
+        },
+        "inputBindings": [
+          {
+            "parameterName": "value",
+            "parameterLocation": {
+              "moduleId": "methods.py",
+              "start": {
+                "line": 5,
+                "column": 78
+              },
+              "end": {
+                "line": 5,
+                "column": 83
+              }
+            },
+            "kind": "callerLiteral",
+            "value": 3.0,
+            "callerLocation": {
+              "moduleId": "calculate.cso.py",
+              "start": {
+                "line": 8,
+                "column": 23
+              },
+              "end": {
+                "line": 8,
+                "column": 26
+              }
+            },
+            "numericKind": "float"
+          }
+        ],
+        "symbols": [
+          {
+            "symbolId": "[\"symbol\",\"root/first\",\"value\"]",
+            "localId": "value",
+            "variableName": "value",
+            "definitionLocation": {
+              "moduleId": "methods.py",
+              "start": {
+                "line": 5,
+                "column": 78
+              },
+              "end": {
+                "line": 5,
+                "column": 83
+              }
+            },
+            "kind": "input",
+            "givenSource": {
+              "kind": "parameter",
+              "parameterName": "value"
+            }
+          },
+          {
+            "symbolId": "[\"symbol\",\"root/first\",\"__cso_result_0\"]",
+            "localId": "__cso_result_0",
+            "variableName": "__cso_result_0",
+            "definitionLocation": {
+              "moduleId": "methods.py",
+              "start": {
+                "line": 5,
+                "column": 0
+              },
+              "end": {
+                "line": 5,
+                "column": 147
+              }
+            },
+            "kind": "externalResult",
+            "externalCallId": "root/first",
+            "outputName": "value"
+          }
+        ],
+        "parentInvocationId": "root",
+        "callBindingName": "first",
+        "callSite": {
+          "moduleId": "calculate.cso.py",
+          "start": {
+            "line": 8,
+            "column": 4
+          },
+          "end": {
+            "line": 8,
+            "column": 27
+          }
+        },
+        "resolvedInputKinds": {
+          "value": "float"
+        }
+      },
+      {
+        "id": "root/forwarded",
+        "moduleId": "forward.cso.py",
+        "function": "forward",
+        "resolvedInputs": {
+          "value": 5.0
+        },
+        "inputBindings": [
+          {
+            "parameterName": "value",
+            "parameterLocation": {
+              "moduleId": "forward.cso.py",
+              "start": {
+                "line": 6,
+                "column": 12
+              },
+              "end": {
+                "line": 6,
+                "column": 24
+              }
+            },
+            "kind": "callerSymbol",
+            "source": {
+              "symbolId": "[\"symbol\",\"root\",\"shifted\"]",
+              "nodeKey": "n1"
+            },
+            "callerLocation": {
+              "moduleId": "calculate.cso.py",
+              "start": {
+                "line": 10,
+                "column": 30
+              },
+              "end": {
+                "line": 10,
+                "column": 37
+              }
+            }
+          }
+        ],
+        "symbols": [],
+        "parentInvocationId": "root",
+        "callBindingName": "forwarded",
+        "callSite": {
+          "moduleId": "calculate.cso.py",
+          "start": {
+            "line": 10,
+            "column": 4
+          },
+          "end": {
+            "line": 10,
+            "column": 38
+          }
+        },
+        "resolvedInputKinds": {
+          "value": "float"
+        }
+      },
+      {
+        "id": "root/forwarded/second",
+        "moduleId": "methods.py",
+        "function": "step",
+        "resolvedInputs": {
+          "value": 5.0
+        },
+        "inputBindings": [
+          {
+            "parameterName": "value",
+            "parameterLocation": {
+              "moduleId": "methods.py",
+              "start": {
+                "line": 5,
+                "column": 78
+              },
+              "end": {
+                "line": 5,
+                "column": 83
+              }
+            },
+            "kind": "callerSymbol",
+            "source": {
+              "symbolId": "[\"symbol\",\"root\",\"shifted\"]",
+              "nodeKey": "n1"
+            },
+            "callerLocation": {
+              "moduleId": "forward.cso.py",
+              "start": {
+                "line": 7,
+                "column": 24
+              },
+              "end": {
+                "line": 7,
+                "column": 29
+              }
+            }
+          }
+        ],
+        "symbols": [
+          {
+            "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+            "localId": "__cso_result_0",
+            "variableName": "__cso_result_0",
+            "definitionLocation": {
+              "moduleId": "methods.py",
+              "start": {
+                "line": 5,
+                "column": 0
+              },
+              "end": {
+                "line": 5,
+                "column": 147
+              }
+            },
+            "kind": "externalResult",
+            "externalCallId": "root/forwarded/second",
+            "outputName": "value"
+          }
+        ],
+        "parentInvocationId": "root/forwarded",
+        "callBindingName": "second",
+        "callSite": {
+          "moduleId": "forward.cso.py",
+          "start": {
+            "line": 7,
+            "column": 4
+          },
+          "end": {
+            "line": 7,
+            "column": 30
+          }
+        },
+        "resolvedInputKinds": {
+          "value": "float"
+        }
+      }
+    ],
+    "observations": [
+      {
+        "symbolId": "[\"symbol\",\"root/first\",\"value\"]",
+        "kind": "input",
+        "definitionLocation": {
+          "moduleId": "methods.py",
+          "start": {
+            "line": 5,
+            "column": 78
+          },
+          "end": {
+            "line": 5,
+            "column": 83
+          }
+        },
+        "invocationId": "root/first",
+        "value": 3.0,
+        "numericKind": "float"
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/first\",\"__cso_result_0\"]",
+        "kind": "externalResult",
+        "definitionLocation": {
+          "moduleId": "methods.py",
+          "start": {
+            "line": 5,
+            "column": 0
+          },
+          "end": {
+            "line": 5,
+            "column": 147
+          }
+        },
+        "invocationId": "root/first",
+        "value": 4.0,
+        "numericKind": "float"
+      },
+      {
+        "symbolId": "[\"symbol\",\"root\",\"shifted\"]",
+        "kind": "formula",
+        "definitionLocation": {
+          "moduleId": "calculate.cso.py",
+          "start": {
+            "line": 9,
+            "column": 4
+          },
+          "end": {
+            "line": 9,
+            "column": 109
+          }
+        },
+        "invocationId": "root",
+        "value": 5.0,
+        "numericKind": "float"
+      },
+      {
+        "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+        "kind": "externalResult",
+        "definitionLocation": {
+          "moduleId": "methods.py",
+          "start": {
+            "line": 5,
+            "column": 0
+          },
+          "end": {
+            "line": 5,
+            "column": 147
+          }
+        },
+        "invocationId": "root/forwarded/second",
+        "value": 6.0,
+        "numericKind": "float"
+      }
+    ],
+    "assets": [],
+    "versions": {
+      "pythonPackage": "1.0.0",
+      "pythonInterpreter": "python3",
+      "pythonVersion": "3.14.3"
+    },
+    "externalCalls": [
+      {
+        "id": "root/first",
+        "parentInvocationId": "root",
+        "callBindingName": "first",
+        "callSite": {
+          "moduleId": "calculate.cso.py",
+          "start": {
+            "line": 8,
+            "column": 4
+          },
+          "end": {
+            "line": 8,
+            "column": 27
+          }
+        },
+        "declaration": {
+          "moduleId": "methods.py",
+          "name": "step",
+          "fingerprint": "19e36af7d52d4c99d761a05443f630fd1f67fc1cb0dd33edcc748eecc3eb1a68",
+          "location": {
+            "moduleId": "methods.py",
+            "start": {
+              "line": 5,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 147
+            }
+          },
+          "interface": {
+            "path": "adapter.py",
+            "function": "step",
+            "description": "Add external state.",
+            "inputs": [
+              [
+                "value",
+                "float",
+                {
+                  "glyph": "x",
+                  "description": "Input",
+                  "unit": ""
+                }
+              ]
+            ],
+            "outputs": [
+              [
+                "value",
+                "float",
+                {
+                  "glyph": "v",
+                  "description": "Output",
+                  "unit": ""
+                }
+              ]
+            ],
+            "defaults": []
+          }
+        },
+        "adapter": {
+          "moduleId": "adapter.py",
+          "sha256": "efef41c9b9019a36e4b821e7a353a81b4f8c795a2f71ec1142fa9c391db8a07d",
+          "function": "step"
+        },
+        "description": "Add external state.",
+        "inputs": [
+          {
+            "name": "value",
+            "symbolId": "[\"symbol\",\"root/first\",\"value\"]",
+            "numericType": "float",
+            "value": 3.0,
+            "numericKind": "float"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "value",
+            "symbolId": "[\"symbol\",\"root/first\",\"__cso_result_0\"]",
+            "numericType": "float",
+            "value": 4.0,
+            "numericKind": "float"
+          }
+        ],
+        "warnings": []
+      },
+      {
+        "id": "root/forwarded/second",
+        "parentInvocationId": "root/forwarded",
+        "callBindingName": "second",
+        "callSite": {
+          "moduleId": "forward.cso.py",
+          "start": {
+            "line": 7,
+            "column": 4
+          },
+          "end": {
+            "line": 7,
+            "column": 30
+          }
+        },
+        "declaration": {
+          "moduleId": "methods.py",
+          "name": "step",
+          "fingerprint": "19e36af7d52d4c99d761a05443f630fd1f67fc1cb0dd33edcc748eecc3eb1a68",
+          "location": {
+            "moduleId": "methods.py",
+            "start": {
+              "line": 5,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 147
+            }
+          },
+          "interface": {
+            "path": "adapter.py",
+            "function": "step",
+            "description": "Add external state.",
+            "inputs": [
+              [
+                "value",
+                "float",
+                {
+                  "glyph": "x",
+                  "description": "Input",
+                  "unit": ""
+                }
+              ]
+            ],
+            "outputs": [
+              [
+                "value",
+                "float",
+                {
+                  "glyph": "v",
+                  "description": "Output",
+                  "unit": ""
+                }
+              ]
+            ],
+            "defaults": []
+          }
+        },
+        "adapter": {
+          "moduleId": "adapter.py",
+          "sha256": "efef41c9b9019a36e4b821e7a353a81b4f8c795a2f71ec1142fa9c391db8a07d",
+          "function": "step"
+        },
+        "description": "Add external state.",
+        "inputs": [
+          {
+            "name": "value",
+            "symbolId": "[\"symbol\",\"root\",\"shifted\"]",
+            "numericType": "float",
+            "value": 5.0,
+            "numericKind": "float"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "value",
+            "symbolId": "[\"symbol\",\"root/forwarded/second\",\"__cso_result_0\"]",
+            "numericType": "float",
+            "value": 6.0,
+            "numericKind": "float"
+          }
+        ],
+        "warnings": []
+      }
+    ],
+    "runId": "06c6ca71-b60d-4061-8c62-2462ab3b53fd",
+    "environment": {
+      "pythonVersion": "3.14.3",
+      "pythonImplementation": "CPython",
+      "distributions": [
+        [
+          "synthetic-adapter",
+          "1.0"
+        ]
+      ]
+    }
+  }
+]

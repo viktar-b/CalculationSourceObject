@@ -75,6 +75,31 @@ The captured path preflights local source and executes captured UTF-8 bytes.
 Older single-file exports retain the development exporter. This is trusted local
 calculation authoring, not isolation for hostile Python.
 
+## External adapters
+
+`external_function` declares a single-file ordinary Python adapter with ordered
+numeric inputs, named outputs, defaults and a reusable method explanation.
+Generate its typed handle with the usual bindings command and import it from
+`_cso_bindings._external.<declaration_module>`. Static tools capture the adapter
+without importing it or requiring its scientific dependencies.
+
+Use the handle inside a top-level generated calculation. It executes once per
+authored call and captures every output, including unused diagnostics. Callers
+select named outputs from the returned handle. External handles alone require
+an active calculation context. Direct Python can also call the ordinary helper.
+
+Adapters return native finite Python numbers, or a plain dictionary with exactly
+the declared output keys. Convert library scalars explicitly and raise when the
+algorithm fails. Adapter state is shared within a run and starts fresh in the
+next run; installed dependency state is not a process sandbox. See the
+[canonical examples](../../examples/external-functions/README.md).
+
+The Python command-line consumer must explicitly advertise support with
+`--supported-execution-protocol 4` before executing an external calculation.
+The coordinated CSO CLI sends that capability automatically. `export` rejects
+external calculations because standalone CSO cannot retain their call evidence.
+Use full captured execution or prepared HTML/PDF instead.
+
 ## Code and checks
 
 [Public helpers](src/cso_python/__init__.py), [capture](src/cso_python/source.py),

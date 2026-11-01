@@ -35,6 +35,11 @@ const mathSheet = (document: PreparedDocument): SheetDocument =>
         id: section.id,
         title: section.title,
         items: section.items.flatMap((item): CalculationSourceSectionItem[] => {
+          if (item.kind === 'externalCall') {
+            return [...item.call.inputs, ...item.call.outputs].map(
+              (quantity) => ({ kind: 'symbolRef', id: quantity.symbolId }),
+            );
+          }
           if (item.kind === 'section') {
             return [{ kind: 'section', id: item.id }];
           }
@@ -142,6 +147,43 @@ export const PreparedFormulaSheet = ({
       items: readonly PreparedMethodContent[],
     ): ReactElement[] =>
       items.map((item, index) => {
+        if (item.kind === 'external') {
+          return (
+            <section
+              key={`external-${item.binding}`}
+              className="cso-method-external"
+              data-method-external={item.binding}
+            >
+              <h4>{item.binding}</h4>
+              <p>
+                External source: {item.adapter.moduleId},{' '}
+                {item.adapter.function}
+              </p>
+              <p>External algorithm excluded from CSO formula verification.</p>
+              <h5>Inputs</h5>
+              {item.inputs.map((input) => (
+                <div key={input.name} data-external-method-input={input.name}>
+                  {notation.row(input.symbolId, symbolIndex++)}
+                </div>
+              ))}
+              <h5>Method</h5>
+              {item.declaration.interface.description
+                .split(/\n\s*\n/u)
+                .map((paragraph, paragraphIndex) => (
+                  <p key={`paragraph-${paragraphIndex}`}>{paragraph}</p>
+                ))}
+              <h5>Outputs</h5>
+              {item.outputs.map((output) => (
+                <div
+                  key={output.name}
+                  data-external-method-output={output.name}
+                >
+                  {notation.row(output.symbolId, symbolIndex++)}
+                </div>
+              ))}
+            </section>
+          );
+        }
         if (item.kind === 'check' || item.kind === 'applicability') {
           return (
             <p
@@ -275,6 +317,139 @@ export const PreparedFormulaSheet = ({
       ))}
       {section.items.map((item) => {
         switch (item.kind) {
+          case 'externalCall': {
+            const quantityRow = (
+              quantity: (typeof item.call.outputs)[number],
+              role: string,
+              index: number,
+            ) => {
+              const symbol = requiredItem(symbols, quantity.symbolId);
+              const qualification = item.qualifications?.find(
+                (note) => note.symbolId === quantity.symbolId,
+              );
+              return (
+                <tr
+                  key={`${role}-${quantity.name}`}
+                  data-external-quantity={quantity.name}
+                  data-external-role={role}
+                  data-external-index={index}
+                  data-symbol-id={quantity.symbolId}
+                >
+                  <td colSpan={2} className="cso-external-quantity-cell">
+                    {qualification ? (
+                      <p
+                        className="cso-branch-note"
+                        data-applicability="not-applicable"
+                      >
+                        Not applicable. {qualification.reasons.join(' ')}
+                      </p>
+                    ) : null}
+                    <FormulaSheetSymbolRow
+                      sheet={sheet}
+                      item={symbol}
+                      sheetItemIndex={symbolIndex++}
+                      showFormula={false}
+                    />
+                  </td>
+                </tr>
+              );
+            };
+            return (
+              <section
+                key={item.sourcePlacementId}
+                data-source-placement={item.sourcePlacementId}
+                data-external-call={item.call.id}
+                className="cso-external-call"
+              >
+                <table>
+                  <thead>
+                    <tr>
+                      <th colSpan={2}>
+                        <h3>{item.title}</h3>
+                        <p>
+                          External source: {item.call.adapter.moduleId},{' '}
+                          {item.call.adapter.function}
+                        </p>
+                        <p>
+                          External algorithm excluded from CSO formula
+                          verification.
+                        </p>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <th colSpan={2}>Inputs</th>
+                    </tr>
+                    {item.call.inputs.map((quantity, index) =>
+                      quantityRow(quantity, 'input', index),
+                    )}
+                    <tr>
+                      <th colSpan={2}>Method</th>
+                    </tr>
+                    {item.call.description
+                      .split(/\n\s*\n/u)
+                      .map((paragraph, index) => (
+                        <tr key={`method-${index}`}>
+                          <td colSpan={2}>{paragraph}</td>
+                        </tr>
+                      ))}
+                    <tr>
+                      <th colSpan={2}>Outputs</th>
+                    </tr>
+                    {item.call.outputs.map((quantity, index) =>
+                      quantityRow(quantity, 'output', index),
+                    )}
+                    {item.call.warnings.map((warning, index) => (
+                      <tr key={`warning-${index}`}>
+                        <td colSpan={2}>{warning}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {document.verification?.externalCoverage ? (
+                  <p className="cso-external-coverage">
+                    External-result consistency:{' '}
+                    {
+                      document.verification.checks.externalResultConsistency
+                        ?.status
+                    }
+                    . Formula checks:{' '}
+                    {document.verification.checks.formulaConsistency.counts
+                      ?.checked ?? 0}
+                    . Captured external calls:{' '}
+                    {document.verification.externalCoverage.calls}. External
+                    results: {document.verification.externalCoverage.results}.
+                  </p>
+                ) : null}
+                {document.verification?.externalReferenceCoverage ? (
+                  <div className="cso-external-reference-coverage">
+                    <p>
+                      Independent external reference coverage:{' '}
+                      {document.verification.externalReferenceCoverage.status}.
+                    </p>
+                    <p>
+                      Checked outputs:{' '}
+                      {document.verification.externalReferenceCoverage.checked
+                        .filter((slot) => slot.externalCallId === item.call.id)
+                        .map((slot) => slot.outputName)
+                        .join(', ') || 'None'}
+                      .
+                    </p>
+                    <p>
+                      Uncovered outputs:{' '}
+                      {document.verification.externalReferenceCoverage.uncovered
+                        .filter((slot) => slot.externalCallId === item.call.id)
+                        .map((slot) => slot.outputName)
+                        .join(', ') || 'None'}
+                      .
+                    </p>
+                  </div>
+                ) : null}
+                <EngineeringMetadata entries={item.context} />
+              </section>
+            );
+          }
           case 'section': {
             const child = requiredItem(sections, item.id);
             return (

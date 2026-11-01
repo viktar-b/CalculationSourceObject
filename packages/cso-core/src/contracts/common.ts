@@ -212,6 +212,7 @@ export const DiagnosticStageSchema = z.enum([
   'write',
 ]);
 export const CheckNameSchema = z.enum([
+  'externalResultConsistency',
   'executionValidity',
   'inputConsistency',
   'constantConsistency',
@@ -276,6 +277,8 @@ export const DiagnosticSchema = z
     },
   );
 export const ProvenanceSchema = OptionalResolvedInputEvidenceSchema.safeExtend({
+  captureHash: HashSchema.optional(),
+  runId: z.string().uuid().optional(),
   entryModuleId: ModuleIdSchema.optional(),
   entrySourceHash: HashSchema.optional(),
   sourceClosureHash: HashSchema.optional(),
@@ -414,7 +417,16 @@ export const ExecutionBindingSchema = ResolvedInputEvidenceSchema.safeExtend({
   entrySourceHash: HashSchema,
   sourceClosureHash: HashSchema,
   function: PythonIdentifierSchema,
-});
+  captureHash: HashSchema.optional(),
+  runId: z.string().uuid().optional(),
+}).refine(
+  (binding) =>
+    (binding.captureHash === undefined) === (binding.runId === undefined),
+  {
+    message:
+      'Exact capture bindings require both a capture hash and run identity',
+  },
+);
 export type ExecutionBinding = z.infer<typeof ExecutionBindingSchema>;
 export const executionBindingKey = (binding: ExecutionBinding): string =>
   JSON.stringify([
@@ -427,4 +439,25 @@ export const executionBindingKey = (binding: ExecutionBinding): string =>
       // Inputs are numbers, so a string marker cannot collide with an input.
       // JSON.stringify alone would erase the sign of negative zero.
       .map(([name, value]) => [name, Object.is(value, -0) ? '-0' : value]),
+    ...(binding.captureHash === undefined
+      ? []
+      : [binding.captureHash, binding.runId]),
   ]);
+
+/** Canonical, kind-sensitive capture digest, including signed zero. */
+export const exactCaptureHash = (value: unknown): string => {
+  const encode = (item: unknown): unknown => {
+    if (typeof item === 'number')
+      return ['number', Object.is(item, -0) ? '-0' : String(item)];
+    if (Array.isArray(item)) return ['array', item.map(encode)];
+    if (item !== null && typeof item === 'object')
+      return [
+        'object',
+        Object.entries(item)
+          .sort(([left], [right]) => compareUtf8(left, right))
+          .map(([key, entry]) => [key, encode(entry)]),
+      ];
+    return [typeof item, item];
+  };
+  return sha256Bytes(encoder.encode(JSON.stringify(encode(value))));
+};

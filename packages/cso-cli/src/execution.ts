@@ -32,9 +32,11 @@ export function runPythonExecution(
       options.functionName,
       '--inputs-json',
       stringifyJson(options.inputs),
+      '--supported-execution-protocol',
+      '4',
     ],
     maxBuffer: 64 * 1024 * 1024,
-    timeout: timeoutMs,
+    timeout: timeoutMs ?? options.executionTimeoutMs,
     killSignal: 'SIGKILL',
   });
   if (result.stderr) {

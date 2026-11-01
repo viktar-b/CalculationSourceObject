@@ -98,10 +98,21 @@ Unsupported formulas, invalid intermediate values and `documented_result` cannot
 pass verified generation. Rendering supports more notation than this evaluator.
 
 An explicit `--reference` file supplies independently established expected values.
+Reference file version 2 also supports explicitly scoped `externalOutputs` cases.
+Use Core's `externalReferenceBindingFrom(execution)` to bind their independently
+authored expectations to captured source, adapter, inputs and environment.
+Select each expected output by external call ID and output name. The binding
+excludes observed answers and run IDs. Matching failures block success; unchecked
+external outputs remain listed as pending coverage. Version 1 keeps its complete
+formula-coverage semantics. See the [external examples](../../examples/external-functions/README.md)
+and [reference schema](../cso-core/src/contracts/reference.ts).
+
 [Reference binding](../../packages/cso-core/src/contracts/reference.ts) uses the
 complete source closure, selected function and resolved inputs. Positive and
 negative zero have distinct identities; input-key order does not affect identity.
-A matching case must cover every calculated symbol and match its declared unit.
+A matching complete formula-reference case must cover every calculated symbol
+and match its declared unit. Scoped external cases check only their selected
+outputs and report the remaining external outputs as uncovered.
 No match is `not_applicable`, never a pass. A failed matching reference blocks
 success; absence of a match alone does not block an otherwise consistent PDF.
 
@@ -137,9 +148,11 @@ for when PDF inspection is needed.
 ## Document and evidence publication
 
 The [document coordinator](src/document.ts) uses one execution for verification and
-preparation. A source that declares `method` and `table` publishes protocol 3
-evidence and a version 3 prepared document from that same execution. Sources
-without those declarations stay on protocol 2. See
+preparation. A pure-CSO source that declares `method` and `table` publishes
+protocol 3 evidence and a version 3 prepared document from that same execution.
+Pure-CSO sources without those declarations stay on protocol 2. External calls
+or static external method boundaries use protocol/document 4 and preserve their
+call evidence through checked HTML/PDF. See
 [authoring](../../docs/authoring.md#explain-one-method-and-compare-its-cases)
 and [comparison layout](../../docs/rendering.md#engineering-presentation). [Asset capture](src/assets.ts) checks module-relative containment,
 hashes and media signatures. Browser checks for PDF and checked HTML additionally
@@ -224,7 +237,11 @@ after the maintained automatic presentation checks pass.
 
 The server binds only to IPv4 loopback and rejects foreign Host/Origin headers.
 It executes trusted local calculation sources. Python requests have a 30-second
-deadline and bounded output. Execution is synchronous, so the local server pauses
+default deadline and bounded output. `--timeout <seconds>` overrides the whole
+calculation deadline for `dev`, `verify`, `html` and `pdf`; zero disables it.
+One-shot commands have no deadline unless supplied. Invalid or negative durations
+fail before execution. A timed-out run leaves an earlier successful artifact
+unchanged. Browser-rendering deadlines remain separate. Execution is synchronous, so the local server pauses
 while Python runs. One PDF renders at a time, with a 90-second deadline. Retention
 is limited to 10 runs, 128 MiB of serialized report data, and 30 minutes. Expired or evicted
 run URLs return 404. Request bodies are limited to 64 KiB. Stop with Ctrl+C;
