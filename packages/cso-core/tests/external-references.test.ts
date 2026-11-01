@@ -1,21 +1,24 @@
 import { describe, expect, test } from 'vitest';
-import fixture from './fixtures/external-execution.json';
 import { sourceClosureHash } from '../src/contracts/common.ts';
 import {
-  ExecutionPayloadSchema,
   type ExecutionPayload,
+  ExecutionPayloadSchema,
 } from '../src/contracts/execution.ts';
+import { ExternalCallSchema } from '../src/contracts/external.ts';
 import {
   BoundReferenceCaseSchema,
-  externalReferenceBindingFrom,
   ExternalOutputReferenceCaseSchema,
+  externalReferenceBindingFrom,
   ReferenceCasesSchema,
   ReferenceFileSchema,
   referenceBindingKey,
+  referenceMatchesExecution,
   referenceSourceBindingFrom,
 } from '../src/contracts/reference.ts';
 import { verifyExecution } from '../src/verification/verify.ts';
-import { ExternalCallSchema } from '../src/contracts/external.ts';
+import chainCaptures from './fixtures/external-chain-executions.json';
+import fixture from './fixtures/external-execution.json';
+import helperChainCaptures from './fixtures/external-helper-chain-executions.json';
 
 const capture = (): ExecutionPayload =>
   ExecutionPayloadSchema.parse(structuredClone(fixture));
@@ -200,6 +203,78 @@ describe('scoped independent external output references', () => {
       }).success,
     ).toBe(false);
   });
+  test.each([
+    {
+      path: 'direct argument',
+      captures: chainCaptures,
+      expectedValues: [3, 3],
+      changedValues: [4, 5],
+    },
+    {
+      path: 'formula and helper argument',
+      captures: helperChainCaptures,
+      expectedValues: [3, 4],
+      changedValues: [4, 6],
+    },
+  ])(
+    'upstream external answers through $path never invalidate scoped expectations',
+    ({ captures, expectedValues, changedValues }) => {
+      const [first, changed] = captures.map((capture) =>
+        ExecutionPayloadSchema.parse(capture),
+      );
+      if (!first || !changed || !first.externalCalls || !changed.externalCalls)
+        throw new Error('Missing external chain captures');
+      // Source, entry inputs and argument origins stay fixed while external state
+      // changes an upstream answer used directly or through a formula and helper.
+      expect(first.externalCalls.map((call) => call.outputs[0]?.value)).toEqual(
+        expectedValues,
+      );
+      expect(
+        changed.externalCalls.map((call) => call.outputs[0]?.value),
+      ).toEqual(changedValues);
+      expect(referenceBindingKey(externalReferenceBindingFrom(first))).toBe(
+        referenceBindingKey(externalReferenceBindingFrom(changed)),
+      );
+      for (const [index, call] of first.externalCalls.entries()) {
+        const reference = ExternalOutputReferenceCaseSchema.parse({
+          kind: 'externalOutputs',
+          id: `independent-${call.id}`,
+          revision: '1',
+          basis: {
+            method: 'Independent chain arithmetic',
+            derivation:
+              'With zero adapter increment, the first value is 3; the next value is 3 directly or 3 + 1 through the helper.',
+            sourceDescription:
+              'Synthetic adapter adds an external-state increment.',
+          },
+          binding: externalReferenceBindingFrom(first),
+          expected: [
+            {
+              externalCallId: call.id,
+              outputName: 'value',
+              value: expectedValues[index],
+              numericKind: 'float',
+              unit: '',
+            },
+          ],
+        });
+        expect(referenceMatchesExecution(reference, changed)).toBe(true);
+        const report = verifyExecution({
+          execution: changed,
+          referenceCases: [reference],
+        });
+        expect(report.ok).toBe(false);
+        expect(report.checks.sourceToDocumentConsistency.status).toBe('passed');
+        expect(report.checks.independentReferenceAgreement).toMatchObject({
+          status: 'failed',
+          counts: { checked: 1, failed: 1 },
+        });
+        expect(report.externalReferenceCoverage?.checked).toMatchObject([
+          { externalCallId: call.id, outputName: 'value' },
+        ]);
+      }
+    },
+  );
   test('source, adapter and interpreter/distribution changes conservatively invalidate references', () => {
     const execution = capture();
     const reference = scoped(execution);
@@ -239,23 +314,15 @@ describe('scoped independent external output references', () => {
       expect(report.externalReferenceCoverage?.status).toBe('pending');
     }
   });
-  test('binding preserves resolved numeric kinds and zero signs', () => {
+  test('binding preserves entry numeric kinds and zero signs', () => {
     const binding = externalReferenceBindingFrom(capture());
     const floatZero = {
       ...binding,
       resolvedInputs: { length: -0 },
-      calls: binding.calls.map((call) => ({
-        ...call,
-        resolvedInputs: { length: -0 },
-      })),
     };
     const positiveZero = {
       ...floatZero,
       resolvedInputs: { length: 0 },
-      calls: floatZero.calls.map((call) => ({
-        ...call,
-        resolvedInputs: { length: 0 },
-      })),
     };
     expect(referenceBindingKey(floatZero)).not.toBe(
       referenceBindingKey(positiveZero),
@@ -263,10 +330,6 @@ describe('scoped independent external output references', () => {
     const integer = {
       ...binding,
       resolvedInputKinds: { length: 'int' },
-      calls: binding.calls.map((call) => ({
-        ...call,
-        resolvedInputKinds: { length: 'int' },
-      })),
     } satisfies typeof binding;
     expect(referenceBindingKey(integer)).not.toBe(referenceBindingKey(binding));
   });

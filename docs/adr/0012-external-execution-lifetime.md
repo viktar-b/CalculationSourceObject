@@ -45,6 +45,13 @@ identity. Never match on run IDs or returned values. Conservatively invalidate
 those reference bindings when the recorded environment changes. Existing
 pure-CSO reference semantics stay unchanged.
 
+Resolved inputs in reference identity are the top-level supplied inputs. For
+external call arguments, retain authored literal/default bindings and symbolic
+origins. Exclude evaluated arguments derived from external results, including
+through formulas or helpers, so a changed upstream answer cannot suppress a
+matching expectation on either call. Actual argument values remain in the
+captured execution and its exact artifact binding.
+
 Exceptions, invalid or missing outputs, resource failures, nonconvergence and
 failure to find an admissible numerical solution stop the run. The adapter must
 translate library-specific failure statuses and convergence warnings into

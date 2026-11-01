@@ -1,15 +1,19 @@
 import { z } from 'zod';
-import { NumericValueSchema } from './numbers.ts';
 import {
-  ExecutionBindingSchema,
-  executionBindingKey,
-  exactCaptureHash,
   collectCsoSymbols,
+  ExecutionBindingSchema,
+  exactCaptureHash,
+  executionBindingKey,
   NonemptyStringSchema,
   ResolvedInputEvidenceSchema,
 } from './common.ts';
-import { ExecutionPayloadSchema, type ExecutionPayload } from './execution.ts';
+import {
+  type ExecutionPayload,
+  ExecutionPayloadSchema,
+  InputBindingSchema,
+} from './execution.ts';
 import { ExternalCallSchema, ExternalEnvironmentSchema } from './external.ts';
+import { NumericValueSchema } from './numbers.ts';
 import type { VerificationReport } from './reports.ts';
 
 // Reference identity describes the source and inputs, never an observed answer.
@@ -36,18 +40,17 @@ export const LegacyReferenceCaseSchema = z.strictObject({
   binding: ReferenceBindingSchema,
   expected: z.array(expectedSymbolSchema),
 });
-const ExternalCallReferenceBindingSchema =
-  ResolvedInputEvidenceSchema.safeExtend({
-    externalCallId: NonemptyStringSchema,
-    declarationModuleId: ExternalCallSchema.shape.declaration.shape.moduleId,
-    declarationName: ExternalCallSchema.shape.declaration.shape.name,
-    declarationFingerprint:
-      ExternalCallSchema.shape.declaration.shape.fingerprint,
-    adapter: ExternalCallSchema.shape.adapter,
-  }).refine((binding) => binding.resolvedInputKinds !== undefined, {
-    message: 'External reference inputs require captured numeric kinds',
-    params: { diagnosticCode: 'REFERENCE_INPUT_KINDS_REQUIRED' },
-  });
+const ExternalCallReferenceBindingSchema = z.strictObject({
+  externalCallId: NonemptyStringSchema,
+  declarationModuleId: ExternalCallSchema.shape.declaration.shape.moduleId,
+  declarationName: ExternalCallSchema.shape.declaration.shape.name,
+  declarationFingerprint:
+    ExternalCallSchema.shape.declaration.shape.fingerprint,
+  adapter: ExternalCallSchema.shape.adapter,
+  // Symbol arguments retain their source address, never their evaluated value:
+  // that value can depend on the external answer being independently checked.
+  inputBindings: z.array(InputBindingSchema),
+});
 export const ExternalReferenceBindingSchema = ReferenceBindingSchema.safeExtend(
   {
     pythonInterpreter: NonemptyStringSchema,
@@ -145,26 +148,65 @@ export const externalReferenceBindingFrom = (
     ...referenceSourceBindingFrom(execution),
     pythonInterpreter: execution.versions.pythonInterpreter,
     environment: execution.environment,
-    calls: execution.externalCalls.map((call) => ({
-      externalCallId: call.id,
-      declarationModuleId: call.declaration.moduleId,
-      declarationName: call.declaration.name,
-      declarationFingerprint: call.declaration.fingerprint,
-      adapter: call.adapter,
-      resolvedInputs: Object.fromEntries(
-        call.inputs.map((input) => [input.name, input.value]),
-      ),
-      resolvedInputKinds: Object.fromEntries(
-        call.inputs.map((input) => [input.name, input.numericKind]),
-      ),
-    })),
+    calls: execution.externalCalls.map((call) => {
+      const invocation = execution.invocations.find(
+        (invocation) => invocation.id === call.id,
+      );
+      if (!invocation)
+        throw new Error(
+          'External reference binding requires captured invocation input origins',
+        );
+      return {
+        externalCallId: call.id,
+        declarationModuleId: call.declaration.moduleId,
+        declarationName: call.declaration.name,
+        declarationFingerprint: call.declaration.fingerprint,
+        adapter: call.adapter,
+        inputBindings: invocation.inputBindings,
+      };
+    }),
   });
 };
 export const referenceBindingKey = (
   binding: ReferenceBinding | ExternalReferenceBinding,
 ): string => {
   if (!('calls' in binding)) return executionBindingKey(binding);
-  return `external:${exactCaptureHash({ ...binding, calls: [...binding.calls].sort((left, right) => (left.externalCallId < right.externalCallId ? -1 : left.externalCallId > right.externalCallId ? 1 : 0)), environment: { ...binding.environment, distributions: [...binding.environment.distributions].sort((left, right) => (left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : left[1] < right[1] ? -1 : left[1] > right[1] ? 1 : 0)) } })}`;
+  return `external:${exactCaptureHash({
+    ...binding,
+    calls: binding.calls
+      .map((call) => ({
+        ...call,
+        inputBindings: [...call.inputBindings].sort((left, right) =>
+          left.parameterName < right.parameterName
+            ? -1
+            : left.parameterName > right.parameterName
+              ? 1
+              : 0,
+        ),
+      }))
+      .sort((left, right) =>
+        left.externalCallId < right.externalCallId
+          ? -1
+          : left.externalCallId > right.externalCallId
+            ? 1
+            : 0,
+      ),
+    environment: {
+      ...binding.environment,
+      distributions: [...binding.environment.distributions].sort(
+        (left, right) =>
+          left[0] < right[0]
+            ? -1
+            : left[0] > right[0]
+              ? 1
+              : left[1] < right[1]
+                ? -1
+                : left[1] > right[1]
+                  ? 1
+                  : 0,
+      ),
+    },
+  })}`;
 };
 export const referenceMatchesExecution = (
   reference: ReferenceCase,
