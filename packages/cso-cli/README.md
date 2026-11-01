@@ -137,7 +137,11 @@ for when PDF inspection is needed.
 ## Document and evidence publication
 
 The [document coordinator](src/document.ts) uses one execution for verification and
-preparation. [Asset capture](src/assets.ts) checks module-relative containment,
+preparation. A source that declares `method` and `table` publishes protocol 3
+evidence and a version 3 prepared document from that same execution. Sources
+without those declarations stay on protocol 2. See
+[authoring](../../docs/authoring.md#explain-one-method-and-compare-its-cases)
+and [comparison layout](../../docs/rendering.md#engineering-presentation). [Asset capture](src/assets.ts) checks module-relative containment,
 hashes and media signatures. Browser checks for PDF and checked HTML additionally
 require PNG/JPEG decode and passive SVG policy. Symlink escapes and active or
 external SVG content fail those checks. The browser uses captured data URLs,

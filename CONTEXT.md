@@ -25,6 +25,33 @@ returned results. Separate calls retain distinct identities even with equal inpu
 A named numeric output of an external invocation, available to subsequent
 documented formulas. Capturing it does not independently verify the external algorithm.
 
+**Calculation method**:
+The shared explanation of an annotated calculation's inputs, formulas,
+relationships, outputs and authored engineering context, independent of case values.
+
+**Calculation case**:
+One evaluated invocation represented in a comparison table, retaining its own
+identity even when its inputs or results equal another case's values.
+
+**Comparison table**:
+A presentation of calculation quantities and distinct cases on opposite axes,
+bound to their existing inputs, results and qualifications. Cases can appear
+in columns or rows.
+
+**Engineering check**:
+An authored criterion applied to a calculated result. A failed check can describe
+a valid numerical result that does not meet the criterion.
+
+**Applicability condition**:
+An authored condition identifying when a calculation result can be used within
+its stated assumptions and limits. An inapplicable result is distinct from a
+valid result that fails an engineering check.
+
+**Inapplicable result**:
+A result outside its authored applicability conditions, or dependent on an
+inapplicable quantity actually used in its calculation. Retaining a computed
+number does not establish that the result is applicable.
+
 **CalculationSourceObject (CSO)**:
 The structured record of a calculation's formulas, symbols, results, units,
 explanations, document structure, and source metadata.

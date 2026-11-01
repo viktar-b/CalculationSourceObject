@@ -40,7 +40,7 @@ check selected default values against the external export.
 
 [compare.cso.py](compare.cso.py) contains two parent calculations:
 `compare_hot_formed` calls the hot-formed reference twice, and `compare_tapered`
-calls the tapered reference twice. Both vary section depth while retaining the
+calls the shared [area and x-axis inertia calculation](unequal_tapered_i_beam/area_inertia.cso.py) twice. The full tapered reference also calls this calculation and forwards its public outputs; its remaining elastic and plastic calculations retain their formulas. Both vary section depth while retaining the
 other reference defaults. Each passes area and centroidal second moment to
 [comparison.cso.py](comparison.cso.py), which computes candidate-to-baseline
 ratios. Ratios describe geometry; they do not establish capacity or compliance.
@@ -52,7 +52,7 @@ affected cases and the required geometry checks.
 
 Generate from this directory's common root so the imports mirror the source
 paths. The Python-compatible directory names differ from the external reference
-URL slugs; the reference calculation files retain their original bytes.
+URL slugs.
 
 ```sh
 "$PYTHON" -m cso_python bindings examples/section-properties
@@ -89,12 +89,16 @@ property_ratios = compare_properties(
 )
 ```
 
-The parent returns the two areas and two ratios. All 91 calculated quantities
-from each tapered invocation remain in its report, including the plastic-modulus
-work that the parent does not return. The hot-formed report similarly retains
-all 38 quantities from each invocation. The shared comparison contributes two
-more formulas. Forwarded outputs retain their original symbols and units rather
-than becoming new independent input rows.
+The parent returns the two areas and two ratios. Each invocation keeps its own
+quantities in the execution. `compare_hot_formed` explains the hot-formed
+calculation once and compares the two depths in columns. `compare_tapered`
+explains the tapered calculation once and compares its two depths in rows.
+The tables show section depth and the two forwarded properties. The remaining
+authored formulas, including the tapered plastic-modulus work, stay in the
+method. The shared ratio calculation contributes two more formulas. Forwarded
+outputs retain their original symbols and units rather than becoming new
+independent input rows. Case-specific glyphs such as `bs` and `cs` remain in
+the execution.
 
 `baseline_section` and `candidate_section` qualify repeated result glyphs with
 `bs` and `cs`. The tapered calculation also retains its separate x-axis and
@@ -159,3 +163,9 @@ Plastic modulus follows from the clipped first moments. Cases place the PNA in
 each flange, each taper and the web, with zero, positive and negative origins.
 They check area, centroid, inertia, PNA, plastic modulus and dependent quantities
 without using captured calculation outputs as expected values.
+
+The tapered comparison table retains all eight dimension inputs, including the
+shared defaults, and selects area and x-axis inertia as its outputs. With two cases and ten quantities,
+it places cases in columns. Use `cases_axis="rows"` to transpose. Its method
+uses the ordinary formula rows without case substitutions. Plastic-section
+formulas belong to the full calculation and are not executed by this comparison.

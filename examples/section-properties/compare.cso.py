@@ -2,8 +2,8 @@
 
 from _cso_bindings.comparison import compare_properties
 from _cso_bindings.hot_formed_i_sections.calculate import calculate as hot_formed_section
-from _cso_bindings.unequal_tapered_i_beam.calculate import calculate as tapered_section
-from cso_python import CalculationResults, calculation, section, text
+from _cso_bindings.unequal_tapered_i_beam.area_inertia import calculate as tapered_section
+from cso_python import CalculationResults, calculation, method, section, table, text
 from quantities import BaselineDepth, CandidateDepth
 
 
@@ -21,6 +21,11 @@ def compare_hot_formed(
         id="notation",
         content="Subscripts base and cand identify the input depths; bs and cs identify baseline_section and candidate_section results. Each child retains its reference notation. The comparison uses the major-axis centroidal second moment I_yy.",
     )
+    method(
+        id="hot-formed-method",
+        calculation=hot_formed_section,
+        title="How a hot-formed I-section is calculated",
+    )
     baseline_section = hot_formed_section(section_depth=baseline_depth)
     candidate_section = hot_formed_section(section_depth=candidate_depth)
     property_ratios = compare_properties(
@@ -28,6 +33,18 @@ def compare_hot_formed(
         candidate_area=candidate_section["cross_section_area"],
         baseline_inertia=baseline_section["second_moment_of_area_about_major_axis"],
         candidate_inertia=candidate_section["second_moment_of_area_about_major_axis"],
+    )
+    table(
+        id="hot-formed-depths",
+        method="hot-formed-method",
+        title="Hot-formed section depths",
+        cases={"Baseline": baseline_section, "Candidate": candidate_section},
+        inputs=("section_depth",),
+        outputs=(
+            "cross_section_area",
+            "second_moment_of_area_about_major_axis",
+        ),
+        cases_axis="columns",
     )
     return {
         "baseline_area": baseline_section["cross_section_area"],
@@ -45,11 +62,16 @@ def compare_tapered(
 ) -> CalculationResults:
     text(
         id="scope",
-        content="Compare section depths while retaining the reference's other default dimensions and zero lower boundary. Ratios describe geometry, not structural capacity or design compliance. Baseline area and second moment must be positive.",
+        content="Compare section depths while retaining the reference's other default dimensions. Ratios describe geometry, not structural capacity or design compliance. Baseline area and second moment must be positive.",
     )
     text(
         id="notation",
-        content="Subscripts base and cand identify the input depths; bs and cs identify baseline_section and candidate_section results. Each child retains its reference notation and x-axis/y-axis scopes. The comparison uses the centroidal second moment I_x.",
+        content="Subscripts base and cand identify the input depths; bs and cs identify baseline_section and candidate_section results. Each child retains the reference notation. The comparison uses the centroidal second moment I_x.",
+    )
+    method(
+        id="tapered-method",
+        calculation=tapered_section,
+        title="Area and x-axis inertia of an unequal tapered I-beam",
     )
     baseline_section = tapered_section(section_depth=baseline_depth)
     candidate_section = tapered_section(section_depth=candidate_depth)
@@ -58,6 +80,17 @@ def compare_tapered(
         candidate_area=candidate_section["total_area_of_the_section"],
         baseline_inertia=baseline_section["second_moment_of_area_about_x_axis"],
         candidate_inertia=candidate_section["second_moment_of_area_about_x_axis"],
+    )
+    table(
+        id="tapered-depths",
+        method="tapered-method",
+        title="Tapered section depths",
+        cases={"Baseline": baseline_section, "Candidate": candidate_section},
+        outputs=(
+            "total_area_of_the_section",
+            "second_moment_of_area_about_x_axis",
+        ),
+        cases_axis="columns",
     )
     return {
         "baseline_area": baseline_section["total_area_of_the_section"],

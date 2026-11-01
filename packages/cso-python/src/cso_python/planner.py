@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 import ast
-import copy
-import os
+import hashlib
 from pathlib import Path
 from typing import Any
 
 from .annotations import Annotation, symbol_annotation
 from .definitions import Definitions
 from .exporter import derived_section_id
-from .function_calls import BUILTIN_FUNCTION_NAMES, CALLS
 from .notation import parse_notation
+from .source_plan import compile_source_plan
 from .source import (
     Capture,
     Invocation,
@@ -29,24 +28,6 @@ from .source import (
     span,
 )
 
-OPS = {
-    ast.Add: "fg.add",
-    ast.Sub: "fg.subtract",
-    ast.Mult: "fg.multiply",
-    ast.Div: "fg.divide",
-    ast.Pow: "fg.pow",
-}
-
-COMPARISONS = {
-    ast.Lt: "fg.lt",
-    ast.LtE: "fg.le",
-    ast.Gt: "fg.gt",
-    ast.GtE: "fg.ge",
-    ast.Eq: "fg.eq",
-    ast.NotEq: "fg.ne",
-}
-
-
 class Planner:
     def __init__(self, entry: Path):
         self.capture = Capture(entry)
@@ -55,6 +36,12 @@ class Planner:
         self.sections: list[Json] = []
         self.assets: dict[str, Json] = {}
         self.asset_files: dict[Path, tuple[Path, bytes]] = {}
+        self.source_plans = {}
+        self.compiled_plan_keys: list[tuple[str, str, str]] = []
+        self.methods: list[Json] = []
+        self.tables: list[Json] = []
+        self.method_index: dict[tuple[str, str], Json] = {}
+        self.grouped_invocations: set[str] = set()
 
     def unchanged(self) -> bool:
         if not self.capture.unchanged():
@@ -343,12 +330,14 @@ class Planner:
                 inv.parameter_symbols[name] = inherited
             elif spec is not None:
                 self.signature_input(inv, name, declared, binding_record)
+        plan = self.ensure_plan(inv, module, function)
+        inv.source_plan = plan
         self.body(
             inv,
-            fn.body,
             section_obj,
             {symbol.cso["id"] for symbol in inv.symbols.values()},
             False,
+            plan.steps,
         )
         documented_parameters = {
             symbol.definition["givenSource"]["parameterName"]
@@ -507,319 +496,112 @@ class Planner:
             "Expected an earlier symbol or literal-key child result",
         )
 
+    def ensure_plan(self, inv: Invocation, module, function: str):
+        digest = hashlib.sha256(module.data).hexdigest()
+        key = (module.id, function, digest)
+        plan = self.source_plans.get(key)
+        if plan is None:
+            try:
+                plan = compile_source_plan(self.definitions, module, function)
+            except SourceError as error:
+                if "callChain" not in error.diagnostic:
+                    chain = []
+                    current = inv
+                    while current.parent is not None:
+                        chain.insert(
+                            0, span(current.parent.module.id, current.call_node)
+                        )
+                        current = current.parent
+                    error.diagnostic["callChain"] = chain
+                raise
+            self.source_plans[key] = plan
+            self.compiled_plan_keys.append(key)
+        return plan
+
     def expression(
         self, inv: Invocation, expr: ast.expr, *, given: bool = False
     ) -> list[Json]:
-        nodes: list[Json] = []
+        del given
+        plan = inv.source_plan
+        symbolic = plan.expressions[id(expr)]
+        return self.bind_expression(inv, symbolic)
 
-        def lower(node: ast.expr, *, condition: bool = False) -> str:
-            key = f"n{len(nodes) + 1}"
+    def bind_expression(self, inv: Invocation, symbolic: list[Json]) -> list[Json]:
+        bound: list[Json] = []
+        for source in symbolic:
             item: Json = {
-                "key": key,
+                "key": source["key"],
                 "metadata": {
                     "invocationId": inv.id,
-                    "location": span(inv.module.id, node),
+                    "location": source["location"],
                 },
             }
-            nodes.append(item)
-            if condition and not isinstance(node, (ast.Compare, ast.BoolOp)):
-                self.error(
-                    inv,
-                    node,
-                    "UNSUPPORTED_SYNTAX",
-                    "A conditional test requires numeric comparisons joined by and/or",
+            if "parameterName" in source:
+                item["metadata"]["parameterName"] = source["parameterName"]
+            mode = source["mode"]
+            if mode == "GIVEN_PARAMETER":
+                binding = next(
+                    record
+                    for record in inv.record["inputBindings"]
+                    if record["parameterName"] == source["parameter"]
                 )
-            if numeric_literal(node):
-                item.update(
-                    draft=str(literal(node, inv.module.id)),
-                    mode="LITERAL",
-                    literal={
-                        "kind": "number",
-                        "numericKind": numeric_kind(literal(node, inv.module.id)),
-                        "value": number(
-                            literal(node, inv.module.id), span(inv.module.id, node)
-                        ),
-                    },
-                )
-            elif authoring_name(node) == "math.pi" or (
-                authoring_name(node) == "pi" and "pi" in inv.module.imported
-            ):
-                imported = "math" if authoring_name(node) == "math.pi" else "pi"
-                if imported not in inv.module.imported:
-                    self.error(
-                        inv, node, "UNSUPPORTED_SYNTAX", "Unimported math constant"
-                    )
-                item.update(mode="FUNCTION", funcSpec={"id": "fg.pi"}, funcArgs=[])
-            elif isinstance(node, ast.IfExp):
-                item.update(
-                    mode="FUNCTION",
-                    funcSpec={"id": "fg.cnd"},
-                    funcArgs=[
-                        {"key": lower(node.test, condition=True)},
-                        {"key": lower(node.body)},
-                        {"key": lower(node.orelse)},
-                    ],
-                )
-            elif isinstance(node, ast.BoolOp):
-                if not condition:
-                    self.error(
-                        inv, node, "UNSUPPORTED_SYNTAX",
-                        "Logical operators are supported only in conditional tests",
-                    )
-                item.update(
-                    mode="FUNCTION",
-                    funcSpec={"id": "fg.and" if isinstance(node.op, ast.And) else "fg.or"},
-                    funcArgs=[
-                        {"key": lower(value, condition=condition)}
-                        for value in node.values
-                    ],
-                )
-            elif isinstance(node, ast.Compare):
-                if not condition or any(type(op) not in COMPARISONS for op in node.ops):
-                    self.error(
-                        inv, node, "UNSUPPORTED_SYNTAX",
-                        "Numeric comparisons are supported only in conditional tests",
-                    )
-                operand_keys = [
-                    lower(node.left),
-                    *(lower(value) for value in node.comparators),
-                ]
-                if len(node.ops) == 1:
+                if binding["kind"] == "callerSymbol":
                     item.update(
-                        mode="FUNCTION", funcSpec={"id": COMPARISONS[type(node.ops[0])]},
-                        funcArgs=[{"key": value} for value in operand_keys],
+                        mode="SYMBOL", symbol={"id": binding["source"]["symbolId"]}
                     )
                 else:
-                    comparisons = []
-                    for index, op in enumerate(node.ops):
-                        comparison_key = f"n{len(nodes) + 1}"
-                        nodes.append({
-                            "key": comparison_key,
-                            "metadata": dict(item["metadata"]),
-                            "mode": "FUNCTION",
-                            "funcSpec": {"id": COMPARISONS[type(op)]},
-                            "funcArgs": [
-                                {"key": operand_keys[index]},
-                                {"key": operand_keys[index + 1]},
-                            ],
-                        })
-                        comparisons.append({"key": comparison_key})
-                    item.update(mode="FUNCTION", funcSpec={"id": "fg.and"}, funcArgs=comparisons)
-            elif isinstance(node, (ast.Name, ast.Subscript)):
-                item.update(
-                    mode="SYMBOL", symbol={"id": self.reference(inv, node).cso["id"]}
-                )
-                if isinstance(node, ast.Name) and node.id in inv.parameters:
-                    item["metadata"]["parameterName"] = node.id
-                elif isinstance(node, ast.Subscript):
+                    item.update(
+                        mode="LITERAL",
+                        literal={
+                            "kind": "number",
+                            "value": binding["value"],
+                            "numericKind": binding["numericKind"],
+                        },
+                    )
+            elif mode == "SYMBOL":
+                symbol = self.reference(inv, source["_ast"])
+                item.update(mode="SYMBOL", symbol={"id": symbol.cso["id"]})
+                ref = source["ref"]
+                if ref["kind"] == "output":
                     item["metadata"].update(
-                        outputInvocationId=inv.calls[node.value.id].id,
-                        outputName=node.slice.value,
+                        outputInvocationId=inv.calls[ref["call"]].id,
+                        outputName=ref["output"],
                     )
-            elif isinstance(node, ast.BinOp) and type(node.op) in OPS:
+            elif mode == "LITERAL":
+                literal_node = {
+                    "kind": "number",
+                    "numericKind": source["literal"]["numericKind"],
+                    "value": source["literal"]["value"],
+                }
+                if "draft" in source:
+                    item["draft"] = source["draft"]
+                item["mode"] = "LITERAL"
+                item["literal"] = literal_node
+            elif mode == "FUNCTION":
                 item.update(
                     mode="FUNCTION",
-                    funcSpec={"id": OPS[type(node.op)]},
-                    funcArgs=[{"key": lower(node.left)}, {"key": lower(node.right)}],
+                    funcSpec={"id": source["funcSpec"]["id"]},
+                    funcArgs=[{"key": arg["key"]} for arg in source["funcArgs"]],
                 )
-            elif isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
-                item.update(
-                    mode="FUNCTION",
-                    funcSpec={"id": "fg.uminus"},
-                    funcArgs=[{"key": lower(node.operand)}],
-                )
-            elif isinstance(node, ast.Call):
-                name = authoring_name(node.func)
-                if (
-                    name not in {"given", "documented_result", *CALLS}
-                    or node.keywords
-                    or (
-                        not CALLS[name].accepts_arity(len(node.args))
-                        if name in CALLS else len(node.args) != 1
-                    )
-                ):
-                    self.error(
-                        inv,
-                        node,
-                        "UNSUPPORTED_SYNTAX",
-                        "Unsupported formula call or arity",
-                    )
-                if name in BUILTIN_FUNCTION_NAMES and (
-                    name in inv.parameters
-                    or name in inv.module.imported
-                    or name in inv.module.functions
-                    or name in inv.module.aliases
-                    or name in inv.module.handles
-                    or any(
-                        isinstance(bound, ast.Name)
-                        and isinstance(bound.ctx, ast.Store)
-                        and bound.id == name
-                        for bound in ast.walk(inv.function)
-                    )
-                ):
-                    self.error(
-                        inv, node, "SHADOWED_HELPER",
-                        f"Formula helper {name} is shadowed by a Python binding",
-                    )
-                imported = "math" if name.startswith("math.") else name
-                if (
-                    imported not in BUILTIN_FUNCTION_NAMES
-                    and imported not in inv.module.imported
-                ):
-                    self.error(
-                        inv, node, "UNSUPPORTED_SYNTAX", f"Unimported helper {name}"
-                    )
-                if name == "given":
-                    arg = node.args[0]
-                    if not given or node is not expr:
-                        self.error(
-                            inv,
-                            node,
-                            "UNSUPPORTED_SYNTAX",
-                            "given must be the complete symbol assignment",
-                        )
-                    if isinstance(arg, ast.Name) and arg.id in inv.parameters:
-                        binding = next(
-                            b
-                            for b in inv.record["inputBindings"]
-                            if b["parameterName"] == arg.id
-                        )
-                        if binding["kind"] == "callerSymbol":
-                            item.update(
-                                mode="SYMBOL",
-                                symbol={"id": binding["source"]["symbolId"]},
-                            )
-                        else:
-                            item.update(
-                                mode="LITERAL",
-                                literal={
-                                    "kind": "number",
-                                    "value": binding["value"],
-                                    "numericKind": binding["numericKind"],
-                                },
-                            )
-                    elif numeric_literal(arg):
-                        item.update(
-                            mode="LITERAL",
-                            literal={
-                                "kind": "number",
-                                "numericKind": numeric_kind(
-                                    literal(arg, inv.module.id)
-                                ),
-                                "value": number(
-                                    literal(arg, inv.module.id),
-                                    span(inv.module.id, arg),
-                                ),
-                            },
-                        )
-                    else:
-                        self.error(
-                            inv,
-                            arg,
-                            "INVALID_GIVEN",
-                            "given accepts a parameter or finite literal",
-                        )
-                elif name == "documented_result":
-                    arg = node.args[0]
-                    # Still parse the bounded expression; its definition blocks verification.
-                    if node is not expr:
-                        self.error(
-                            inv,
-                            node,
-                            "UNSUPPORTED_SYNTAX",
-                            "documented_result must be the complete assignment",
-                        )
-                    nodes.pop()
-                    return lower(arg)
-                else:
-                    item.update(
-                        mode="FUNCTION",
-                        funcSpec={"id": CALLS[name].function_id},
-                        funcArgs=[{"key": lower(argument)} for argument in node.args],
-                    )
             else:
-                self.error(
-                    inv,
-                    node,
+                raise SourceError(
                     "UNSUPPORTED_SYNTAX",
-                    f"Unsupported expression {type(node).__name__}",
+                    f"Unsupported planned expression {mode}",
+                    location=source["location"],
                 )
-            return key
-
-        lower(expr)
-        return nodes
+            bound.append(item)
+        return bound
 
     def body(
         self,
         inv: Invocation,
-        body: list[ast.stmt],
         section: Json,
         ids: set[str],
         grouped: bool,
+        steps: list,
     ) -> None:
-        for index, node in enumerate(body):
-            if (
-                not grouped
-                and index == 0
-                and isinstance(node, ast.Expr)
-                and isinstance(node.value, ast.Constant)
-                and isinstance(node.value.value, str)
-            ):
-                continue
-            if (
-                isinstance(node, ast.Assign)
-                and isinstance(node.value, ast.Call)
-                and authoring_name(node.value.func) in inv.module.handles
-            ):
-                handle = inv.module.handles[authoring_name(node.value.func)]
-                if node.value.args or any(k.arg is None for k in node.value.keywords):
-                    self.error(
-                        inv,
-                        node,
-                        "INVALID_CALL_INPUTS",
-                        "Calculation handles use explicit named arguments",
-                    )
-                original = node.value
-                node = copy.deepcopy(node)
-                node.value = ast.copy_location(
-                    ast.Call(
-                        func=ast.Name(id="calculation_call", ctx=ast.Load()),
-                        args=[
-                            ast.copy_location(
-                                ast.Constant(
-                                    os.path.relpath(
-                                        handle["path"], inv.module.path.parent
-                                    )
-                                ),
-                                original,
-                            )
-                        ],
-                        keywords=[
-                            ast.keyword(
-                                arg="function",
-                                value=ast.copy_location(
-                                    ast.Constant(handle["function"]), original
-                                ),
-                            ),
-                            ast.keyword(
-                                arg="inputs",
-                                value=ast.copy_location(
-                                    ast.Dict(
-                                        keys=[
-                                            ast.copy_location(
-                                                ast.Constant(k.arg), k.value
-                                            )
-                                            for k in original.keywords
-                                        ],
-                                        values=[k.value for k in original.keywords],
-                                    ),
-                                    original,
-                                ),
-                            ),
-                        ],
-                    ),
-                    original,
-                )
+        for step in steps:
+            node = step.node
             if isinstance(node, ast.AnnAssign):
                 if (
                     not isinstance(node.target, ast.Name)
@@ -1094,7 +876,27 @@ class Planner:
                         "metadata": self.metadata(inv, config["id"], node),
                     }
                 )
-                self.body(inv, node.body, child, ids, True)
+                self.body(inv, child, ids, True, step.child_steps or [])
+            elif (
+                isinstance(node, ast.Expr)
+                and isinstance(node.value, ast.Call)
+                and authoring_name(node.value.func) in {"method", "table"}
+            ):
+                from .comparison import place_comparison
+
+                place_comparison(self, inv, node, section, ids)
+            elif (
+                isinstance(node, ast.Expr)
+                and isinstance(node.value, ast.Call)
+                and authoring_name(node.value.func) == "check"
+            ):
+                continue
+            elif (
+                isinstance(node, ast.Expr)
+                and isinstance(node.value, ast.Call)
+                and authoring_name(node.value.func) == "applicable"
+            ):
+                continue
             elif (
                 isinstance(node, ast.Expr)
                 and isinstance(node.value, ast.Call)

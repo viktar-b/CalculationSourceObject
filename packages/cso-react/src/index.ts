@@ -5,6 +5,12 @@ export {
   printFormulaSheet,
   type FormulaSheetPrintOptions,
 } from './formula-sheet/print.ts';
+export {
+  partitionRowAxis,
+  measureComparisons,
+  planComparisonParts,
+  renderComparisonParts,
+} from './formula-sheet/partition-comparisons.ts';
 export { AsciiMathView } from './ascii-math/AsciiMathView.tsx';
 export {
   PreparedFormulaSheet,

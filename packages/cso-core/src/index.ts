@@ -128,7 +128,7 @@ export {
 export { assertNever } from './shared/assertNever.ts';
 export { formatNumerical } from './shared/formatNumerical.ts';
 
-export { symbolDisplayIdentity } from './contracts/glyphs.ts';
+export { scopedGlyph, symbolDisplayIdentity } from './contracts/glyphs.ts';
 export { notationIdentity } from './notation/identity.ts';
 export { parseNotation } from './notation/parse.ts';
 export type {
@@ -188,6 +188,9 @@ export {
   SymbolObservationSchema,
   type ExecutionPayload,
   type ExecutionResponse,
+  type EngineeringCheck,
+  type MethodContentItem,
+  type MethodHelperRecord,
   type GivenSource,
   type InputBinding,
   type Invocation,
@@ -239,10 +242,13 @@ export {
   type LegacyAssetManifest,
   type PreparedDocument,
   type PreparedDocumentItem,
+  type PreparedMethodContent,
+  type PreparedMethodHelper,
   type PreparedDocumentSection,
   type ResolvedAsset,
 } from './contracts/document.ts';
 export { verifyExecution } from './verification/verify.ts';
+export { deriveApplicability } from './verification/applicability.ts';
 
 export {
   AuthoringEvidenceSchema,
@@ -254,3 +260,5 @@ export {
   type CalculationDefinition,
   type CalculationDefinitionResponse,
 } from './contracts/definition.ts';
+
+export { methodInvocationBindings } from './verification/method-bindings.ts';

@@ -1,3 +1,9 @@
+import {
+  measureComparisons,
+  planComparisonParts,
+  renderComparisonParts,
+} from './partition-comparisons.ts';
+
 const DEFAULT_FORMULA_SHEET_SELECTOR = '[data-formula-sheet]';
 const FORMULA_SHEET_PRINT_BODY_CLASS = 'formula-sheet-printing';
 const FORMULA_SHEET_PRINT_ROOT_ATTRIBUTE = 'data-formula-sheet-print-root';
@@ -113,6 +119,10 @@ export const printFormulaSheet = (
     }
     cleanupTimeout = browser.window.setTimeout(cleanup, PRINT_CLEANUP_DELAY_MS);
     try {
+      renderComparisonParts(
+        planComparisonParts(measureComparisons(target)),
+        printClone,
+      );
       browser.window.print();
     } catch (error) {
       cleanup();

@@ -1,13 +1,16 @@
 import {
-  executionBindingFrom,
   AssetRecordSchema,
   BoundPreparedDocumentSchema,
   type CalculationSourceObject,
   CalculationSourceObjectSchema,
   type CalculationSourceSectionItem,
+  contractIssuesToDiagnostics,
   type Diagnostic,
+  deriveApplicability,
   type ExecutionPayload,
   ExecutionPayloadSchema,
+  executionBindingFrom,
+  methodInvocationBindings,
   type HistoricalReview,
   HistoricalReviewSchema,
   type LegacyAssetManifest,
@@ -17,12 +20,14 @@ import {
   PreparedDocumentItemSchema,
   PreparedDocumentSchema,
   PreparedDocumentSectionSchema,
+  type PreparedMethodContent,
+  type PreparedMethodHelper,
   type ResolvedAsset,
   ResolvedAssetSchema,
-  contractIssuesToDiagnostics,
 } from '@cs-object/core';
 
 import { activeSymbolIds } from './active-symbols.ts';
+import { methodNotation } from './method-notation.ts';
 import { prepareDocumentContext } from './prepare-context.ts';
 
 export class DocumentPreparationError extends Error {
@@ -458,6 +463,523 @@ const resolveExecutionPlacementProvenance = (
   };
 };
 
+const applicabilityField = (reasons: readonly string[] | undefined) =>
+  reasons && reasons.length > 0
+    ? {
+        applicability: {
+          state: 'not-applicable' as const,
+          reasons: [...reasons],
+        },
+      }
+    : {};
+
+type Applicability = ReturnType<typeof deriveApplicability>;
+
+const sectionChecks = (
+  execution: ExecutionPayload,
+  invocationId: unknown,
+  derived: Applicability,
+) => {
+  if (typeof invocationId !== 'string') return {};
+  type CheckPlan = {
+    id: string;
+    checks?: readonly {
+      id: string;
+      explanation: string;
+      predicateText: string;
+    }[];
+    helpers: readonly CheckPlan[];
+  };
+  const plans = (execution.methods ?? []).flatMap(function walk(
+    plan: CheckPlan,
+  ): CheckPlan[] {
+    return [plan, ...plan.helpers.flatMap(walk)];
+  });
+  const engineeringChecks = plans.flatMap((plan) =>
+    (plan.checks ?? []).flatMap((check) => {
+      const outcome = (execution.checkOutcomes ?? []).find(
+        (item) =>
+          item.methodId === plan.id &&
+          item.invocationId === invocationId &&
+          item.checkId === check.id,
+      );
+      return outcome
+        ? [
+            {
+              id: check.id,
+              explanation: check.explanation,
+              predicateText: check.predicateText,
+              value: outcome.value,
+              ...(() => {
+                const reasons = derived.reasonsByCheck.get(
+                  `${invocationId}|${check.id}`,
+                );
+                return reasons ? { reasons: [...reasons] } : {};
+              })(),
+            },
+          ]
+        : [];
+    }),
+  );
+  return engineeringChecks.length > 0 ? { engineeringChecks } : {};
+};
+
+const groupedInvocationIds = (execution: ExecutionPayload): Set<string> =>
+  new Set(
+    (execution.tables ?? []).flatMap((table) =>
+      table.cases.map((item) => item.invocationId),
+    ),
+  );
+
+const replacesInvocation = (
+  invocationId: string | undefined,
+  grouped: ReadonlySet<string>,
+): boolean =>
+  invocationId !== undefined &&
+  [...grouped].some(
+    (id) => invocationId === id || invocationId.startsWith(`${id}/`),
+  );
+
+const presentedCell = (
+  execution: ExecutionPayload,
+  cell: NonNullable<ExecutionPayload['tables']>[number]['cells'][number],
+  applicability: Applicability,
+) => {
+  if (cell.role === 'input') {
+    const invocation = execution.invocations.find(
+      (item) => item.id === cell.caseInvocationId,
+    );
+    const value = invocation?.resolvedInputs[cell.quantity];
+    const numericKind = invocation?.resolvedInputKinds?.[cell.quantity];
+    if (
+      value === undefined ||
+      (numericKind !== 'int' && numericKind !== 'float')
+    ) {
+      fail('CELL_BINDING_MISMATCH', `Missing input '${cell.quantity}'`);
+    }
+    return {
+      heading: cell.heading,
+      invocationId: cell.caseInvocationId,
+      symbolId: cell.symbolId,
+      value,
+      numericKind: numericKind as 'int' | 'float',
+      ...applicabilityField(applicability.reasonsBySymbolId.get(cell.symbolId)),
+    };
+  }
+  const output = execution.authoring?.outputs.find(
+    (item) =>
+      item.invocationId === cell.caseInvocationId &&
+      item.name === cell.quantity &&
+      item.symbolId === cell.symbolId,
+  );
+  if (
+    !output ||
+    (output.numericKind !== 'int' && output.numericKind !== 'float')
+  ) {
+    fail('CELL_BINDING_MISMATCH', `Missing output '${cell.quantity}'`);
+  }
+  return {
+    heading: cell.heading,
+    invocationId: cell.caseInvocationId,
+    symbolId: cell.symbolId,
+    value: output.value,
+    numericKind: output.numericKind as 'int' | 'float',
+    ...applicabilityField(applicability.reasonsBySymbolId.get(cell.symbolId)),
+  };
+};
+
+type MethodRecord = NonNullable<ExecutionPayload['methods']>[number];
+type MethodOwner = MethodRecord | MethodRecord['helpers'][number];
+type MethodNotation = ReturnType<typeof methodNotation>;
+
+const notationFor = (method: MethodRecord): MethodNotation =>
+  methodNotation(method, (message) => fail('UNKNOWN_QUANTITY', message));
+
+const presentMethodQuantity = (
+  owner: MethodOwner,
+  quantity: MethodRecord['quantities'][number],
+  notation: MethodNotation,
+) => ({
+  selectionName: quantity.selectionName,
+  role: quantity.role,
+  glyph: quantity.glyph,
+  description: quantity.description,
+  unit: quantity.unit,
+  formulaText: quantity.formulaText,
+  symbolId: notation.quantityId(owner, quantity.variableName),
+});
+
+const presentMethodContent = (
+  owner: MethodOwner,
+  content: MethodRecord['content'],
+  notation: MethodNotation,
+): PreparedMethodContent[] =>
+  content.map((item) => {
+    if (item.kind === 'check' || item.kind === 'applicability') {
+      const declared = (
+        (item.kind === 'check' ? owner.checks : owner.applicability) ?? []
+      ).find((candidate) => candidate.id === item.localId);
+      if (!declared) {
+        fail('UNKNOWN_QUANTITY', `Condition '${item.localId}' is missing`);
+      }
+      return {
+        kind: item.kind,
+        localId: item.localId,
+        explanation: declared.explanation,
+        predicateText: declared.predicateText,
+        predicateSymbolId: notation.conditionId(owner, item.kind, declared.id),
+      };
+    }
+    if (item.kind === 'quantity') {
+      const quantity = owner.quantities.find(
+        (candidate) => candidate.variableName === item.variableName,
+      );
+      if (!quantity) {
+        fail('UNKNOWN_QUANTITY', `Quantity '${item.variableName}' is missing`);
+      }
+      return {
+        kind: 'quantity',
+        ...presentMethodQuantity(owner, quantity, notation),
+      };
+    }
+    if (item.kind === 'section') {
+      return {
+        kind: 'section',
+        localId: item.localId,
+        title: item.title,
+        contextSource: HistoricalReviewSchema.shape.originalFields.parse({
+          metadata: item.metadata ?? {},
+        }),
+        content: presentMethodContent(owner, item.content, notation),
+      };
+    }
+    if (item.kind === 'call') {
+      return {
+        ...item,
+        inputs: item.inputs.map(({ name, formulaText }) => ({
+          name,
+          formulaText,
+          symbolId: notation.callInputId(owner, item.binding, name),
+        })),
+      };
+    }
+    return item;
+  });
+
+const presentMethodHelpers = (
+  helpers: MethodRecord['helpers'],
+  notation: MethodNotation,
+): PreparedMethodHelper[] =>
+  helpers.map((helper) => ({
+    id: helper.id,
+    function: helper.function,
+    contextSource: HistoricalReviewSchema.shape.originalFields.parse({
+      metadata: helper.metadata ?? {},
+    }),
+    content: presentMethodContent(helper, helper.content, notation),
+    helpers: presentMethodHelpers(helper.helpers, notation),
+  }));
+
+const presentedBranchNotes = (
+  execution: ExecutionPayload,
+  table: NonNullable<ExecutionPayload['tables']>[number],
+  method: MethodRecord,
+  notation: MethodNotation,
+) => {
+  const outcomes = execution.branchOutcomes ?? [];
+  const bound = table.cases.flatMap((caseItem) =>
+    methodInvocationBindings(execution, method, caseItem.invocationId).flatMap(
+      ({ plan, invocation, callPath }) =>
+        outcomes
+          .filter((outcome) => outcome.invocationId === invocation.id)
+          .map((outcome) => {
+            const variable = invocation.symbols.find(
+              (item) => item.symbolId === outcome.symbolId,
+            )?.variableName;
+            const quantity =
+              plan.quantities.find((item) => item.variableName === variable) ??
+              fail(
+                'UNKNOWN_QUANTITY',
+                `Branch symbol '${outcome.symbolId}' is missing`,
+              );
+            return { caseItem, plan, callPath, outcome, quantity };
+          }),
+    ),
+  );
+  const groupKey = (item: (typeof bound)[number]) =>
+    JSON.stringify([
+      item.plan.id,
+      item.callPath,
+      item.quantity.variableName,
+      item.outcome.nodeKey,
+    ]);
+  const labels = new Map<string, Set<string>>();
+  for (const item of bound) {
+    const key = groupKey(item);
+    const values = labels.get(key) ?? new Set<string>();
+    values.add(item.outcome.label);
+    labels.set(key, values);
+  }
+  return bound
+    .filter((item) => (labels.get(groupKey(item))?.size ?? 0) > 1)
+    .map(({ caseItem, plan, callPath, outcome, quantity }) => {
+      const nodes = new Map(quantity.nodes.map((node) => [node.key, node]));
+      let branch = outcome;
+      let chosen: string;
+      for (;;) {
+        const arm =
+          nodes.get(branch.nodeKey)?.funcArgs?.[branch.value ? 1 : 2]?.key ??
+          fail(
+            'UNKNOWN_QUANTITY',
+            `Conditional '${branch.nodeKey}' is incomplete`,
+          );
+        const inner =
+          nodes.get(arm)?.funcSpec?.id === 'fg.cnd'
+            ? outcomes.find(
+                (item) =>
+                  item.invocationId === outcome.invocationId &&
+                  item.symbolId === outcome.symbolId &&
+                  item.nodeKey === arm,
+              )
+            : undefined;
+        if (!inner) {
+          chosen = arm;
+          break;
+        }
+        branch = inner;
+      }
+      return {
+        heading: caseItem.heading,
+        ...(callPath.length > 0 ? { callPath: callPath.join(' / ') } : {}),
+        invocationId: outcome.invocationId,
+        symbolId: outcome.symbolId,
+        nodeKey: outcome.nodeKey,
+        label: outcome.label,
+        conditionHolds: outcome.value,
+        ...notation.branch(
+          plan,
+          quantity.variableName,
+          outcome.nodeKey,
+          chosen,
+        ),
+      };
+    });
+};
+
+const comparisonPlacement = (
+  execution: ExecutionPayload,
+  item: CalculationSourceSectionItem,
+  sectionId: string,
+  index: number,
+  applicability: Applicability,
+): PreparedDocumentItem => {
+  if (item.kind !== 'method' && item.kind !== 'table') {
+    fail('UNKNOWN_METHOD', 'Expected a method or table placement');
+  }
+  const provenance = resolveExecutionPlacementProvenance(execution, item);
+  const placement = {
+    context: [] as PreparedDocumentItem['context'],
+    sourcePlacementId: placementId(sectionId, index),
+    ...(typeof provenance.localId === 'string'
+      ? { localId: provenance.localId }
+      : {}),
+    ...(typeof provenance.invocationId === 'string'
+      ? { invocationId: provenance.invocationId }
+      : {}),
+    ...(provenance.location
+      ? { location: provenance.location as PreparedDocumentItem['location'] }
+      : {}),
+  };
+  if (item.kind === 'method') {
+    const method = execution.methods?.find((record) => record.id === item.id);
+    if (!method) fail('UNKNOWN_METHOD', `Method '${item.id}' is missing`);
+    const notation = notationFor(method);
+    return {
+      kind: 'method',
+      id: item.id,
+      title: method.title,
+      contextSource: HistoricalReviewSchema.shape.originalFields.parse({
+        metadata: item.metadata ?? {},
+        contentMetadata: method.metadata ?? {},
+      }),
+      quantities: method.quantities.map((quantity) =>
+        presentMethodQuantity(method, quantity, notation),
+      ),
+      content: presentMethodContent(method, method.content, notation),
+      helpers: presentMethodHelpers(method.helpers, notation),
+      symbols: notation.symbols(),
+      ...placement,
+    };
+  }
+  const table = execution.tables?.find((record) => record.id === item.id);
+  if (!table) fail('UNKNOWN_METHOD', `Table '${item.id}' is missing`);
+  const method = execution.methods?.find(
+    (record) => record.id === table.methodId,
+  );
+  if (!method) fail('UNKNOWN_METHOD', `Method '${table.methodId}' is missing`);
+  const rows = (role: 'input' | 'output', names: readonly string[]) =>
+    names.map((name) => {
+      const quantity = method.quantities.find(
+        (candidate) =>
+          candidate.role === role && candidate.selectionName === name,
+      );
+      if (!quantity) {
+        fail(
+          'UNKNOWN_QUANTITY',
+          `Quantity '${name}' is missing from the method`,
+        );
+      }
+      return {
+        quantity: name,
+        role,
+        glyph: quantity.glyph,
+        description: quantity.description,
+        unit: quantity.unit,
+        cells: table.cases.map((caseItem) => {
+          const cell = table.cells.find(
+            (candidate) =>
+              candidate.caseInvocationId === caseItem.invocationId &&
+              candidate.quantity === name &&
+              candidate.role === role,
+          );
+          if (!cell) {
+            fail('CELL_BINDING_MISMATCH', `Missing cell for '${name}'`);
+          }
+          return presentedCell(execution, cell, applicability);
+        }),
+      };
+    });
+  const notation = notationFor(method);
+  const branchNotes = presentedBranchNotes(execution, table, method, notation);
+  const bindings = table.cases.flatMap((caseItem) =>
+    methodInvocationBindings(execution, method, caseItem.invocationId).map(
+      (binding) => ({ ...binding, heading: caseItem.heading }),
+    ),
+  );
+  const checkPlans = new Map(bindings.map(({ plan }) => [plan.id, plan]));
+  const engineeringChecks = [...checkPlans.values()].flatMap((plan) =>
+    (plan.checks ?? []).flatMap((check) => {
+      const results = bindings
+        .filter((binding) => binding.plan.id === plan.id)
+        .flatMap(({ invocation, callPath, heading }) => {
+          const outcome = (execution.checkOutcomes ?? []).find(
+            (item) =>
+              item.methodId === plan.id &&
+              item.invocationId === invocation.id &&
+              item.checkId === check.id,
+          );
+          if (!outcome) return [];
+          const reasons = applicability.reasonsByCheck.get(
+            `${invocation.id}|${check.id}`,
+          );
+          return [
+            {
+              heading,
+              invocationId: invocation.id,
+              value: outcome.value,
+              ...(callPath.length > 0
+                ? { callPath: callPath.join(' / ') }
+                : {}),
+              ...(reasons ? { reasons: [...reasons] } : {}),
+            },
+          ];
+        });
+      return results.length > 0
+        ? [
+            {
+              id:
+                plan.id === method.id
+                  ? check.id
+                  : JSON.stringify([plan.id, check.id]),
+              explanation: check.explanation,
+              predicateText: check.predicateText,
+              results,
+            },
+          ]
+        : [];
+    }),
+  );
+  const applicabilityPlans = [
+    method,
+    ...method.helpers.flatMap(function walk(
+      helper: (typeof method.helpers)[number],
+    ): (typeof method.helpers)[number][] {
+      return [helper, ...helper.helpers.flatMap(walk)];
+    }),
+  ];
+  const applicabilityNotes = applicabilityPlans.flatMap((plan) =>
+    (plan.applicability ?? []).flatMap((condition) => {
+      const results = table.cases.flatMap((caseItem) =>
+        (execution.applicabilityOutcomes ?? [])
+          .filter(
+            (item) =>
+              item.methodId === plan.id &&
+              item.applicabilityId === condition.id &&
+              (item.invocationId === caseItem.invocationId ||
+                item.invocationId.startsWith(`${caseItem.invocationId}/`)),
+          )
+          .map((outcome) => ({
+            heading: caseItem.heading,
+            invocationId: outcome.invocationId,
+            value: outcome.value,
+            ...(outcome.value ? {} : { reasons: [condition.explanation] }),
+          })),
+      );
+      return results.length > 0
+        ? [
+            {
+              id: condition.id,
+              explanation: condition.explanation,
+              predicateText: condition.predicateText,
+              results,
+            },
+          ]
+        : [];
+    }),
+  );
+  return {
+    kind: 'table',
+    id: item.id,
+    title: table.title,
+    casesAxis: table.casesAxis,
+    ...(table.columnCap ? { columnCap: table.columnCap } : {}),
+    ...(branchNotes.length > 0
+      ? { branchNotes, symbols: notation.symbols() }
+      : {}),
+    ...(engineeringChecks.length > 0 ? { engineeringChecks } : {}),
+    ...(applicabilityNotes.length > 0 ? { applicabilityNotes } : {}),
+    cases: table.cases.map(({ heading, invocationId }) => ({
+      heading,
+      invocationId,
+    })),
+    groups: [
+      ...(table.inputs.length > 0
+        ? [
+            {
+              role: 'input' as const,
+              label: 'Inputs' as const,
+              rows: rows('input', table.inputs),
+            },
+          ]
+        : []),
+      ...(table.outputs.length > 0
+        ? [
+            {
+              role: 'output' as const,
+              label: 'Outputs' as const,
+              rows: rows('output', table.outputs),
+            },
+          ]
+        : []),
+    ],
+    ...(table.cases.length === 0
+      ? { emptyState: 'No cases evaluated' as const }
+      : {}),
+    replacedSections: table.cases.map((caseItem) => caseItem.sectionId),
+    ...placement,
+  };
+};
+
 export interface PrepareExecutionDocumentOptions {
   readonly execution: ExecutionPayload;
   readonly assets: readonly ResolvedAsset[];
@@ -493,25 +1015,68 @@ export const prepareExecutionDocument = (
       );
     }
   }
-  const sections = reachableSections(cso).map((section) => ({
-    id: section.id,
-    title: section.title,
-    sourcePlacementId: placementId(section.id, 'heading'),
-    context: [],
-    localId: section.metadata?.localId,
-    invocationId: section.metadata?.invocationId,
-    location: section.metadata?.location,
-    metadata: retainedMetadata(section.metadata, true),
-    items: section.items.map((item, index) => {
-      return {
-        ...itemFields(item),
-        context: [],
-        contextSource: retainItemContextSource(item, true),
-        sourcePlacementId: placementId(section.id, index),
-        ...resolveExecutionPlacementProvenance(execution, item),
-      };
-    }),
-  }));
+  const applicability = deriveApplicability(execution);
+  const grouped = groupedInvocationIds(execution);
+  const sectionsById = new Map(
+    cso.sections.map((section) => [section.id, section]),
+  );
+  const replaced = (section: (typeof cso.sections)[number]): boolean =>
+    replacesInvocation(
+      typeof section.metadata?.invocationId === 'string'
+        ? section.metadata.invocationId
+        : undefined,
+      grouped,
+    );
+  const sections = reachableSections(cso)
+    .filter((section) => !replaced(section))
+    .map((section) => ({
+      id: section.id,
+      title: section.title,
+      sourcePlacementId: placementId(section.id, 'heading'),
+      context: [],
+      localId: section.metadata?.localId,
+      invocationId: section.metadata?.invocationId,
+      location: section.metadata?.location,
+      metadata: retainedMetadata(section.metadata, true),
+      ...sectionChecks(
+        execution,
+        section.metadata?.invocationId,
+        applicability,
+      ),
+      items: section.items.flatMap((item, index) => {
+        if (item.kind === 'section') {
+          const target = sectionsById.get(item.id);
+          if (target && replaced(target)) return [];
+        }
+        if (item.kind === 'method' || item.kind === 'table') {
+          return [
+            comparisonPlacement(
+              execution,
+              item,
+              section.id,
+              index,
+              applicability,
+            ),
+          ];
+        }
+        return [
+          {
+            ...itemFields(item),
+            ...applicabilityField(
+              item.kind === 'symbol' || item.kind === 'symbolRef'
+                ? applicability.reasonsBySymbolId.get(
+                    item.kind === 'symbol' ? item.symbol.id : item.id,
+                  )
+                : undefined,
+            ),
+            context: [],
+            contextSource: retainItemContextSource(item, true),
+            sourcePlacementId: placementId(section.id, index),
+            ...resolveExecutionPlacementProvenance(execution, item),
+          } as PreparedDocumentItem,
+        ];
+      }),
+    }));
   const displayed = new Set(
     sections.flatMap((section) =>
       section.items.flatMap((item) =>
@@ -530,7 +1095,13 @@ export const prepareExecutionDocument = (
   );
   const { metadata: _sourceMetadata, ...sourceProvenance } = cso.source;
   const document = parseDocument({
-    documentVersion: '2',
+    documentVersion: sections.some((section) =>
+      section.items.some(
+        (item) => item.kind === 'method' || item.kind === 'table',
+      ),
+    )
+      ? '3'
+      : '2',
     context: [],
     source: {
       kind: 'execution',
@@ -578,7 +1149,16 @@ export const prepareExecutionDocument = (
   });
   return parseContent(BoundPreparedDocumentSchema, {
     execution,
-    document: prepareDocumentContext(document),
+    document: prepareDocumentContext(
+      document,
+      new Set(
+        execution.invocations
+          .filter((invocation) => replacesInvocation(invocation.id, grouped))
+          .flatMap((invocation) =>
+            invocation.symbols.map((symbol) => symbol.symbolId),
+          ),
+      ),
+    ),
   }).document;
 };
 

@@ -13,12 +13,15 @@ import type { FormulaSheetRowProps } from './FormulaSheetRowProps.ts';
 import { FormulaSheetResultCell } from './FormulaSheetResultCell.tsx';
 import { FormulaSheetValueTree } from './FormulaSheetValueTree.tsx';
 
-export type FormulaSheetSymbolRowProps = FormulaSheetRowProps<SheetSymbol>;
+export type FormulaSheetSymbolRowProps = FormulaSheetRowProps<SheetSymbol> & {
+  readonly symbolicOnly?: boolean;
+};
 
 export const FormulaSheetSymbolRow = ({
   sheet,
   sheetItemIndex,
   item: symbol,
+  symbolicOnly = false,
 }: FormulaSheetSymbolRowProps): ReactElement => {
   const { glyph: symbolGlyph } = symbol;
   const symbolUnit = symbol.unit ?? '';
@@ -49,7 +52,9 @@ export const FormulaSheetSymbolRow = ({
             />
           </FormulaSheetSymbolCell>
 
-          <FormulaSheetResultCell literal={symbol.valueTree.result} />
+          {!symbolicOnly && (
+            <FormulaSheetResultCell literal={symbol.valueTree.result} />
+          )}
 
           <FormulaSheetUnitCell>
             <UnitMathBlock unit={symbolUnit} optional={true} />
@@ -59,13 +64,20 @@ export const FormulaSheetSymbolRow = ({
           </FormulaSheetCommentCell>
         </div>
 
-        {!symbolIsSolidLiteral && (
+        {(!symbolIsSolidLiteral ||
+          (symbolicOnly &&
+            rootNode.kind === 'literal' &&
+            rootNode.value.kind !== 'empty')) && (
           <div className="flex min-w-0">
             <div className="w-full min-w-0 overflow-visible border-t border-gray-300 text-[14px]">
               <div className="my-2 flex min-w-0">
                 <FormulaSheetSpacerCell />
                 <div className="min-w-0 max-w-full flex-1 overflow-visible">
-                  <FormulaSheetValueTree sheet={sheet} symbol={symbol} />
+                  <FormulaSheetValueTree
+                    sheet={sheet}
+                    symbol={symbol}
+                    symbolicOnly={symbolicOnly}
+                  />
                 </div>
               </div>
             </div>

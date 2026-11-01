@@ -62,6 +62,59 @@ get [qualified notation](#repeated-symbols), even when calls receive equal value
 See the [section-property comparisons](../examples/section-properties/README.md#reuse-in-a-comparison)
 for the same workflow with larger calculations.
 
+### Explain one method and compare its cases
+
+Declare `method(id=..., calculation=..., title=...)` before the calls it
+explains, then `table(...)` after those calls. The method and every case share
+one symbolic plan from that source revision. A table does not rerun the
+calculation or invent a second reading of the formulas.
+
+Core resolves the method's formulas through each case's parameter and helper-call
+bindings and checks their structure against the captured formulas. Changing an
+operation, constant or referenced quantity fails verification even when the
+numbers happen to agree. This check uses the captured cases; an empty table does
+not execute a representative calculation.
+
+`cases` maps a heading to an earlier call result. Each call belongs to one
+table. `cases_axis="columns"` is the default and places cases in columns.
+`cases_axis="rows"` places cases in rows. Use the same choice in HTML and PDF.
+`column_cap` is an optional positive integer that limits how many data columns
+share one print part; measured fit still decides the split. Orientation and
+the cap do not change cell identity, case order or numerical evidence.
+
+`inputs` and `outputs` select table rows by quantity name. Omit either tuple
+to include every parameter or public output. Selection does not remove
+formulas, nested calls, text or figures from the method. For a smaller comparison,
+extract a reusable calculation with the required scope and call it from both the
+comparison and the full calculation. The tapered section example shares its area
+and x-axis inertia formulas this way.
+
+A composed method may return a helper's public output directly. Its table cell
+keeps that output's captured symbol identity; no copied assignment is required.
+Method quantities use the ordinary formula-row layout without case substitutions.
+Select all inputs needed to review the cases, including shared dimensions.
+Cases in columns usually fit a few cases with many quantities; rows suit many
+cases with fewer quantities.
+
+`check(id=..., targets=(...), explanation=..., predicate=...)` records an
+engineering criterion. Each case shows Pass or Fail with the explanation while
+keeping the calculated number. Nested helper outcomes identify their call path
+and remain visible when their quantities are omitted from the table.
+Write the explanation as the criterion, since it appears with both outcomes.
+`applicable(...)` uses the same arguments to record when a
+result may be used. An inapplicable result displays "Not applicable" and the
+originating explanation; the computed number stays in the execution.
+Inapplicability follows dependencies that the calculation actually used. A
+failed check does not make a valid number inapplicable. Python errors still
+stop the run.
+
+Captures that contain method or table evidence use protocol version 3 and CSO
+schema `1.1.0`. Prepared documents that contain those items use document
+version 3. Protocol 2 and prepared document version 2 remain valid when the
+source has no method or table. Rebuild a prepared document from the retained
+execution with `prepareExecutionDocument`. Do not rebind an older execution to
+a new numerical run in order to add a method.
+
 ### Parameters and public outputs
 
 Keep reusable metadata in shared `Annotated` / `TypeAlias` declarations.
@@ -266,8 +319,9 @@ resulting abbreviations instead of widening the PDF column.
 Captured execution uses original UTF-8 source bytes. Assignment observations
 and public outputs are separate from parsed formulas and cached results.
 Instrumentation operates on a copied AST; source hashes and locations describe
-the original files. Source columns are UTF-8 byte offsets. New captures use
-protocol v2; v1 remains readable without invented public-output evidence.
+the original files. Source columns are UTF-8 byte offsets. Captures without a method or table use protocol v2. Captures that record a
+method or table use protocol v3. Protocol v1 remains readable without invented
+public-output evidence.
 
 Formula-only edits can leave generated editor types current while invalidating
 numerical reference bindings. Interface edits require regenerating handles.
