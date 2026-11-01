@@ -284,6 +284,40 @@ def wrapper():
             finally:
                 sys.path.pop(0)
 
+    def test_external_package_initializer_handles_survive_sibling_module_generation(
+        self,
+    ):
+        package = self.root / "pkg"
+        package.mkdir()
+        declaration = (
+            (self.root / "methods.py")
+            .read_text()
+            .replace('path="adapter.py"', 'path="../adapter.py"')
+        )
+        (package / "__init__.py").write_text(declaration)
+        (package / "other.py").write_text(
+            declaration.replace(
+                "square = external_function", "other_square = external_function"
+            )
+        )
+        self.source.write_text(
+            self.source.read_text()
+            .replace(
+                "from _cso_bindings._external.methods import square",
+                "from _cso_bindings._external.pkg.__init__ import square\nfrom _cso_bindings._external.pkg.other import other_square",
+            )
+            .replace(
+                "    doubled:", "    second = other_square(length=length)\n    doubled:"
+            )
+        )
+        generate(self.root)
+        initializer = self.root / "_cso_bindings/_external/pkg/__init__.py"
+        self.assertIn("square = load_external", initializer.read_text())
+        self.assertTrue(generate(self.root, check=True)["ok"])
+        response = execute(self.source, "calculate", {})
+        self.assertTrue(response["ok"], response)
+        self.assertEqual(len(response["execution"]["externalCalls"]), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
