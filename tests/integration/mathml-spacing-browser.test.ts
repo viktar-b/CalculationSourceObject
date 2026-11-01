@@ -155,6 +155,7 @@ test('conditional branches and power scripts stay legible in screen and print', 
           if (!value || !label)
             throw new Error('Missing branch value or label');
           return {
+            formula: table.closest('[data-probe]')?.getAttribute('data-probe'),
             vertical:
               Math.min(...secondBounds.map((b) => b.top)) -
               Math.max(...firstBounds.map((b) => b.bottom)),
@@ -164,7 +165,10 @@ test('conditional branches and power scripts stay legible in screen and print', 
       );
       expect(branches.length).toBeGreaterThan(0);
       for (const gap of branches) {
-        expect(gap.vertical, `${media} branch gap`).toBeGreaterThanOrEqual(4);
+        expect(
+          gap.vertical,
+          `${media} ${gap.formula} branch gap`,
+        ).toBeGreaterThanOrEqual(4);
         expect(gap.vertical, `${media} excessive branch gap`).toBeLessThan(16);
         expect(
           gap.horizontal,

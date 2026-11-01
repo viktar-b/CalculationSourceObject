@@ -20,7 +20,7 @@ interface ConditionalFunctionMathmlProps {
 }
 
 const baseStyle = { textAlign: 'left' as const };
-const branchStyle = { ...baseStyle, paddingBlock: '0.3em' };
+const branchStyle = { ...baseStyle, paddingBlock: '0.4em' };
 
 const ConditionalFunctionMathml = ({
   argCnd,
