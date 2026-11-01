@@ -24,7 +24,12 @@ import { afterAll, beforeAll, expect, test } from 'vitest';
 
 const repoRoot = join(import.meta.dirname, '../..');
 const directory = mkdtempSync(join(tmpdir(), 'cso-method-table-'));
-const python = join(directory, 'venv', 'bin', 'python');
+const python = join(
+  directory,
+  'venv',
+  process.platform === 'win32' ? 'Scripts' : 'bin',
+  process.platform === 'win32' ? 'python.exe' : 'python',
+);
 const cli = join(repoRoot, 'packages/cso-cli/dist/cli.js');
 
 const rectangle = `from typing import Annotated, TypeAlias
@@ -279,7 +284,7 @@ def compare() -> CalculationResults:
 
 beforeAll(() => {
   const created = spawnSync(
-    '/opt/homebrew/bin/python3',
+    process.env.PYTHON ?? 'python3',
     ['-m', 'venv', join(directory, 'venv')],
     {
       encoding: 'utf8',

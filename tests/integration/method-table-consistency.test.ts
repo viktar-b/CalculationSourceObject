@@ -17,7 +17,12 @@ import { afterAll, beforeAll, expect, test } from 'vitest';
 
 const directory = mkdtempSync(join(tmpdir(), 'cso-method-consistency-'));
 const python =
-  process.env.PYTHON ?? join(import.meta.dirname, '../../.venv/bin/python');
+  process.env.PYTHON ??
+  join(
+    import.meta.dirname,
+    '../../.venv',
+    process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python',
+  );
 const leaf = `from typing import Annotated, TypeAlias
 from cso_python import CalculationResults, calculation, check, document_section, section, symbol
 Width: TypeAlias = Annotated[float, symbol(glyph="w_{rect}", description="Width", unit="m")]
