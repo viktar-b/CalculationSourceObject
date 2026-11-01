@@ -66,7 +66,7 @@ class CalculationHandle:
             return_annotation=CalculationResults,
         )
 
-    def __call__(self, **inputs: float) -> CalculationResults:
+    def __call__(self, /, **inputs: float) -> CalculationResults:
         from .execution import ACTIVE, Execution, invoke
 
         frame = sys._getframe(1)
