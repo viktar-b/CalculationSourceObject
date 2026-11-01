@@ -63,7 +63,22 @@ Version 1 prepared JSON is rejected. Regenerate saved documents with
 `prepareLegacyDocument` from the original CSO, asset manifest and captured assets.
 Reattach historical reviews through the preparation options. Synthetic documents
 constructed directly must provide context arrays and symbol operand arrays.
-Update core and React together; source CSO and execution versions are unchanged.
+Update core and React together. A prepared document is version 3 only when it
+contains a method or table; otherwise it remains version 2. Source CSO schema
+`1.1.0` and execution protocol 3 follow the same rule. Rebuild that document
+from the captured execution rather than rewriting old evidence.
+
+A comparison is one logical table. On screen it scrolls horizontally and keeps
+the identifying column visible. Print divides the authored column axis into
+parts that fit the page width, then continues a tall part onto later pages.
+Each part repeats the identifying labels, group context and qualifications
+needed to read that part. A single column or row that cannot fit at report
+type size fails checked publication with `DOCUMENT_LAYOUT_OVERFLOW` and leaves
+an existing output file unchanged. Publication does not shrink type, clip a
+column, drop a case or switch orientation. Extracted page text is layout
+evidence. Inspect every delivered PDF page before treating the report as
+visually accepted. See [ADR 0009](adr/0009-shared-calculation-method-plan.md)
+and [ADR 0010](adr/0010-applicability-and-numerical-execution.md).
 
 The pure preparer receives captured data URLs and validates their binding to
 the execution. The [CLI](../packages/cso-cli/src/assets.ts) owns file containment,
@@ -159,6 +174,46 @@ For a failing layout, plain `html` export still produces an inspectable preview.
 `html --check-layout` and `pdf` fail without replacing an existing output.
 Browser geometry checks do not establish actual PDF pagination, font embedding,
 independent numerical agreement or human visual acceptance.
+
+### Inspect and adjust a comparison table
+
+Start with the authored `table(...)` call and its `method(...)` target. The
+calculation's symbol metadata supplies descriptions, glyphs and units. The table
+selects quantities, names cases and chooses `cases_axis`; CSS controls appearance.
+
+| Change | Owning implementation |
+| --- | --- |
+| Cell markup and description/symbol/unit structure | `case 'table'` in [PreparedFormulaSheet](../packages/cso-react/src/PreparedFormulaSheet.tsx) |
+| Spacing, alignment, borders and group headings | `.cso-comparison` rules in [styles.css](../packages/cso-react/src/styles.css) |
+| Case values, selected quantities and qualifications | `comparisonPlacement` in [prepare-document](../packages/cso-react/src/prepare-document.ts) |
+| Measured print parts and repeated headings | [partition-comparisons](../packages/cso-react/src/formula-sheet/partition-comparisons.ts) |
+
+Inspect `[data-comparison-id]` in the generated HTML. It carries
+`data-source-placement` and `data-cases-axis`. Each value cell carries
+`data-quantity`, `data-case`, `data-symbol-id` and its unformatted `data-value`.
+These identify the case and captured quantity independently of visible labels or
+orientation. The description, notation and unit have separate
+`.cso-comparison-description`, `.cso-comparison-notation` and
+`.cso-comparison-unit` elements for targeted style changes.
+
+Edit the source renderer or shared CSS, then rebuild React and regenerate the
+report. Generated HTML embeds the CSS; editing it alone will not fix the next
+report. Print parts clone the screen table and retain its classes and binding
+attributes. Inspect both orientations at report width and run the
+[method/table integration checks](../tests/integration/method-table.test.ts) after
+changes that affect cell size. They cover wide and tall tables, repeated headings,
+MathML units, checks and applicability. Keep the data attributes intact: print
+measurement and inspection use them.
+
+For the maintained tapered comparison:
+
+```sh
+npm run build:cli
+node packages/cso-cli/dist/cli.js html examples/section-properties/compare.cso.py \
+  --function compare_tapered --check-layout --out .scratch/tapered.html --format json
+```
+
+Then follow the PDF inspection steps below if print layout changed.
 
 ## Printing and inspection
 

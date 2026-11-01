@@ -14,6 +14,11 @@ import types
 from pathlib import Path
 from typing import Any
 
+from .comparison import (
+    collect_applicability_outcomes,
+    collect_branch_outcomes,
+    collect_check_outcomes,
+)
 from .exporter import authored_output_to_stderr
 from .glyphs import qualify_glyphs
 from .planner import Planner
@@ -306,11 +311,7 @@ class Execution:
         source_hash = next(
             m["sha256"] for m in manifest if m["moduleId"] == root.module.id
         )
-        return {
-            "protocolVersion": "2",
-            "ok": True,
-            "diagnostics": [],
-            "execution": {
+        execution = {
                 "authoring": {
                     "version": "2",
                     "parameters": [
@@ -358,7 +359,29 @@ class Execution:
                 "observations": self.observations,
                 "assets": list(self.planner.assets.values()),
                 "versions": versions(),
-            },
+            }
+        protocol = "2"
+        if self.planner.methods or self.planner.tables:
+            protocol = "3"
+            execution["cso"]["schemaVersion"] = "1.1.0"
+            if self.planner.methods:
+                execution["methods"] = self.planner.methods
+            if self.planner.tables:
+                execution["tables"] = self.planner.tables
+            outcomes = collect_branch_outcomes(self.planner)
+            if outcomes:
+                execution["branchOutcomes"] = outcomes
+            check_outcomes = collect_check_outcomes(self.planner)
+            if check_outcomes:
+                execution["checkOutcomes"] = check_outcomes
+            applicability_outcomes = collect_applicability_outcomes(self.planner)
+            if applicability_outcomes:
+                execution["applicabilityOutcomes"] = applicability_outcomes
+        return {
+            "protocolVersion": protocol,
+            "ok": True,
+            "diagnostics": [],
+            "execution": execution,
         }
 
 

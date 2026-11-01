@@ -68,7 +68,11 @@ it.each([
     expect(
       execution.observations.filter((o) => o.kind === 'formula'),
     ).toHaveLength(formulas);
-    expect(execution.authoring?.outputs).toHaveLength(formulas);
+    expect(
+      execution.authoring?.outputs.filter(
+        (output) => output.invocationId === 'root',
+      ),
+    ).toHaveLength(formulas);
     const observation = execution.observations.find(
       (o) => JSON.parse(o.symbolId)[2] === localId,
     );

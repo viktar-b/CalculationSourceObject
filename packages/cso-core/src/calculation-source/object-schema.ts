@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { NumericValueSchema } from '../contracts/numbers.ts';
 import {
-  SymbolDisplaySchema,
   addSymbolDisplayIssues,
+  SymbolDisplaySchema,
 } from '../contracts/glyphs.ts';
+import { NumericValueSchema } from '../contracts/numbers.ts';
 import { parseNotation } from '../notation/parse.ts';
 import { supportedValueFunctionIds } from '../sheet-model/functions.ts';
 
@@ -276,6 +276,20 @@ export const CalculationSourceSectionItemSchema = z.discriminatedUnion('kind', [
     .strict(),
   z
     .object({
+      kind: z.literal('method'),
+      id: IdSchema,
+      metadata: JsonObjectSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('table'),
+      id: IdSchema,
+      metadata: JsonObjectSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
       kind: z.literal('unknown'),
       id: IdSchema.optional(),
       sourceType: z.string().optional(),
@@ -337,7 +351,7 @@ const CalculationSourceOriginSchema = z
 
 export const CalculationSourceObjectSchema = z
   .object({
-    schemaVersion: z.literal('1.0.0'),
+    schemaVersion: z.enum(['1.0.0', '1.1.0']),
     title: z.string(),
     source: z
       .object({
@@ -352,6 +366,20 @@ export const CalculationSourceObjectSchema = z
   })
   .strict()
   .superRefine((document, ctx) => {
+    const comparison = document.sections.some((section) =>
+      section.items.some(
+        (item) => item.kind === 'method' || item.kind === 'table',
+      ),
+    );
+    if ((document.schemaVersion === '1.1.0') !== comparison) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['schemaVersion'],
+        message:
+          'Comparison documents use schema 1.1.0 and place method or table items',
+        params: { diagnosticCode: 'INCOMPATIBLE_CONTRACT' },
+      });
+    }
     addDocumentReferenceIssues(document, ctx);
   });
 

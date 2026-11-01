@@ -3,10 +3,10 @@ import { CalculationSourceSymbolSchema } from '../calculation-source/object-sche
 import {
   AssetRecordSchema,
   ExecutionBindingSchema,
+  executionBindingKey,
   HashSchema,
   NonemptyStringSchema,
   SourceSpanSchema,
-  executionBindingKey,
   sha256Bytes,
 } from './common.ts';
 import { ExecutionPayloadSchema, executionBindingFrom } from './execution.ts';
@@ -136,7 +136,7 @@ export const ResolvedAssetSchema = z
 const ContextPathSchema = z
   .string()
   .regex(
-    /^\/(?:sourceMetadata(?:\/|$)|sections\/\d+\/(?:metadata|items\/\d+\/(?:contextSource|symbol\/metadata))(?:\/|$)|detachedSymbols\/\d+\/(?:metadata|description|unit|comment)(?:\/|$))/,
+    /^\/(?:sourceMetadata(?:\/|$)|sections\/\d+\/(?:metadata|items\/\d+\/(?:(?:(?:content|helpers)\/\d+\/)*contextSource|symbol\/metadata))(?:\/|$)|detachedSymbols\/\d+\/(?:metadata|description|unit|comment)(?:\/|$))/,
   );
 export type PreparedContextValue =
   | { kind: 'text'; path: string; value: string | number | boolean }
@@ -203,6 +203,146 @@ const executionPlacementFields: ('localId' | 'invocationId' | 'location')[] = [
   'location',
 ];
 
+const PreparedMethodQuantitySchema = z.strictObject({
+  selectionName: NonemptyStringSchema,
+  role: z.enum(['input', 'intermediate', 'output']),
+  glyph: NonemptyStringSchema,
+  description: NonemptyStringSchema,
+  unit: z.string(),
+  formulaText: z.string(),
+  symbolId: NonemptyStringSchema,
+});
+export type PreparedMethodContent =
+  | ({ kind: 'quantity' } & z.infer<typeof PreparedMethodQuantitySchema>)
+  | { kind: 'text'; localId: string; content: string }
+  | {
+      kind: 'figure';
+      localId: string;
+      assetId: string;
+      caption: string;
+      alt: string;
+    }
+  | {
+      kind: 'call';
+      binding: string;
+      helperId: string;
+      inputs: { name: string; formulaText: string; symbolId: string }[];
+      outputs: string[];
+    }
+  | {
+      kind: 'section';
+      localId: string;
+      title: string;
+      contextSource?: Record<string, HistoricalJsonValue>;
+      context?: PreparedContextField[];
+      content: PreparedMethodContent[];
+    }
+  | {
+      kind: 'check';
+      localId: string;
+      explanation: string;
+      predicateText: string;
+      predicateSymbolId: string;
+    }
+  | {
+      kind: 'applicability';
+      localId: string;
+      explanation: string;
+      predicateText: string;
+      predicateSymbolId: string;
+    };
+export type PreparedMethodHelper = {
+  id: string;
+  function: string;
+  content: PreparedMethodContent[];
+  helpers: PreparedMethodHelper[];
+  contextSource?: Record<string, HistoricalJsonValue>;
+  context?: PreparedContextField[];
+};
+const PreparedMethodContentSchema: z.ZodType<PreparedMethodContent> = z.lazy(
+  () =>
+    z.discriminatedUnion('kind', [
+      PreparedMethodQuantitySchema.extend({ kind: z.literal('quantity') }),
+      z.strictObject({
+        kind: z.literal('text'),
+        localId: NonemptyStringSchema,
+        content: z.string(),
+      }),
+      z.strictObject({
+        kind: z.literal('figure'),
+        localId: NonemptyStringSchema,
+        assetId: NonemptyStringSchema,
+        caption: NonemptyStringSchema,
+        alt: NonemptyStringSchema,
+      }),
+      z.strictObject({
+        kind: z.literal('call'),
+        binding: NonemptyStringSchema,
+        helperId: NonemptyStringSchema,
+        inputs: z.array(
+          z.strictObject({
+            name: NonemptyStringSchema,
+            formulaText: z.string(),
+            symbolId: NonemptyStringSchema,
+          }),
+        ),
+        outputs: z.array(NonemptyStringSchema).min(1),
+      }),
+      z.strictObject({
+        kind: z.literal('section'),
+        localId: NonemptyStringSchema,
+        title: NonemptyStringSchema,
+        contextSource: HistoricalJsonObjectSchema.optional(),
+        context: ContextSchema.optional(),
+        content: z.array(PreparedMethodContentSchema),
+      }),
+      z.strictObject({
+        kind: z.literal('check'),
+        localId: NonemptyStringSchema,
+        explanation: NonemptyStringSchema,
+        predicateText: NonemptyStringSchema,
+        predicateSymbolId: NonemptyStringSchema,
+      }),
+      z.strictObject({
+        kind: z.literal('applicability'),
+        localId: NonemptyStringSchema,
+        explanation: NonemptyStringSchema,
+        predicateText: NonemptyStringSchema,
+        predicateSymbolId: NonemptyStringSchema,
+      }),
+    ]),
+);
+const PreparedMethodHelperSchema: z.ZodType<PreparedMethodHelper> = z.lazy(() =>
+  z.strictObject({
+    id: NonemptyStringSchema,
+    function: NonemptyStringSchema,
+    content: z.array(PreparedMethodContentSchema).min(1),
+    helpers: z.array(PreparedMethodHelperSchema),
+    contextSource: HistoricalJsonObjectSchema.optional(),
+    context: ContextSchema.optional(),
+  }),
+);
+const ApplicabilityNoteSchema = z.strictObject({
+  state: z.literal('not-applicable'),
+  reasons: z.array(NonemptyStringSchema).min(1),
+});
+const PreparedTableCellSchema = z.strictObject({
+  heading: NonemptyStringSchema,
+  invocationId: NonemptyStringSchema,
+  symbolId: NonemptyStringSchema,
+  value: z.number().finite(),
+  numericKind: z.enum(['int', 'float']),
+  applicability: ApplicabilityNoteSchema.optional(),
+});
+const PreparedTableRowSchema = z.strictObject({
+  quantity: NonemptyStringSchema,
+  role: z.enum(['input', 'output']),
+  glyph: NonemptyStringSchema,
+  description: NonemptyStringSchema,
+  unit: z.string(),
+  cells: z.array(PreparedTableCellSchema),
+});
+
 export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('section'),
@@ -214,6 +354,7 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
     kind: z.literal('symbol'),
     operands: OperandContextSchema,
     symbol: CalculationSourceSymbolSchema,
+    applicability: ApplicabilityNoteSchema.optional(),
     contextSource: HistoricalJsonObjectSchema.optional(),
     ...placementFields,
   }),
@@ -221,6 +362,7 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
     kind: z.literal('symbolRef'),
     operands: OperandContextSchema,
     id: NonemptyStringSchema,
+    applicability: ApplicabilityNoteSchema.optional(),
     contextSource: HistoricalJsonObjectSchema.optional(),
     ...placementFields,
   }),
@@ -243,19 +385,126 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
     contextSource: HistoricalJsonObjectSchema.optional(),
     ...placementFields,
   }),
+  z.strictObject({
+    kind: z.literal('method'),
+    id: NonemptyStringSchema,
+    title: NonemptyStringSchema,
+    quantities: z.array(PreparedMethodQuantitySchema).min(1),
+    content: z.array(PreparedMethodContentSchema).min(1),
+    helpers: z.array(PreparedMethodHelperSchema),
+    symbols: z.array(CalculationSourceSymbolSchema).min(1),
+    contextSource: HistoricalJsonObjectSchema.optional(),
+    ...placementFields,
+  }),
+  z.strictObject({
+    kind: z.literal('table'),
+    id: NonemptyStringSchema,
+    title: NonemptyStringSchema,
+    casesAxis: z.enum(['columns', 'rows']),
+    columnCap: z.number().int().positive().optional(),
+    cases: z.array(
+      z.strictObject({
+        heading: NonemptyStringSchema,
+        invocationId: NonemptyStringSchema,
+      }),
+    ),
+    groups: z.array(
+      z.strictObject({
+        role: z.enum(['input', 'output']),
+        label: z.enum(['Inputs', 'Outputs']),
+        rows: z.array(PreparedTableRowSchema),
+      }),
+    ),
+    emptyState: z.literal('No cases evaluated').optional(),
+    branchNotes: z
+      .array(
+        z.strictObject({
+          heading: NonemptyStringSchema,
+          callPath: NonemptyStringSchema.optional(),
+          invocationId: NonemptyStringSchema,
+          symbolId: NonemptyStringSchema,
+          nodeKey: NonemptyStringSchema,
+          label: NonemptyStringSchema,
+          conditionHolds: z.boolean(),
+          quantitySymbolId: NonemptyStringSchema,
+          branchSymbolId: NonemptyStringSchema,
+          conditionSymbolId: NonemptyStringSchema,
+        }),
+      )
+      .min(1)
+      .optional(),
+    symbols: z.array(CalculationSourceSymbolSchema).min(1).optional(),
+    engineeringChecks: z
+      .array(
+        z.strictObject({
+          id: NonemptyStringSchema,
+          explanation: NonemptyStringSchema,
+          predicateText: NonemptyStringSchema,
+          results: z
+            .array(
+              z.strictObject({
+                heading: NonemptyStringSchema,
+                callPath: NonemptyStringSchema.optional(),
+                invocationId: NonemptyStringSchema,
+                value: z.boolean(),
+                reasons: z.array(NonemptyStringSchema).min(1).optional(),
+              }),
+            )
+            .min(1),
+        }),
+      )
+      .min(1)
+      .optional(),
+    applicabilityNotes: z
+      .array(
+        z.strictObject({
+          id: NonemptyStringSchema,
+          explanation: NonemptyStringSchema,
+          predicateText: NonemptyStringSchema,
+          results: z
+            .array(
+              z.strictObject({
+                heading: NonemptyStringSchema,
+                callPath: NonemptyStringSchema.optional(),
+                invocationId: NonemptyStringSchema,
+                value: z.boolean(),
+                reasons: z.array(NonemptyStringSchema).min(1).optional(),
+              }),
+            )
+            .min(1),
+        }),
+      )
+      .min(1)
+      .optional(),
+    replacedSections: z.array(NonemptyStringSchema),
+    contextSource: HistoricalJsonObjectSchema.optional(),
+    ...placementFields,
+  }),
 ]);
 
 export const PreparedDocumentSectionSchema = z.strictObject({
   id: NonemptyStringSchema,
   title: z.string(),
   metadata: HistoricalJsonObjectSchema.optional(),
+  engineeringChecks: z
+    .array(
+      z.strictObject({
+        id: NonemptyStringSchema,
+        explanation: NonemptyStringSchema,
+        predicateText: NonemptyStringSchema,
+        value: z.boolean(),
+        reasons: z.array(NonemptyStringSchema).min(1).optional(),
+      }),
+    )
+    .min(1)
+    .optional(),
   items: z.array(PreparedDocumentItemSchema),
   ...placementFields,
 });
 
 export const PreparedDocumentSchema = z
   .strictObject({
-    documentVersion: z.literal('2'),
+    documentVersion: z.enum(['2', '3']),
     context: ContextSchema,
     source: z.discriminatedUnion('kind', [
       ExecutionBindingSchema.safeExtend({ kind: z.literal('execution') }),
@@ -274,9 +523,23 @@ export const PreparedDocumentSchema = z
     historicalReviews: z.array(HistoricalReviewSchema),
   })
   .superRefine((document, ctx) => {
+    const comparison = document.sections.some((section) =>
+      section.items.some(
+        (item) => item.kind === 'method' || item.kind === 'table',
+      ),
+    );
+    if ((document.documentVersion === '3') !== comparison) {
+      addIssue(
+        ctx,
+        'INCOMPATIBLE_CONTRACT',
+        'Comparison documents use document version 3',
+        ['documentVersion'],
+      );
+    }
     validatePlacements(document, ctx);
     validateContentIds(document, ctx);
     validateAssets(document, ctx);
+    validateNotation(document, ctx);
     validateSectionTree(document, ctx);
     validateSymbols(document, ctx);
     validateContext(document, ctx);
@@ -314,6 +577,25 @@ export const BoundPreparedDocumentSchema = z
         'Prepared content must bind to the supplied entry, source closure, function, and resolved inputs',
         ['document', 'source'],
       );
+    }
+    const methodIds = new Set(
+      (execution.methods ?? []).map((method) => method.id),
+    );
+    const tableIds = new Set((execution.tables ?? []).map((table) => table.id));
+    for (const [sectionIndex, section] of document.sections.entries()) {
+      for (const [itemIndex, item] of section.items.entries()) {
+        if (
+          (item.kind === 'method' && !methodIds.has(item.id)) ||
+          (item.kind === 'table' && !tableIds.has(item.id))
+        ) {
+          addIssue(
+            ctx,
+            'DOCUMENT_EXECUTION_BINDING_MISMATCH',
+            'Prepared comparison items must bind to captured method and table records',
+            ['document', 'sections', sectionIndex, 'items', itemIndex, 'id'],
+          );
+        }
+      }
     }
   });
 
@@ -437,6 +719,33 @@ const validateAssets = (document: PreparedDocument, ctx: z.RefinementCtx) => {
     }
     assetIds.add(resolved.asset.id);
   }
+  const walkContent = (
+    content: PreparedMethodContent[],
+    path: (string | number)[],
+  ): void => {
+    for (const [index, item] of content.entries()) {
+      if (item.kind === 'figure' && !assetIds.has(item.assetId)) {
+        addIssue(
+          ctx,
+          'UNRESOLVED_DOCUMENT_ASSET',
+          'Figure asset must resolve to captured bytes',
+          [...path, index, 'assetId'],
+        );
+      }
+      if (item.kind === 'section') {
+        walkContent(item.content, [...path, index, 'content']);
+      }
+    }
+  };
+  const walkHelpers = (
+    helpers: PreparedMethodHelper[],
+    path: (string | number)[],
+  ): void => {
+    for (const [index, helper] of helpers.entries()) {
+      walkContent(helper.content, [...path, index, 'content']);
+      walkHelpers(helper.helpers, [...path, index, 'helpers']);
+    }
+  };
   for (const [sectionIndex, section] of document.sections.entries()) {
     for (const [itemIndex, item] of section.items.entries()) {
       if (item.kind === 'figure' && !assetIds.has(item.figure.assetId)) {
@@ -445,6 +754,76 @@ const validateAssets = (document: PreparedDocument, ctx: z.RefinementCtx) => {
           'UNRESOLVED_DOCUMENT_ASSET',
           'Figure asset must resolve to captured bytes',
           ['sections', sectionIndex, 'items', itemIndex, 'figure', 'assetId'],
+        );
+      }
+      if (item.kind === 'method') {
+        walkContent(item.content, [
+          'sections',
+          sectionIndex,
+          'items',
+          itemIndex,
+          'content',
+        ]);
+        walkHelpers(item.helpers, [
+          'sections',
+          sectionIndex,
+          'items',
+          itemIndex,
+          'helpers',
+        ]);
+      }
+    }
+  }
+};
+
+const methodNotationIds = (content: PreparedMethodContent[]): string[] =>
+  content.flatMap((item) => {
+    if (item.kind === 'quantity') return [item.symbolId];
+    if (item.kind === 'call') return item.inputs.map((input) => input.symbolId);
+    if (item.kind === 'check' || item.kind === 'applicability') {
+      return [item.predicateSymbolId];
+    }
+    if (item.kind === 'section') return methodNotationIds(item.content);
+    return [];
+  });
+const helperNotationIds = (helpers: PreparedMethodHelper[]): string[] =>
+  helpers.flatMap((helper) => [
+    ...methodNotationIds(helper.content),
+    ...helperNotationIds(helper.helpers),
+  ]);
+
+const validateNotation = (document: PreparedDocument, ctx: z.RefinementCtx) => {
+  for (const [sectionIndex, section] of document.sections.entries()) {
+    for (const [itemIndex, item] of section.items.entries()) {
+      if (item.kind !== 'method' && item.kind !== 'table') continue;
+      const ids =
+        item.kind === 'method'
+          ? [
+              ...item.quantities.map((quantity) => quantity.symbolId),
+              ...methodNotationIds(item.content),
+              ...helperNotationIds(item.helpers),
+            ]
+          : (item.branchNotes ?? []).flatMap((note) => [
+              note.quantitySymbolId,
+              note.branchSymbolId,
+              note.conditionSymbolId,
+            ]);
+      const declared = item.symbols ?? [];
+      const symbols = new Set(declared.map((symbol) => symbol.id));
+      if (symbols.size !== declared.length) {
+        addIssue(
+          ctx,
+          'DUPLICATE_NOTATION_SYMBOL',
+          'Method notation symbol IDs must be unique',
+          ['sections', sectionIndex, 'items', itemIndex, 'symbols'],
+        );
+      }
+      if (ids.some((id) => !symbols.has(id))) {
+        addIssue(
+          ctx,
+          'UNRESOLVED_NOTATION_SYMBOL',
+          'Method notation must resolve to the item symbols',
+          ['sections', sectionIndex, 'items', itemIndex, 'symbols'],
         );
       }
     }
@@ -687,6 +1066,26 @@ const validateContext = (document: PreparedDocument, ctx: z.RefinementCtx) => {
       checkValue(field.value, [...path, index, 'value'], field.path);
     });
   };
+  const checkContent = (
+    content: PreparedMethodContent[],
+    path: (string | number)[],
+  ): void => {
+    content.forEach((item, index) => {
+      if (item.kind !== 'section') return;
+      check(item.context ?? [], [...path, index, 'context']);
+      checkContent(item.content, [...path, index, 'content']);
+    });
+  };
+  const checkHelpers = (
+    helpers: PreparedMethodHelper[],
+    path: (string | number)[],
+  ): void => {
+    helpers.forEach((helper, index) => {
+      check(helper.context ?? [], [...path, index, 'context']);
+      checkContent(helper.content, [...path, index, 'content']);
+      checkHelpers(helper.helpers, [...path, index, 'helpers']);
+    });
+  };
   check(document.context, ['context']);
   const detachedIds = new Set(
     document.detachedSymbols.map((symbol) => symbol.id),
@@ -697,6 +1096,10 @@ const validateContext = (document: PreparedDocument, ctx: z.RefinementCtx) => {
     section.items.forEach((item, itemIndex) => {
       const itemPath = [...path, 'items', itemIndex];
       check(item.context, [...itemPath, 'context']);
+      if (item.kind === 'method') {
+        checkContent(item.content, [...itemPath, 'content']);
+        checkHelpers(item.helpers, [...itemPath, 'helpers']);
+      }
       if (item.kind !== 'symbol' && item.kind !== 'symbolRef') {
         return;
       }

@@ -5,6 +5,8 @@ import {
   type PreparedContextField,
   type PreparedContextValue,
   type PreparedDocument,
+  type PreparedMethodContent,
+  type PreparedMethodHelper,
 } from '@cs-object/core';
 import { activeSymbolIds } from './active-symbols.ts';
 
@@ -112,9 +114,51 @@ const engineeringFields = (
   });
 };
 
+const placementContext = (
+  source: PreparedDocument['sections'][number]['items'][number]['contextSource'],
+  path: string,
+) =>
+  ['metadata', 'contentMetadata', 'additionalFields'].flatMap((key) =>
+    engineeringFields(source?.[key], `${path}/${key}`),
+  );
+const methodContentContext = (
+  content: PreparedMethodContent[],
+  path: string,
+): PreparedMethodContent[] =>
+  content.map((item, index) =>
+    item.kind !== 'section'
+      ? item
+      : {
+          ...item,
+          context: placementContext(
+            item.contextSource,
+            `${path}/${index}/contextSource`,
+          ),
+          content: methodContentContext(
+            item.content,
+            `${path}/${index}/content`,
+          ),
+        },
+  );
+const methodHelperContext = (
+  helpers: PreparedMethodHelper[],
+  path: string,
+): PreparedMethodHelper[] =>
+  helpers.map((helper, index) => ({
+    ...helper,
+    context: placementContext(
+      helper.contextSource,
+      `${path}/${index}/contextSource`,
+    ),
+    content: methodContentContext(helper.content, `${path}/${index}/content`),
+    helpers: methodHelperContext(helper.helpers, `${path}/${index}/helpers`),
+  }));
+
 // Internal to both preparation adapters. It never reads historical reviews.
+// Symbols in `explained` already have a method and table, so they are not operands.
 export const prepareDocumentContext = (
   document: PreparedDocument,
+  explained: ReadonlySet<string> = new Set(),
 ): PreparedDocument => {
   const definitions = new Map<
     string,
@@ -194,13 +238,16 @@ export const prepareDocumentContext = (
       ),
       items: section.items.map((item, itemIndex) => {
         const path = `/sections/${sectionIndex}/items/${itemIndex}/contextSource`;
-        const context = [
-          'metadata',
-          'contentMetadata',
-          'additionalFields',
-        ].flatMap((key) =>
-          engineeringFields(item.contextSource?.[key], `${path}/${key}`),
-        );
+        const context = placementContext(item.contextSource, path);
+        if (item.kind === 'method') {
+          const itemPath = `/sections/${sectionIndex}/items/${itemIndex}`;
+          return {
+            ...item,
+            context,
+            content: methodContentContext(item.content, `${itemPath}/content`),
+            helpers: methodHelperContext(item.helpers, `${itemPath}/helpers`),
+          };
+        }
         if (item.kind !== 'symbol' && item.kind !== 'symbolRef') {
           return { ...item, context };
         }
@@ -209,7 +256,7 @@ export const prepareDocumentContext = (
           ...item,
           context: [...symbolContext(id), ...context],
           operands: [...activeSymbolIds([id], symbols)]
-            .filter((id) => !placed.has(id))
+            .filter((id) => !placed.has(id) && !explained.has(id))
             .map(operandContext),
         };
       }),

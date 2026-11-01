@@ -114,6 +114,44 @@ def documented_result(value: Any) -> Any:
     return value
 
 
+def method(*, id: str, calculation: Any, title: str) -> None:
+    """Record a reusable calculation without invoking it."""
+
+
+def check(
+    *,
+    id: str,
+    targets: tuple[str, ...],
+    explanation: str,
+    predicate: bool,
+) -> None:
+    """Record an engineering criterion without changing the numeric result."""
+
+
+def applicable(
+    *,
+    id: str,
+    targets: tuple[str, ...],
+    explanation: str,
+    predicate: bool,
+) -> None:
+    """Record when a result may be used, without changing the numeric result."""
+
+
+def table(
+    *,
+    id: str,
+    method: str,
+    title: str,
+    cases: dict[str, Any],
+    inputs: tuple[str, ...] | None = None,
+    outputs: tuple[str, ...] | None = None,
+    cases_axis: str = "columns",
+    column_cap: int | None = None,
+) -> None:
+    """Record an identity-bound comparison of earlier calculation calls."""
+
+
 def text(*, id: str, content: str) -> None:
     """Place literal review prose; the source parser retains its order."""
 
