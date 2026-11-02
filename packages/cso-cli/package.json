@@ -42,7 +42,7 @@
     "@types/node": "^26",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@biomejs/biome": "2.6.2"
+    "@biomejs/biome": "2.6.4"
   },
   "repository": {
     "type": "git",

@@ -44,7 +44,7 @@
     "typescript": "^5",
     "vitest": "^5.0.5",
     "@types/node": "^26",
-    "@biomejs/biome": "2.6.2"
+    "@biomejs/biome": "2.6.4"
   },
   "dependencies": {
     "@noble/hashes": "2.4.0",
