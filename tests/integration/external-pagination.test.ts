@@ -212,7 +212,7 @@ test('publishes complete mixed method and grouped-case external blocks from one 
       .replace(/\s+/gu, '')
       .match(/Keepthisdiagnosticevenwhenthecomparisonomitsit\./gu),
   ).toHaveLength(3);
-  expect(text).toContain('Double area must be below one square metre.');
+  expect(text).toContain('Double area must be below one square metre:');
   expect(text).toContain('Fail');
   retain('mixed', project);
 }, 120_000);

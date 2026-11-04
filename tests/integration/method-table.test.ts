@@ -1297,8 +1297,20 @@ test('marks results outside their applicability without changing the number', as
   expect(pdf.status, pdf.stdout || pdf.stderr).toBe(0);
   const info = spawnSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
   expect(info.status, info.stderr).toBe(0);
-  // Required outcome columns continue alongside the numeric columns at readable size.
-  expect(info.stdout).toMatch(/Pages:\s+[1-3]\b/);
+  // Font metrics can add a width partition for the required outcome columns.
+  // Bound the small fixture and require case and limit context on every part.
+  expect(info.stdout).toMatch(/Pages:\s+[1-4]\b/);
+  const comparisonPages = pdfPageTexts(pdfPath).filter((page) =>
+    /Part \d+ of/u.test(page),
+  );
+  expect(comparisonPages.length).toBeGreaterThan(0);
+  for (const page of comparisonPages) {
+    expect(page).toContain('Case A');
+    expect(page).toContain('Case B');
+    expect(page.replace(/\s+/gu, ' ')).toContain(
+      'Area exceeds the method limit.',
+    );
+  }
 }, 180_000);
 
 test('continues a wide comparison across measured column groups', () => {
