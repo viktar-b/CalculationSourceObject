@@ -10,7 +10,7 @@ import {
   type PreparedMethodHelper,
   type SheetDocument,
 } from '@cs-object/core';
-import { Fragment, type ReactElement } from 'react';
+import { Fragment, type ReactElement, type ReactNode } from 'react';
 import { EngineeringMetadata } from './EngineeringMetadata.tsx';
 import { FormulaSheetSymbolRow } from './formula-sheet/FormulaSheetSymbolRow.tsx';
 import { GlyphMathBlock } from './mathml/GlyphMathBlock.tsx';
@@ -115,6 +115,43 @@ type Notation = ReturnType<typeof notationSheet>;
 const numberText = (value: number): string =>
   Object.is(value, -0) ? '-0' : formatNumerical(value);
 
+const readableName = (name: string): string =>
+  name.replaceAll('_', ' ').replace(/\b\w/u, (letter) => letter.toUpperCase());
+
+const SymbolicValueNote = (): ReactElement => (
+  <p className="cso-symbolic-note">
+    Reusable function for downstream use. Values are not defined yet.
+  </p>
+);
+
+const Procedure = ({
+  title,
+  children,
+  heading: Heading,
+}: {
+  title: string;
+  children: readonly ReactNode[];
+  heading: 'h3' | 'h4';
+}): ReactElement => (
+  <table className="cso-procedure-table">
+    <thead>
+      <tr>
+        <th>
+          <Heading>{title}</Heading>
+          <SymbolicValueNote />
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      {children.map((child, index) => (
+        <tr key={index}>
+          <td>{child}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+);
+
 export const PreparedFormulaSheet = ({
   document: input,
   showSourceDetails = true,
@@ -154,19 +191,23 @@ export const PreparedFormulaSheet = ({
               className="cso-method-external"
               data-method-external={item.binding}
             >
-              <h4>{item.binding}</h4>
+              <h4>{readableName(item.binding)}</h4>
+              <SymbolicValueNote />
               <p>
                 External source: {item.adapter.moduleId},{' '}
                 {item.adapter.function}
               </p>
-              <p>External algorithm excluded from CSO formula verification.</p>
+              <p>
+                CSO does not check the formulas inside this external
+                calculation.
+              </p>
               <h5>Inputs</h5>
               {item.inputs.map((input) => (
                 <div key={input.name} data-external-method-input={input.name}>
                   {notation.row(input.symbolId, symbolIndex++)}
                 </div>
               ))}
-              <h5>Method</h5>
+              <h5>Calculation procedure</h5>
               {item.declaration.interface.description
                 .split(/\n\s*\n/u)
                 .map((paragraph, paragraphIndex) => (
@@ -258,9 +299,15 @@ export const PreparedFormulaSheet = ({
           shown.add(helper.id);
           explanation = (
             <div className="cso-method-helper" data-helper={helper.function}>
-              <h4>{helper.function}</h4>
-              <EngineeringMetadata entries={helper.context ?? []} />
-              {renderItems(helper.content)}
+              <Procedure title={readableName(helper.function)} heading="h4">
+                {[
+                  <EngineeringMetadata
+                    key="context"
+                    entries={helper.context ?? []}
+                  />,
+                  ...renderItems(helper.content),
+                ]}
+              </Procedure>
             </div>
           );
         }
@@ -271,17 +318,17 @@ export const PreparedFormulaSheet = ({
             data-call={item.binding}
           >
             {explanation}
-            <p>
-              {item.binding}:{' '}
-              {item.inputs.map((input, inputIndex) => (
-                <Fragment key={input.name}>
-                  {inputIndex > 0 ? ', ' : null}
-                  <span data-formula={input.formulaText}>
-                    {notation.formula(input.symbolId)}
-                  </span>
-                </Fragment>
+            <div className="cso-formula-terms">
+              {item.inputs.map((input) => (
+                <span
+                  key={input.name}
+                  data-formula={input.formulaText}
+                  className="cso-formula-term"
+                >
+                  {notation.formula(input.symbolId)}
+                </span>
               ))}
-            </p>
+            </div>
           </div>
         );
       });
@@ -365,14 +412,14 @@ export const PreparedFormulaSheet = ({
                   <thead>
                     <tr>
                       <th colSpan={2}>
-                        <h3>{item.title}</h3>
+                        <h3>{readableName(item.title)}</h3>
                         <p>
                           External source: {item.call.adapter.moduleId},{' '}
                           {item.call.adapter.function}
                         </p>
                         <p>
-                          External algorithm excluded from CSO formula
-                          verification.
+                          CSO does not check the formulas inside this external
+                          calculation.
                         </p>
                       </th>
                     </tr>
@@ -385,7 +432,7 @@ export const PreparedFormulaSheet = ({
                       quantityRow(quantity, 'input', index),
                     )}
                     <tr>
-                      <th colSpan={2}>Method</th>
+                      <th colSpan={2}>Calculation procedure</th>
                     </tr>
                     {item.call.description
                       .split(/\n\s*\n/u)
@@ -507,14 +554,20 @@ export const PreparedFormulaSheet = ({
                 data-method-id={item.id}
                 className="cso-method"
               >
-                <h3>{item.title}</h3>
-                <EngineeringMetadata entries={item.context} />
-                {renderMethodContent(
-                  item.content,
-                  item.helpers,
-                  notationSheet(item.id, item.symbols),
-                  new Set(),
-                )}
+                <Procedure title={item.title} heading="h3">
+                  {[
+                    <EngineeringMetadata
+                      key="context"
+                      entries={item.context}
+                    />,
+                    ...renderMethodContent(
+                      item.content,
+                      item.helpers,
+                      notationSheet(item.id, item.symbols),
+                      new Set(),
+                    ),
+                  ]}
+                </Procedure>
               </section>
             );
           }
@@ -539,7 +592,19 @@ export const PreparedFormulaSheet = ({
             const shownCell = (
               cell: (typeof item.groups)[number]['rows'][number]['cells'][number],
             ) =>
-              cell.applicability ? 'Not applicable' : numberText(cell.value);
+              cell.applicability ? (
+                <span>
+                  {numberText(cell.value)}
+                  <span
+                    className="cso-result-status"
+                    title={cell.applicability.reasons.join(' ')}
+                  >
+                    Not applicable
+                  </span>
+                </span>
+              ) : (
+                numberText(cell.value)
+              );
             const notation = item.symbols
               ? notationSheet(item.id, item.symbols)
               : undefined;

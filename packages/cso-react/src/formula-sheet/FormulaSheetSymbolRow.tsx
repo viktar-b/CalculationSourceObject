@@ -12,6 +12,7 @@ import { FormulaSheetItemIndex } from './FormulaSheetItemIndex.tsx';
 import type { FormulaSheetRowProps } from './FormulaSheetRowProps.ts';
 import { FormulaSheetResultCell } from './FormulaSheetResultCell.tsx';
 import { FormulaSheetValueTree } from './FormulaSheetValueTree.tsx';
+import { FormulaSheetValueCell } from './cells/FormulaSheetValueCell.tsx';
 
 export type FormulaSheetSymbolRowProps = FormulaSheetRowProps<SheetSymbol> & {
   readonly symbolicOnly?: boolean;
@@ -54,7 +55,17 @@ export const FormulaSheetSymbolRow = ({
             />
           </FormulaSheetSymbolCell>
 
-          {!symbolicOnly && (
+          {symbolicOnly ? (
+            <FormulaSheetValueCell>
+              <span
+                className="cso-symbolic-value"
+                role="img"
+                aria-label="Value not yet defined"
+              >
+                ×
+              </span>
+            </FormulaSheetValueCell>
+          ) : (
             <FormulaSheetResultCell literal={symbol.valueTree.result} />
           )}
 

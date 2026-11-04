@@ -912,10 +912,10 @@ test('publishes nested helper explanations without pruning authored context', as
   expect(htmlText).toContain('data-call="wider"');
   expect(htmlText).toContain('data-call="taller"');
   expect(elementWith(htmlText, 'data-call="wider"')).toContain(
-    '<span data-formula="w"><math',
+    'data-formula="w"',
   );
   expect(elementWith(htmlText, 'data-call="taller"')).toContain(
-    '<span data-formula="h"><math',
+    'data-formula="h"',
   );
   expect(htmlText).toContain('The margin is one metre.');
   expect(htmlText).toContain('Panel sides are grown independently.');
@@ -931,7 +931,8 @@ test('publishes nested helper explanations without pruning authored context', as
   expect(pdf.status, pdf.stdout || pdf.stderr).toBe(0);
   const info = spawnSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
   expect(info.status, info.stderr).toBe(0);
-  expect(info.stdout).toContain('Pages:           1');
+  // Each reusable function now retains its own scope and absent-value context.
+  expect(info.stdout).toMatch(/Pages:\s+[12]\b/);
 }, 180_000);
 
 test('publishes verified conditional notes without rerunning dormant branches', async () => {

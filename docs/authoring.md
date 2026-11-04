@@ -27,6 +27,41 @@ is not a LaTeX engine; commands such as `\mathrm` and `\frac` are unsupported.
 
 ## Inputs and reusable calculations
 
+### Report components and prose
+
+Calculation reports use eight fixed components. Compose these components rather
+than adding a new visual style for an individual calculation.
+
+| Component | Use |
+| --- | --- |
+| Report header | Calculation title and essential identification |
+| Section | Heading and content in authored order |
+| Reusable calculation | Named procedure with its own left rule, including nested functions |
+| Quantity row | Index, description, variable, value, unit and comment |
+| Derivation row | Formula and, where evaluated, its numerical substitution |
+| Text note | Engineering assumptions, reasoning, references and qualifications |
+| Figure | Authored engineering image with caption and alternative text |
+| Table | Compared quantities or external inputs, procedure and outputs |
+
+Use titles a reader can understand without programming knowledge. Prefer
+"Calculation procedure" to "method" in report prose. The source declaration
+remains `method(...)`. Keep meaningful engineering names and qualified notation.
+
+Every reusable function has its own visible scope. Its quantity rows retain the
+value column and display × where no case value is defined. Each function explains
+this briefly: "Reusable function for downstream use. Values are not defined yet."
+The explanation also applies when no downstream cases have run. Zero is a value,
+and an inapplicable computed number retains its separate qualification.
+
+Write prose for engineering assumptions, derivations, choices and limitations.
+Use fixed headings, rows and cells to explain report structure. Omit tautological
+sentences such as "The method defines the calculation" or instructions announcing
+that inputs and results follow. Keep the brief absent-value explanation with its
+reusable function. Use the existing figure component for engineering images.
+
+The [rendering guide](rendering.md#choose-verification-by-change) owns layout
+checks and [inspection](rendering.md#printing-and-inspection).
+
 ### Reuse a calculation
 
 Start with the [two-panel walkthrough](../examples/two-panel/README.md).

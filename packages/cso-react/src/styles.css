@@ -131,6 +131,14 @@ math {
 .cso-symbol-row { break-inside: avoid; page-break-inside: avoid; }
 .cso-symbol-placement { overflow-wrap: anywhere; }
 .cso-method, .cso-comparison { margin: 3mm 0 5mm; }
+.cso-method, .cso-method-helper, .cso-method-external { border-left: 2px solid #667085; padding-left: 3mm; }
+.cso-document .cso-symbolic-note { font-size: 11px; color: #475467; margin: 1mm 0 3mm; }
+.cso-procedure-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.cso-procedure-table > thead { display: table-header-group; }
+.cso-procedure-table > thead > tr > th { text-align: left; font-weight: 400; }
+.cso-procedure-table > tbody > tr > td { padding: 0; }
+.cso-symbolic-value { width: 100%; text-align: center; color: #667085; }
+.cso-result-status { display: block; max-width: 24ch; white-space: normal; font-size: 10px; text-align: left; color: #475467; }
 .cso-external-call { margin: 3mm 0 5mm; }
 .cso-external-call table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
 .cso-external-call th, .cso-external-call td { border: 1px solid #d0d5dd; padding: 2mm; overflow-wrap: anywhere; text-align: left; }
@@ -142,6 +150,7 @@ math {
 .cso-external-call .cso-external-quantity-cell { padding: 0; }
 .cso-external-coverage { margin-top: 2mm !important; font-size: 10px; }
 .cso-method h3, .cso-comparison h3 { font-size: 13px; font-weight: 650; margin: 0 0 2mm; }
+.cso-document h3, .cso-document h4, .cso-document h5 { break-after: avoid; }
 .cso-method-quantity, .cso-method-text, .cso-method-call, .cso-branch-note { margin: 1mm 0; }
 .cso-method-quantity math, .cso-method-call math, .cso-branch-note math { vertical-align: middle; }
 .cso-method-helper, .cso-method-section { margin: 2mm 0 2mm 4mm; }

@@ -225,7 +225,7 @@ function inspectPreparedPresentationInPage(
           !text.includes(external.adapterModuleId) ||
           !text.includes(external.adapterFunction) ||
           !text.includes(
-            'External algorithm excluded from CSO formula verification.',
+            'CSO does not check the formulas inside this external calculation.',
           )
         )
           throw new Error('Missing external source or algorithm exclusion');
