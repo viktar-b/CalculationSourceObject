@@ -1,7 +1,7 @@
 import { GlyphMathBlock } from '../mathml/GlyphMathBlock.tsx';
 import { UnitMathBlock } from '../mathml/UnitMathBlock.tsx';
 import { getValueNodeByKey } from '@cs-object/core';
-import type { SheetSymbol } from '@cs-object/core';
+import type { NumericKind, SheetSymbol } from '@cs-object/core';
 import type { ReactElement } from 'react';
 import { FormulaSheetCommentCell } from './cells/FormulaSheetCommentCell.tsx';
 import { FormulaSheetDescriptionCell } from './cells/FormulaSheetDescriptionCell.tsx';
@@ -17,6 +17,7 @@ import { FormulaSheetValueCell } from './cells/FormulaSheetValueCell.tsx';
 export type FormulaSheetSymbolRowProps = FormulaSheetRowProps<SheetSymbol> & {
   readonly symbolicOnly?: boolean;
   readonly showFormula?: boolean;
+  readonly numericKind?: NumericKind;
 };
 
 export const FormulaSheetSymbolRow = ({
@@ -25,6 +26,7 @@ export const FormulaSheetSymbolRow = ({
   item: symbol,
   symbolicOnly = false,
   showFormula = true,
+  numericKind,
 }: FormulaSheetSymbolRowProps): ReactElement => {
   const { glyph: symbolGlyph } = symbol;
   const symbolUnit = symbol.unit ?? '';
@@ -66,7 +68,10 @@ export const FormulaSheetSymbolRow = ({
               </span>
             </FormulaSheetValueCell>
           ) : (
-            <FormulaSheetResultCell literal={symbol.valueTree.result} />
+            <FormulaSheetResultCell
+              literal={symbol.valueTree.result}
+              numericKind={numericKind}
+            />
           )}
 
           <FormulaSheetUnitCell>

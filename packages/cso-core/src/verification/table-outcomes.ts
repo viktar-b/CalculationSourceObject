@@ -26,11 +26,12 @@ export function tableOutcomeRows(
   const rows: PreparedOutcomeRow[] = [];
   for (const plan of plans) {
     const declarations = [
-      ...(plan.id === method.id
-        ? (plan.booleans ?? [])
-            .filter((item) => (table.booleans ?? []).includes(item.id))
-            .map((item) => ({ kind: 'boolean' as const, declaration: item }))
-        : []),
+      ...(plan.booleans ?? [])
+        .filter(
+          (item) =>
+            plan.id !== method.id || (table.booleans ?? []).includes(item.id),
+        )
+        .map((item) => ({ kind: 'boolean' as const, declaration: item })),
       ...(plan.checks ?? []).map((item) => ({
         kind: 'check' as const,
         declaration: item,
@@ -44,6 +45,7 @@ export function tableOutcomeRows(
       rows.push({
         kind,
         id: JSON.stringify([plan.id, kind, declaration.id]),
+        localId: declaration.id,
         label:
           'description' in declaration
             ? declaration.description

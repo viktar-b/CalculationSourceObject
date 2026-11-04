@@ -12,7 +12,7 @@ from quantities import (
     Allowed,
 )
 from _cso_bindings.design import design
-from _cso_bindings.response import response
+from _cso_bindings.response import harmonic_response as response
 from _cso_bindings._external.methods import equilibrium
 
 

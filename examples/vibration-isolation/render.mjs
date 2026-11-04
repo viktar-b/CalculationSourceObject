@@ -44,7 +44,7 @@ for (const fn of ['compare', 'sweep']) {
         '--function',
         fn,
         '--supported-execution-protocol',
-        '4',
+        '5',
       ]),
     ),
   );

@@ -797,7 +797,8 @@ test('typesets methods, notes and table values like ordinary formula rows', () =
   for (const heading of ['Narrow', 'Wide']) {
     const note = elementWith(branchHtml, `data-branch-note="${heading}"`);
     expect(note).toContain('<math');
-    expect(visibleText(note)).toContain('Chosen');
+    expect(visibleText(branchHtml)).toContain('Chosen');
+    expect(visibleText(note)).toMatch(/Condition holds|Otherwise/);
     expect(visibleText(note)).not.toContain(' if ');
   }
 
@@ -1296,7 +1297,8 @@ test('marks results outside their applicability without changing the number', as
   expect(pdf.status, pdf.stdout || pdf.stderr).toBe(0);
   const info = spawnSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
   expect(info.status, info.stderr).toBe(0);
-  expect(info.stdout).toMatch(/Pages:\s+[12]/);
+  // Required outcome columns continue alongside the numeric columns at readable size.
+  expect(info.stdout).toMatch(/Pages:\s+[1-3]\b/);
 }, 180_000);
 
 test('continues a wide comparison across measured column groups', () => {
@@ -1377,10 +1379,12 @@ test('repeats comparison context across vertical page breaks', () => {
   expect(rowPages.join('\n')).toContain(
     'North elevation panel with a long wrapped heading',
   );
-  expect(rowPages.some((page) => page.includes('Continued'))).toBe(true);
+  expect(
+    rowPages.filter((page) => page.includes('Tall rows')).length,
+  ).toBeGreaterThan(1);
   for (const page of rowPages) {
     if (page.includes('Case ')) {
-      expect(page).toMatch(/Inputs|Outputs/);
+      expect(page).toMatch(/Inputs|Outputs|Checks and conditions/);
     }
   }
   expect(rowPages.at(-1)).toContain('Case 64');
@@ -1407,11 +1411,13 @@ test('repeats comparison context across vertical page breaks', () => {
   const columnPages = pdfPageTexts(columnsPdf);
   expect(columnPages.join('\n')).toContain('Part 1 of 2');
   expect(columnPages.join('\n')).toContain('Part 2 of 2');
-  expect(columnPages.some((page) => page.includes('Continued'))).toBe(true);
+  expect(
+    columnPages.filter((page) => page.includes('Series comparison')).length,
+  ).toBeGreaterThan(1);
   expect(columnPages.join('\n')).toContain('Width exceeds the series limit.');
   for (const page of columnPages) {
-    if (page.includes('Continued')) {
-      expect(page).toMatch(/Inputs|Outputs/);
+    if (page.includes('Series comparison')) {
+      expect(page).toMatch(/Inputs|Outputs|Checks and conditions/);
       expect(page).toContain('Width exceeds the series limit.');
     }
   }
@@ -1704,7 +1710,8 @@ test('external applicability propagates across every input and follows downstrea
     'data-external-call="root/first_case/searched"',
   );
   expect(firstBlock).toContain('Not applicable. Length must be positive.');
-  expect(html).toContain('Fail. Double area must be below one square metre.');
+  expect(html).toContain('Double area must be below one square metre.');
+  expect(html).toContain('data-check-result="fail"');
   writeFileSync(
     join(directory, 'external_adapter.py'),
     'raise RuntimeError("changed adapter must not run during preparation")\n',

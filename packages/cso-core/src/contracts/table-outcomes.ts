@@ -18,6 +18,7 @@ const BooleanCellsSchema = z.array(
 );
 const rowFields = {
   id: NonemptyStringSchema,
+  localId: NonemptyStringSchema.optional(),
   label: NonemptyStringSchema,
   predicateText: z.string(),
   predicateSymbolId: NonemptyStringSchema.optional(),

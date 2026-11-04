@@ -47,7 +47,7 @@ for (const [name, roots] of [
           '--function',
           name,
           '--supported-execution-protocol',
-          '4',
+          '5',
         ],
         { encoding: 'utf8', maxBuffer: 16000000 },
       );
@@ -109,6 +109,25 @@ for (const [name, roots] of [
       if (name === 'compare')
         expect(html).toContain('class="cso-method-helper"');
       expect(html).toContain('data-method-id=');
+      expect(execution.cso.schemaVersion).toBe('1.3.0');
+      expect(html).toContain('data-outcome-kind="boolean"');
+      expect(html).toContain('data-outcome-kind="check"');
+      expect(html).toContain('data-outcome-kind="applicability"');
+      const comparison = prepared.sections
+        .flatMap((section) => section.items)
+        .find((item) => item.kind === 'table');
+      if (comparison?.kind !== 'table') throw new Error('Missing comparison');
+      expect(
+        comparison.outcomeRows
+          ?.find(
+            (row) => row.label === 'Excitation below the natural frequency',
+          )
+          ?.cells.map((cell) => cell.results.map((result) => result.value)),
+      ).toEqual(
+        name === 'compare'
+          ? [[false], [false], [false]]
+          : [[true], [true], [false], [false], [false]],
+      );
       expect(html.match(/External-result consistency:/gu)).toHaveLength(1);
       expect(html).not.toContain('Function compare.');
       if (name === 'compare')
@@ -130,10 +149,6 @@ for (const [name, roots] of [
         );
         expect(fallback?.value).toBe(1);
         expect(html).toContain('0.20133');
-        const comparison = prepared.sections
-          .flatMap((section) => section.items)
-          .find((item) => item.kind === 'table');
-        if (comparison?.kind !== 'table') throw new Error('Missing comparison');
         for (const quantity of [
           'damping',
           'allowance',

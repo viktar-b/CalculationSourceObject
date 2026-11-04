@@ -42,6 +42,11 @@ in columns or rows.
 An authored criterion applied to a calculated result. A failed check can describe
 a valid numerical result that does not meet the criterion.
 
+**Boolean report value**:
+An authored True or False answer to a condition. It describes a fact about a
+case without assigning a Pass or Fail verdict. It is separate from numerical
+quantities and applicability conditions.
+
 **Applicability condition**:
 An authored condition identifying when a calculation result can be used within
 its stated assumptions and limits. An inapplicable result is distinct from a

@@ -2,17 +2,19 @@ import {
   type CalculationSourceSectionItem,
   type CalculationSourceSymbol,
   createSheetFromCalculationSourceObject,
-  formatNumerical,
   type PreparedDocument,
   PreparedDocumentSchema,
   type PreparedDocumentSection,
   type PreparedMethodContent,
   type PreparedMethodHelper,
+  type PreparedOutcomeRow,
   type SheetDocument,
 } from '@cs-object/core';
 import { Fragment, type ReactElement, type ReactNode } from 'react';
 import { EngineeringMetadata } from './EngineeringMetadata.tsx';
 import { FormulaSheetSymbolRow } from './formula-sheet/FormulaSheetSymbolRow.tsx';
+import { FormulaSheetItemIndex } from './formula-sheet/FormulaSheetItemIndex.tsx';
+import { NumericalValue } from './formula-sheet/NumericalValue.tsx';
 import { GlyphMathBlock } from './mathml/GlyphMathBlock.tsx';
 import { InlineFormulaMath } from './mathml/InlineFormulaMath.tsx';
 import { UnitMathBlock } from './mathml/UnitMathBlock.tsx';
@@ -62,7 +64,7 @@ const mathSheet = (document: PreparedDocument): SheetDocument =>
 
 const requiredItem = <T,>(items: ReadonlyMap<string, T>, id: string): T => {
   const item = items.get(id);
-  if (!item) {
+  if (item === undefined) {
     throw new Error(`Missing prepared item '${id}'`);
   }
   return item;
@@ -111,9 +113,6 @@ const notationSheet = (
   };
 };
 type Notation = ReturnType<typeof notationSheet>;
-
-const numberText = (value: number): string =>
-  Object.is(value, -0) ? '-0' : formatNumerical(value);
 
 const readableName = (name: string): string =>
   name.replaceAll('_', ' ').replace(/\b\w/u, (letter) => letter.toUpperCase());
@@ -208,7 +207,7 @@ export const PreparedFormulaSheet = ({
                     </th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="cso-external-quantities">
                   <tr>
                     <th colSpan={2}>Inputs</th>
                   </tr>
@@ -222,6 +221,8 @@ export const PreparedFormulaSheet = ({
                       </td>
                     </tr>
                   ))}
+                </tbody>
+                <tbody>
                   <tr>
                     <th colSpan={2}>Calculation procedure</th>
                   </tr>
@@ -232,6 +233,8 @@ export const PreparedFormulaSheet = ({
                         <td colSpan={2}>{paragraph}</td>
                       </tr>
                     ))}
+                </tbody>
+                <tbody className="cso-external-quantities">
                   <tr>
                     <th colSpan={2}>Outputs</th>
                   </tr>
@@ -258,7 +261,7 @@ export const PreparedFormulaSheet = ({
               data-boolean={item.localId}
               data-formula={item.predicateText}
             >
-              {item.description}{' '}
+              {item.description.replace(/[.!?:]$/u, '')}:{' '}
               {item.predicateSymbolId
                 ? notation.formula(item.predicateSymbolId, false)
                 : item.predicateText}
@@ -276,7 +279,7 @@ export const PreparedFormulaSheet = ({
               }
               data-formula={item.predicateText}
             >
-              {item.explanation}{' '}
+              {item.explanation.replace(/[.!?:]$/u, '')}:{' '}
               {notation.formula(item.predicateSymbolId, false)}
             </p>
           );
@@ -405,6 +408,14 @@ export const PreparedFormulaSheet = ({
       {section.items.map((item) => {
         switch (item.kind) {
           case 'externalCall': {
+            const outputLabel = (name: string): string => {
+              const output = item.call.outputs.find(
+                (quantity) => quantity.name === name,
+              );
+              return output
+                ? requiredItem(symbols, output.symbolId).description
+                : name;
+            };
             const quantityRow = (
               quantity: (typeof item.call.outputs)[number],
               role: string,
@@ -436,6 +447,7 @@ export const PreparedFormulaSheet = ({
                       item={symbol}
                       sheetItemIndex={symbolIndex++}
                       showFormula={false}
+                      numericKind={quantity.numericKind}
                     />
                   </td>
                 </tr>
@@ -464,13 +476,15 @@ export const PreparedFormulaSheet = ({
                       </th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="cso-external-quantities">
                     <tr>
                       <th colSpan={2}>Inputs</th>
                     </tr>
                     {item.call.inputs.map((quantity, index) =>
                       quantityRow(quantity, 'input', index),
                     )}
+                  </tbody>
+                  <tbody>
                     <tr>
                       <th colSpan={2}>Calculation procedure</th>
                     </tr>
@@ -481,6 +495,8 @@ export const PreparedFormulaSheet = ({
                           <td colSpan={2}>{paragraph}</td>
                         </tr>
                       ))}
+                  </tbody>
+                  <tbody className="cso-external-quantities">
                     <tr>
                       <th colSpan={2}>Outputs</th>
                     </tr>
@@ -492,32 +508,45 @@ export const PreparedFormulaSheet = ({
                         <td colSpan={2}>{warning}</td>
                       </tr>
                     ))}
+                    {document.verification?.externalReferenceCoverage ? (
+                      <tr>
+                        <td
+                          colSpan={2}
+                          className="cso-external-reference-coverage"
+                        >
+                          <p>
+                            Independent check coverage:{' '}
+                            {
+                              document.verification.externalReferenceCoverage
+                                .status
+                            }
+                            .
+                          </p>
+                          <p>
+                            Independently checked:{' '}
+                            {document.verification.externalReferenceCoverage.checked
+                              .filter(
+                                (slot) => slot.externalCallId === item.call.id,
+                              )
+                              .map((slot) => outputLabel(slot.outputName))
+                              .join(', ') || 'None'}
+                            .
+                          </p>
+                          <p>
+                            Without an independent check:{' '}
+                            {document.verification.externalReferenceCoverage.uncovered
+                              .filter(
+                                (slot) => slot.externalCallId === item.call.id,
+                              )
+                              .map((slot) => outputLabel(slot.outputName))
+                              .join(', ') || 'None'}
+                            .
+                          </p>
+                        </td>
+                      </tr>
+                    ) : null}
                   </tbody>
                 </table>
-                {document.verification?.externalReferenceCoverage ? (
-                  <div className="cso-external-reference-coverage">
-                    <p>
-                      Independent external reference coverage:{' '}
-                      {document.verification.externalReferenceCoverage.status}.
-                    </p>
-                    <p>
-                      Checked outputs:{' '}
-                      {document.verification.externalReferenceCoverage.checked
-                        .filter((slot) => slot.externalCallId === item.call.id)
-                        .map((slot) => slot.outputName)
-                        .join(', ') || 'None'}
-                      .
-                    </p>
-                    <p>
-                      Uncovered outputs:{' '}
-                      {document.verification.externalReferenceCoverage.uncovered
-                        .filter((slot) => slot.externalCallId === item.call.id)
-                        .map((slot) => slot.outputName)
-                        .join(', ') || 'None'}
-                      .
-                    </p>
-                  </div>
-                ) : null}
                 <EngineeringMetadata entries={item.context} />
               </section>
             );
@@ -597,11 +626,24 @@ export const PreparedFormulaSheet = ({
             );
           }
           case 'table': {
+            const outcomeRows = item.outcomeRows ?? [];
+            const rowIndices = new Map<string, number>();
+            for (const group of item.groups)
+              for (const row of group.rows)
+                rowIndices.set(`${group.role}:${row.quantity}`, symbolIndex++);
+            for (const row of outcomeRows)
+              rowIndices.set(row.id, symbolIndex++);
             const quantityHeading = (
               quantity: (typeof item.groups)[number]['rows'][number],
             ) => (
               <span className="cso-comparison-quantity">
                 <span className="cso-comparison-description">
+                  <FormulaSheetItemIndex
+                    index={requiredItem(
+                      rowIndices,
+                      `${quantity.role}:${quantity.quantity}`,
+                    )}
+                  />{' '}
                   {quantity.description}
                 </span>
                 <span className="cso-comparison-notation">
@@ -619,7 +661,10 @@ export const PreparedFormulaSheet = ({
             ) =>
               cell.applicability ? (
                 <span>
-                  {numberText(cell.value)}
+                  <NumericalValue
+                    value={cell.value}
+                    numericKind={cell.numericKind}
+                  />
                   <span
                     className="cso-result-status"
                     title={cell.applicability.reasons.join(' ')}
@@ -628,11 +673,154 @@ export const PreparedFormulaSheet = ({
                   </span>
                 </span>
               ) : (
-                numberText(cell.value)
+                <NumericalValue
+                  value={cell.value}
+                  numericKind={cell.numericKind}
+                />
               );
             const notation = item.symbols
               ? notationSheet(item.id, item.symbols)
               : undefined;
+            const outcomeHeading = (row: PreparedOutcomeRow) => {
+              const predicate =
+                row.predicateSymbolId ??
+                (row.kind === 'branch'
+                  ? row.cells.flatMap((cell) => cell.results)[0]
+                      ?.conditionSymbolId
+                  : undefined);
+              return (
+                <span className="cso-comparison-description">
+                  <FormulaSheetItemIndex
+                    index={requiredItem(rowIndices, row.id)}
+                  />{' '}
+                  {row.kind === 'branch'
+                    ? `Rule used for ${row.label.toLowerCase()}`
+                    : row.label}
+                  {predicate ? (
+                    <span className="cso-result-status">
+                      {notation?.formula(predicate, false)}
+                    </span>
+                  ) : null}
+                </span>
+              );
+            };
+            const outcomeCell = (
+              row: PreparedOutcomeRow,
+              heading: string,
+            ): ReactNode => {
+              if (row.kind === 'branch') {
+                const results =
+                  row.cells.find((cell) => cell.heading === heading)?.results ??
+                  [];
+                return results.length
+                  ? results.map((result) => (
+                      <div
+                        key={`${result.invocationId}:${result.nodeKey}`}
+                        data-branch-note={heading}
+                        data-case={heading}
+                        data-symbol-id={result.symbolId}
+                        data-node-key={result.nodeKey}
+                        data-formula={result.value}
+                      >
+                        {results.length > 1 && result.callPath ? (
+                          <span className="cso-result-status">
+                            {readableName(result.callPath)}
+                          </span>
+                        ) : null}
+                        {notation?.formula(result.branchSymbolId, false)}
+                        <span className="cso-result-status">
+                          {result.conditionHolds
+                            ? 'Condition holds'
+                            : 'Otherwise'}
+                        </span>
+                      </div>
+                    ))
+                  : 'Not evaluated';
+              }
+              const results =
+                row.cells.find((cell) => cell.heading === heading)?.results ??
+                [];
+              return results.length
+                ? results.map((result) => {
+                    const qualified = Boolean(result.reasons?.length);
+                    const label =
+                      row.kind === 'boolean'
+                        ? result.value
+                          ? 'True'
+                          : 'False'
+                        : qualified
+                          ? 'Not applicable'
+                          : row.kind === 'check'
+                            ? result.value
+                              ? 'Pass'
+                              : 'Fail'
+                            : result.value
+                              ? 'Applicable'
+                              : 'Not applicable';
+                    return (
+                      <div
+                        key={result.invocationId}
+                        data-case={heading}
+                        data-invocation-id={result.invocationId}
+                        data-boolean={
+                          row.kind === 'boolean' ? row.id : undefined
+                        }
+                        data-value={result.value}
+                        data-check={
+                          row.kind === 'check'
+                            ? (row.localId ?? row.id)
+                            : undefined
+                        }
+                        data-check-result={
+                          row.kind === 'check'
+                            ? qualified
+                              ? 'not-applicable'
+                              : result.value
+                                ? 'pass'
+                                : 'fail'
+                            : undefined
+                        }
+                        data-applicability={
+                          row.kind === 'applicability'
+                            ? (row.localId ?? row.id)
+                            : undefined
+                        }
+                        data-applicability-result={
+                          row.kind === 'applicability'
+                            ? qualified || !result.value
+                              ? 'not-applicable'
+                              : 'applicable'
+                            : undefined
+                        }
+                      >
+                        {results.length > 1 && result.callPath ? (
+                          <span className="cso-result-status">
+                            {readableName(result.callPath)}
+                          </span>
+                        ) : null}
+                        <strong>{label}</strong>
+                        {result.reasons?.length ? (
+                          <span className="cso-result-status">
+                            {result.reasons
+                              .filter((reason) => reason !== row.label)
+                              .map((reason) => {
+                                const limit = outcomeRows.find(
+                                  (candidate) =>
+                                    candidate.kind === 'applicability' &&
+                                    candidate.label === reason,
+                                );
+                                return limit
+                                  ? `See limit ${requiredItem(rowIndices, limit.id)}.`
+                                  : reason;
+                              })
+                              .join(' ')}
+                          </span>
+                        ) : null}
+                      </div>
+                    );
+                  })
+                : 'Not evaluated';
+            };
             const quantityColumn = new Map<string, number>();
             for (const group of item.groups) {
               for (const row of group.rows) {
@@ -658,68 +846,71 @@ export const PreparedFormulaSheet = ({
                 className="cso-comparison"
               >
                 <h3>{item.title}</h3>
-                {item.engineeringChecks?.map((check) =>
-                  check.results.map((result) => (
+                {!item.outcomeRows &&
+                  item.engineeringChecks?.map((check) =>
+                    check.results.map((result) => (
+                      <p
+                        key={`${check.id}-${result.invocationId}`}
+                        className="cso-branch-note"
+                        data-check={check.id}
+                        data-check-result={
+                          result.reasons
+                            ? 'not-applicable'
+                            : result.value
+                              ? 'pass'
+                              : 'fail'
+                        }
+                        data-case={result.heading}
+                        data-formula={check.predicateText}
+                      >
+                        {result.heading}
+                        {result.callPath ? ` / ${result.callPath}` : ''}:{' '}
+                        {result.reasons
+                          ? `Not applicable. ${result.reasons.join(' ')}`
+                          : `${result.value ? 'Pass' : 'Fail'}. ${check.explanation}`}
+                      </p>
+                    )),
+                  )}
+                {!item.outcomeRows &&
+                  item.applicabilityNotes?.map((condition) =>
+                    condition.results.map((result) => (
+                      <p
+                        key={`${condition.id}-${result.invocationId}`}
+                        className="cso-branch-note"
+                        data-applicability={condition.id}
+                        data-applicability-result={
+                          result.value ? 'applicable' : 'not-applicable'
+                        }
+                        data-case={result.heading}
+                        data-formula={condition.predicateText}
+                      >
+                        {result.heading}
+                        {result.callPath ? ` / ${result.callPath}` : ''}:{' '}
+                        {result.reasons
+                          ? `Not applicable. ${result.reasons.join(' ')}`
+                          : condition.explanation}
+                      </p>
+                    )),
+                  )}
+                {!item.outcomeRows &&
+                  item.branchNotes?.map((note) => (
                     <p
-                      key={`${check.id}-${result.invocationId}`}
+                      key={`${note.invocationId}-${note.symbolId}-${note.nodeKey}`}
                       className="cso-branch-note"
-                      data-check={check.id}
-                      data-check-result={
-                        result.reasons
-                          ? 'not-applicable'
-                          : result.value
-                            ? 'pass'
-                            : 'fail'
-                      }
-                      data-case={result.heading}
-                      data-formula={check.predicateText}
+                      data-branch-note={note.heading}
+                      data-case={note.heading}
+                      data-symbol-id={note.symbolId}
+                      data-node-key={note.nodeKey}
+                      data-formula={note.label}
                     >
-                      {result.heading}
-                      {result.callPath ? ` / ${result.callPath}` : ''}:{' '}
-                      {result.reasons
-                        ? `Not applicable. ${result.reasons.join(' ')}`
-                        : `${result.value ? 'Pass' : 'Fail'}. ${check.explanation}`}
+                      {note.heading}
+                      {note.callPath ? ` / ${note.callPath}` : ''}:{' '}
+                      {notation?.description(note.branchSymbolId)}{' '}
+                      {notation?.formula(note.branchSymbolId)}, because{' '}
+                      {notation?.formula(note.conditionSymbolId, false)}{' '}
+                      {note.conditionHolds ? 'holds' : 'does not hold'}.
                     </p>
-                  )),
-                )}
-                {item.applicabilityNotes?.map((condition) =>
-                  condition.results.map((result) => (
-                    <p
-                      key={`${condition.id}-${result.invocationId}`}
-                      className="cso-branch-note"
-                      data-applicability={condition.id}
-                      data-applicability-result={
-                        result.value ? 'applicable' : 'not-applicable'
-                      }
-                      data-case={result.heading}
-                      data-formula={condition.predicateText}
-                    >
-                      {result.heading}
-                      {result.callPath ? ` / ${result.callPath}` : ''}:{' '}
-                      {result.reasons
-                        ? `Not applicable. ${result.reasons.join(' ')}`
-                        : condition.explanation}
-                    </p>
-                  )),
-                )}
-                {item.branchNotes?.map((note) => (
-                  <p
-                    key={`${note.invocationId}-${note.symbolId}-${note.nodeKey}`}
-                    className="cso-branch-note"
-                    data-branch-note={note.heading}
-                    data-case={note.heading}
-                    data-symbol-id={note.symbolId}
-                    data-node-key={note.nodeKey}
-                    data-formula={note.label}
-                  >
-                    {note.heading}
-                    {note.callPath ? ` / ${note.callPath}` : ''}:{' '}
-                    {notation?.description(note.branchSymbolId)}{' '}
-                    {notation?.formula(note.branchSymbolId)}, because{' '}
-                    {notation?.formula(note.conditionSymbolId, false)}{' '}
-                    {note.conditionHolds ? 'holds' : 'does not hold'}.
-                  </p>
-                ))}
+                  ))}
                 {item.emptyState ? (
                   <p className="cso-comparison-empty">{item.emptyState}</p>
                 ) : null}
@@ -744,6 +935,17 @@ export const PreparedFormulaSheet = ({
                               {group.label}
                             </th>
                           ))}
+                          {outcomeRows.length ? (
+                            <th
+                              scope="colgroup"
+                              colSpan={outcomeRows.length}
+                              data-comparison-columns={outcomeRows
+                                .map((_, index) => quantityColumn.size + index)
+                                .join(',')}
+                            >
+                              Checks and conditions
+                            </th>
+                          ) : null}
                         </tr>
                         <tr>
                           <th scope="col" data-comparison-label="">
@@ -763,6 +965,18 @@ export const PreparedFormulaSheet = ({
                               </th>
                             )),
                           )}
+                          {outcomeRows.map((row, index) => (
+                            <th
+                              key={row.id}
+                              scope="col"
+                              data-outcome-kind={row.kind}
+                              data-comparison-column={
+                                quantityColumn.size + index
+                              }
+                            >
+                              {outcomeHeading(row)}
+                            </th>
+                          ))}
                         </tr>
                       </thead>
                       <tbody>
@@ -808,6 +1022,17 @@ export const PreparedFormulaSheet = ({
                                 );
                               }),
                             )}
+                            {outcomeRows.map((row, index) => (
+                              <td
+                                key={row.id}
+                                data-outcome-kind={row.kind}
+                                data-comparison-column={
+                                  quantityColumn.size + index
+                                }
+                              >
+                                {outcomeCell(row, caseItem.heading)}
+                              </td>
+                            ))}
                           </tr>
                         ))}
                       </tbody>
@@ -877,6 +1102,37 @@ export const PreparedFormulaSheet = ({
                               </tr>
                             ))}
                           </Fragment>
+                        ))}
+                        {outcomeRows.length ? (
+                          <tr>
+                            <th
+                              scope="colgroup"
+                              colSpan={item.cases.length + 1}
+                              data-comparison-banner=""
+                            >
+                              Checks and conditions
+                            </th>
+                          </tr>
+                        ) : null}
+                        {outcomeRows.map((row) => (
+                          <tr key={row.id}>
+                            <th
+                              scope="row"
+                              data-comparison-label=""
+                              data-outcome-kind={row.kind}
+                            >
+                              {outcomeHeading(row)}
+                            </th>
+                            {item.cases.map((caseItem, index) => (
+                              <td
+                                key={caseItem.invocationId}
+                                data-outcome-kind={row.kind}
+                                data-comparison-column={index}
+                              >
+                                {outcomeCell(row, caseItem.heading)}
+                              </td>
+                            ))}
+                          </tr>
                         ))}
                       </tbody>
                     </table>

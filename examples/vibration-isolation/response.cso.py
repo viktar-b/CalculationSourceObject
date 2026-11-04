@@ -1,7 +1,7 @@
 """Local harmonic response about a nonlinear spring's static equilibrium."""
 
 import math
-from cso_python import applicable, calculation, check, document_section, section, text
+from cso_python import applicable, boolean, calculation, check, document_section, section, text
 from quantities import (
     Stiffness,
     Cubic,
@@ -23,7 +23,7 @@ from quantities import (
 
 @calculation(id="linearized-response", title="Harmonic response about equilibrium")
 @section(title="Local response", root=True)
-def response(
+def harmonic_response(
     linear_stiffness: Stiffness,
     cubic_coefficient: Cubic,
     displacement: Deflection,
@@ -43,6 +43,7 @@ def response(
     natural_frequency: Natural = math.sqrt(tangent_stiffness / mass) / (2.0 * math.pi)
     damping_ratio: DampingRatio = damping / (2.0 * math.sqrt(tangent_stiffness * mass))
     frequency_ratio: Ratio = frequency / natural_frequency
+    boolean(id="below-natural", description="Excitation below the natural frequency", predicate=frequency < natural_frequency)
     with document_section(id="transmission", title="Force isolation and validity"):
         transmissibility: Transmission = math.sqrt(
             (1.0 + (2.0 * damping_ratio * frequency_ratio) ** 2)

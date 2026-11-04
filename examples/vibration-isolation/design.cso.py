@@ -1,6 +1,6 @@
 """Compose a numerical equilibrium with documented response and energy calculations."""
 
-from cso_python import calculation, check, section
+from cso_python import boolean, calculation, check, section
 from quantities import (
     Force,
     Stiffness,
@@ -15,7 +15,7 @@ from quantities import (
     Allowed,
 )
 from _cso_bindings._external.methods import equilibrium
-from _cso_bindings.response import response
+from _cso_bindings.response import harmonic_response as response
 
 
 @calculation(id="isolator-design", title="Nonlinear isolator design case")
@@ -41,6 +41,7 @@ def design(
         0.5 * linear_stiffness * static_equilibrium["displacement"] ** 2
         + 0.25 * cubic_coefficient * static_equilibrium["displacement"] ** 4
     )
+    boolean(id="cubic-spring", description="Cubic spring included", predicate=cubic_coefficient > 0)
     check(
         id="travel-limit",
         targets=("displacement",),

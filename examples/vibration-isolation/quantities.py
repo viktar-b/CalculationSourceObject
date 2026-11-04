@@ -40,7 +40,7 @@ Iterations: TypeAlias = Annotated[
     int,
     symbol(
         glyph="n_{bis}",
-        description="Bisection iterations",
+        description="Interval-halving steps",
         unit="",
         comment="Retained solver diagnostic; not an independent accuracy certificate.",
     ),
