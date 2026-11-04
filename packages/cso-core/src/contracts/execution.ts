@@ -276,7 +276,21 @@ export type MethodContentItem =
       content: MethodContentItem[];
     }
   | { kind: 'check'; localId: string }
-  | { kind: 'applicability'; localId: string };
+  | { kind: 'applicability'; localId: string }
+  | { kind: 'boolean'; localId: string };
+const BooleanDeclarationSchema = z.strictObject({
+  id: NonemptyStringSchema,
+  description: NonemptyStringSchema,
+  predicateText: NonemptyStringSchema,
+  expression: z.discriminatedUnion('kind', [
+    z.strictObject({ kind: z.literal('literal'), value: z.boolean() }),
+    z.strictObject({
+      kind: z.literal('predicate'),
+      nodes: z.array(SymbolicFormulaNodeSchema).min(1),
+    }),
+  ]),
+});
+export type BooleanDeclaration = z.infer<typeof BooleanDeclarationSchema>;
 export type EngineeringCheck = {
   id: string;
   targets: string[];
@@ -296,6 +310,7 @@ export type MethodHelperRecord = {
   content: MethodContentItem[];
   helpers: MethodHelperRecord[];
   metadata?: Record<string, unknown>;
+  booleans?: BooleanDeclaration[];
   checks?: EngineeringCheck[];
   applicability?: EngineeringCheck[];
 };
@@ -339,6 +354,10 @@ const MethodContentSchema: z.ZodType<MethodContentItem> = z.lazy(() =>
       content: z.array(MethodContentSchema),
     }),
     z.strictObject({
+      kind: z.literal('boolean'),
+      localId: NonemptyStringSchema,
+    }),
+    z.strictObject({
       kind: z.literal('check'),
       localId: NonemptyStringSchema,
     }),
@@ -368,6 +387,7 @@ const MethodHelperSchema: z.ZodType<MethodHelperRecord> = z.lazy(() =>
     content: z.array(MethodContentSchema).min(1),
     helpers: z.array(MethodHelperSchema),
     metadata: CalculationSourceSectionSchema.shape.metadata,
+    booleans: z.array(BooleanDeclarationSchema).min(1).optional(),
     checks: z.array(EngineeringCheckSchema).min(1).optional(),
     applicability: z.array(EngineeringCheckSchema).min(1).optional(),
   }),
@@ -388,6 +408,7 @@ const MethodPlanSchema = z.strictObject({
   content: z.array(MethodContentSchema).min(1),
   helpers: z.array(MethodHelperSchema),
   metadata: CalculationSourceSectionSchema.shape.metadata,
+  booleans: z.array(BooleanDeclarationSchema).min(1).optional(),
   checks: z.array(EngineeringCheckSchema).min(1).optional(),
   applicability: z.array(EngineeringCheckSchema).min(1).optional(),
   location: SourceSpanSchema,
@@ -410,6 +431,7 @@ const LogicalTableSchema = z.strictObject({
   columnCap: z.number().int().positive().optional(),
   inputs: z.array(NonemptyStringSchema),
   outputs: z.array(NonemptyStringSchema),
+  booleans: z.array(NonemptyStringSchema).optional(),
   cases: z.array(
     z.strictObject({
       heading: NonemptyStringSchema,
@@ -427,6 +449,13 @@ const BranchOutcomeSchema = z.strictObject({
   value: z.boolean(),
   usedKeys: z.array(NonemptyStringSchema).min(1),
   label: NonemptyStringSchema,
+});
+const BooleanOutcomeSchema = z.strictObject({
+  methodId: IdentityStringSchema,
+  invocationId: IdentityStringSchema,
+  booleanId: NonemptyStringSchema,
+  value: z.boolean(),
+  usedKeys: z.array(NonemptyStringSchema),
 });
 const CheckOutcomeSchema = z.strictObject({
   methodId: IdentityStringSchema,
@@ -461,6 +490,7 @@ const ExecutionPayloadBaseSchema = z
     methods: z.array(MethodPlanSchema).min(1).optional(),
     tables: z.array(LogicalTableSchema).min(1).optional(),
     branchOutcomes: z.array(BranchOutcomeSchema).min(1).optional(),
+    booleanOutcomes: z.array(BooleanOutcomeSchema).min(1).optional(),
     checkOutcomes: z.array(CheckOutcomeSchema).min(1).optional(),
     applicabilityOutcomes: z
       .array(ApplicabilityOutcomeSchema)
@@ -1642,6 +1672,7 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
     validateExternalCalls(execution, ctx);
     if (
       execution.cso.schemaVersion !== '1.2.0' &&
+      execution.cso.schemaVersion !== '1.3.0' &&
       (execution.cso.schemaVersion === '1.1.0') !== comparisonRecords
     ) {
       issue(
@@ -2024,6 +2055,9 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
       value: boolean;
       usedKeys: readonly string[];
     }[] = [];
+    const expectedBooleans: z.infer<typeof BooleanOutcomeSchema>[] = [];
+    let booleansReproduced = true;
+    let hasBooleanDeclarations = false;
     let checksReproduced = true;
     const expectedApplicability: {
       methodId: string;
@@ -2050,6 +2084,55 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
       return values;
     };
     const visitPlans = (plan: MethodHelperRecord): void => {
+      const booleanContentIds = (
+        content: readonly MethodContentItem[],
+      ): string[] =>
+        content.flatMap((item) =>
+          item.kind === 'boolean'
+            ? [item.localId]
+            : item.kind === 'section'
+              ? booleanContentIds(item.content)
+              : [],
+        );
+      const placedBooleans = booleanContentIds(plan.content).sort();
+      const declaredBooleans = (plan.booleans ?? [])
+        .map((item) => item.id)
+        .sort();
+      if (JSON.stringify(placedBooleans) !== JSON.stringify(declaredBooleans))
+        booleansReproduced = false;
+      const seenBooleans = new Set<string>();
+      for (const condition of plan.booleans ?? []) {
+        hasBooleanDeclarations = true;
+        if (seenBooleans.has(condition.id)) booleansReproduced = false;
+        seenBooleans.add(condition.id);
+        for (const invocation of execution.invocations) {
+          if (
+            invocation.function !== plan.function ||
+            invocation.moduleId !== plan.moduleId
+          )
+            continue;
+          const expression = condition.expression;
+          const reproduced =
+            expression.kind === 'literal'
+              ? { value: expression.value, usedKeys: [] }
+              : reproducePredicate(
+                  expression.nodes,
+                  expression.nodes[0]?.key ?? '',
+                  namedValues(invocation),
+                );
+          if (!reproduced) {
+            booleansReproduced = false;
+            continue;
+          }
+          expectedBooleans.push({
+            methodId: plan.id,
+            invocationId: invocation.id,
+            booleanId: condition.id,
+            value: reproduced.value,
+            usedKeys: [...reproduced.usedKeys],
+          });
+        }
+      }
       const seen = new Set<string>();
       for (const check of plan.checks ?? []) {
         if (seen.has(check.id)) checksReproduced = false;
@@ -2112,6 +2195,40 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
       for (const helper of plan.helpers) visitPlans(helper);
     };
     for (const method of execution.methods ?? []) visitPlans(method);
+    const booleanIdentity = (
+      item: z.infer<typeof BooleanOutcomeSchema>,
+    ): string =>
+      JSON.stringify([
+        item.methodId,
+        item.invocationId,
+        item.booleanId,
+        item.value,
+        item.usedKeys,
+      ]);
+    const recordedBooleanIdentities = (execution.booleanOutcomes ?? [])
+      .map(booleanIdentity)
+      .sort();
+    const expectedBooleanIdentities = expectedBooleans
+      .map(booleanIdentity)
+      .sort();
+    if (
+      !booleansReproduced ||
+      JSON.stringify(recordedBooleanIdentities) !==
+        JSON.stringify(expectedBooleanIdentities)
+    ) {
+      issue(
+        'BOOLEAN_OUTCOME_MISMATCH',
+        ['booleanOutcomes'],
+        'Boolean values must reproduce the captured predicate exactly',
+      );
+    }
+    if ((execution.cso.schemaVersion === '1.3.0') !== hasBooleanDeclarations) {
+      issue(
+        'INCOMPATIBLE_CONTRACT',
+        ['cso', 'schemaVersion'],
+        'Boolean declarations require calculation schema 1.3.0',
+      );
+    }
     const recordedChecks = execution.checkOutcomes ?? [];
     const checkIdentity = (item: {
       methodId: string;
@@ -2180,6 +2297,19 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
     const ownedCases = new Set<string>();
     for (const { table, index } of tableRecords.values()) {
       const method = methodRecords.get(table.methodId)?.method;
+      const booleanNames = table.booleans ?? [];
+      if (
+        new Set(booleanNames).size !== booleanNames.length ||
+        booleanNames.some(
+          (name) => !method?.booleans?.some((item) => item.id === name),
+        )
+      ) {
+        issue(
+          'UNKNOWN_QUANTITY',
+          ['tables', index, 'booleans'],
+          'Selected Boolean rows must name distinct method declarations',
+        );
+      }
       if (!method) {
         issue(
           'UNKNOWN_METHOD',
@@ -2279,7 +2409,7 @@ export const ExecutionResponseSchema = z
   .discriminatedUnion('ok', [
     z
       .object({
-        protocolVersion: z.enum(['1', '2', '3', '4']),
+        protocolVersion: z.enum(['1', '2', '3', '4', '5']),
         ok: z.literal(true),
         diagnostics: z.array(DiagnosticSchema),
         execution: ExecutionPayloadSchema,
@@ -2287,7 +2417,7 @@ export const ExecutionResponseSchema = z
       .strict(),
     z
       .object({
-        protocolVersion: z.enum(['1', '2', '3', '4']),
+        protocolVersion: z.enum(['1', '2', '3', '4', '5']),
         ok: z.literal(false),
         diagnostics: z.array(DiagnosticSchema).min(1),
         provenance: ProvenanceSchema.optional(),
@@ -2311,8 +2441,11 @@ export const ExecutionResponseSchema = z
     }
     const external = response.execution.externalCalls !== undefined;
     if (
-      (response.protocolVersion === '4') !== external ||
-      (!external && (response.protocolVersion === '3') !== comparison)
+      (response.protocolVersion === '5') !==
+        (response.execution.cso.schemaVersion === '1.3.0') ||
+      (response.protocolVersion !== '5' &&
+        ((response.protocolVersion === '4') !== external ||
+          (!external && (response.protocolVersion === '3') !== comparison)))
     ) {
       ctx.addIssue({
         code: 'custom',

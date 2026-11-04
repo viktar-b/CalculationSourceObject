@@ -764,7 +764,10 @@ def convert_annotated_python(
     ):
         from .execution import execute
 
-        response = execute(path, function_name, inputs, supports_external=False)
+        response = execute(
+            path, function_name, inputs,
+            supports_external=False, supports_booleans=False,
+        )
         if not response["ok"]:
             raise ExportError(response["diagnostics"][0]["message"])
         return response["execution"]["cso"]

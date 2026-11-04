@@ -255,6 +255,15 @@ export const methodNotation = (
         );
       }
     }
+    for (const declaration of owner.booleans ?? []) {
+      if (declaration.expression.kind !== 'predicate') continue;
+      add({
+        id: notationId(owner.id, 'boolean', declaration.id),
+        glyph: 'b_{condition}',
+        description: declaration.description,
+        valueTree: tree(owner, declaration.expression.nodes),
+      });
+    }
     for (const condition of [
       ...(owner.checks ?? []).map((condition) => ({
         ...condition,
@@ -291,7 +300,7 @@ export const methodNotation = (
       outputSymbolId(owner, binding, name),
     conditionId: (
       owner: Owner,
-      kind: 'check' | 'applicability',
+      kind: 'check' | 'applicability' | 'boolean',
       id: string,
     ): string => notationId(owner.id, kind, id),
     /** The branch a conditional chose and the test that chose it. */

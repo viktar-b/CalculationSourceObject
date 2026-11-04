@@ -270,3 +270,9 @@ export {
 } from './contracts/definition.ts';
 
 export { methodInvocationBindings } from './verification/method-bindings.ts';
+
+export { tableOutcomeRows } from './verification/table-outcomes.ts';
+export {
+  PreparedOutcomeRowSchema,
+  type PreparedOutcomeRow,
+} from './contracts/table-outcomes.ts';

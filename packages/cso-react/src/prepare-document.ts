@@ -14,6 +14,8 @@ import {
   type VerificationReport,
   VerificationReportSchema,
   methodInvocationBindings,
+  tableOutcomeRows,
+  type PreparedOutcomeRow,
   type HistoricalReview,
   HistoricalReviewSchema,
   type LegacyAssetManifest,
@@ -641,6 +643,28 @@ const presentMethodContent = (
         })),
       };
     }
+    if (item.kind === 'boolean') {
+      const declared = owner.booleans?.find(
+        (candidate) => candidate.id === item.localId,
+      );
+      if (!declared)
+        fail('UNKNOWN_QUANTITY', `Boolean '${item.localId}' is missing`);
+      return {
+        kind: 'boolean',
+        localId: item.localId,
+        description: declared.description,
+        predicateText: declared.predicateText,
+        ...(declared.expression.kind === 'predicate'
+          ? {
+              predicateSymbolId: notation.conditionId(
+                owner,
+                'boolean',
+                declared.id,
+              ),
+            }
+          : {}),
+      };
+    }
     if (item.kind === 'check' || item.kind === 'applicability') {
       const declared = (
         (item.kind === 'check' ? owner.checks : owner.applicability) ?? []
@@ -711,6 +735,7 @@ const presentedBranchNotes = (
   table: NonNullable<ExecutionPayload['tables']>[number],
   method: MethodRecord,
   notation: MethodNotation,
+  includeUniform = false,
 ) => {
   const outcomes = execution.branchOutcomes ?? [];
   const bound = table.cases.flatMap((caseItem) =>
@@ -747,7 +772,9 @@ const presentedBranchNotes = (
     labels.set(key, values);
   }
   return bound
-    .filter((item) => (labels.get(groupKey(item))?.size ?? 0) > 1)
+    .filter(
+      (item) => includeUniform || (labels.get(groupKey(item))?.size ?? 0) > 1,
+    )
     .map(({ caseItem, plan, callPath, outcome, quantity }) => {
       const nodes = new Map(quantity.nodes.map((node) => [node.key, node]));
       let branch = outcome;
@@ -963,15 +990,52 @@ const comparisonPlacement = (
         : [];
     }),
   );
+  const outcomeRows = tableOutcomeRows(execution, table);
+  const allBranchNotes = presentedBranchNotes(
+    execution,
+    table,
+    method,
+    notation,
+    true,
+  );
+  const branchRows = new Map<
+    string,
+    Extract<PreparedOutcomeRow, { kind: 'branch' }>
+  >();
+  for (const note of allBranchNotes) {
+    // The method quantity and predicate identify a row independently of which alternative won.
+    const id = JSON.stringify([note.quantitySymbolId, note.conditionSymbolId]);
+    let row = branchRows.get(id);
+    if (!row) {
+      row = {
+        kind: 'branch',
+        id,
+        label:
+          notation
+            .symbols()
+            .find((symbol) => symbol.id === note.quantitySymbolId)
+            ?.description ?? 'Selected rule',
+        predicateText: '',
+        cells: table.cases.map(({ heading }) => ({ heading, results: [] })),
+      };
+      branchRows.set(id, row);
+    }
+    const cell = row.cells.find((cell) => cell.heading === note.heading);
+    if (cell) {
+      const { heading: _heading, label, ...evidence } = note;
+      cell.results.push({ ...evidence, value: label });
+    }
+  }
+  outcomeRows.push(...branchRows.values());
   return {
     kind: 'table',
     id: item.id,
     title: table.title,
     casesAxis: table.casesAxis,
     ...(table.columnCap ? { columnCap: table.columnCap } : {}),
-    ...(branchNotes.length > 0
-      ? { branchNotes, symbols: notation.symbols() }
-      : {}),
+    ...(branchNotes.length > 0 ? { branchNotes } : {}),
+    ...(outcomeRows.length > 0 ? { symbols: notation.symbols() } : {}),
+    ...(outcomeRows.length > 0 ? { outcomeRows } : {}),
     ...(engineeringChecks.length > 0 ? { engineeringChecks } : {}),
     ...(applicabilityNotes.length > 0 ? { applicabilityNotes } : {}),
     cases: table.cases.map(({ heading, invocationId }) => ({
@@ -1210,15 +1274,18 @@ export const prepareExecutionDocument = (
   );
   const { metadata: _sourceMetadata, ...sourceProvenance } = cso.source;
   const document = parseDocument({
-    documentVersion: execution.externalCalls
-      ? '4'
-      : sections.some((section) =>
-            section.items.some(
-              (item) => item.kind === 'method' || item.kind === 'table',
-            ),
-          )
-        ? '3'
-        : '2',
+    documentVersion:
+      execution.cso.schemaVersion === '1.3.0'
+        ? '5'
+        : execution.externalCalls
+          ? '4'
+          : sections.some((section) =>
+                section.items.some(
+                  (item) => item.kind === 'method' || item.kind === 'table',
+                ),
+              )
+            ? '3'
+            : '2',
     context: [],
     ...(verification ? { verification } : {}),
     source: {

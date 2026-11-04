@@ -22,6 +22,10 @@ import { ExternalCallSchema, methodExternalCalls } from './external.ts';
 import { addSymbolDisplayIssues, scopedGlyph } from './glyphs.ts';
 import { VerificationReportSchema } from './reports.ts';
 
+import { PreparedOutcomeRowSchema } from './table-outcomes.ts';
+import { tableOutcomeRows } from '../verification/table-outcomes.ts';
+import { methodInvocationBindings } from '../verification/method-bindings.ts';
+
 type HistoricalJsonValue = z.infer<ReturnType<typeof z.json>>;
 
 const HistoricalJsonValueSchema: z.ZodType<HistoricalJsonValue> = z.lazy(() =>
@@ -234,6 +238,13 @@ export type PreparedMethodContent =
   | ({ kind: 'quantity' } & z.infer<typeof PreparedMethodQuantitySchema>)
   | { kind: 'text'; localId: string; content: string }
   | {
+      kind: 'boolean';
+      localId: string;
+      description: string;
+      predicateText: string;
+      predicateSymbolId?: string;
+    }
+  | {
       kind: 'figure';
       localId: string;
       assetId: string;
@@ -302,6 +313,13 @@ const PreparedMethodContentSchema: z.ZodType<PreparedMethodContent> = z.lazy(
           .min(1),
       }),
       PreparedMethodQuantitySchema.extend({ kind: z.literal('quantity') }),
+      z.strictObject({
+        kind: z.literal('boolean'),
+        localId: NonemptyStringSchema,
+        description: NonemptyStringSchema,
+        predicateText: NonemptyStringSchema,
+        predicateSymbolId: NonemptyStringSchema.optional(),
+      }),
       z.strictObject({
         kind: z.literal('text'),
         localId: NonemptyStringSchema,
@@ -472,6 +490,7 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
       }),
     ),
     emptyState: z.literal('No cases evaluated').optional(),
+    outcomeRows: z.array(PreparedOutcomeRowSchema).min(1).optional(),
     branchNotes: z
       .array(
         z.strictObject({
@@ -730,7 +749,7 @@ const externalMethodInputsMatch = (
 
 export const PreparedDocumentSchema = z
   .strictObject({
-    documentVersion: z.enum(['2', '3', '4']),
+    documentVersion: z.enum(['2', '3', '4', '5']),
     verification: VerificationReportSchema.optional(),
     context: ContextSchema,
     source: z.discriminatedUnion('kind', [
@@ -764,6 +783,26 @@ export const PreparedDocumentSchema = z
               preparedExternalHelpers(item.helpers))),
       ),
     );
+    const booleanContent = (items: readonly PreparedMethodContent[]): boolean =>
+      items.some(
+        (item) =>
+          item.kind === 'boolean' ||
+          (item.kind === 'section' && booleanContent(item.content)),
+      );
+    const booleanHelpers = (
+      helpers: readonly PreparedMethodHelper[],
+    ): boolean =>
+      helpers.some(
+        (helper) =>
+          booleanContent(helper.content) || booleanHelpers(helper.helpers),
+      );
+    const booleans = document.sections.some((section) =>
+      section.items.some(
+        (item) =>
+          item.kind === 'method' &&
+          (booleanContent(item.content) || booleanHelpers(item.helpers)),
+      ),
+    );
     if (
       external &&
       (document.source.kind !== 'execution' ||
@@ -790,8 +829,10 @@ export const PreparedDocumentSchema = z
         ['verification'],
       );
     if (
-      (document.documentVersion === '4') !== external ||
-      (!external && (document.documentVersion === '3') !== comparison)
+      (document.documentVersion === '5') !== booleans ||
+      (!booleans &&
+        ((document.documentVersion === '4') !== external ||
+          (!external && (document.documentVersion === '3') !== comparison)))
     ) {
       addIssue(
         ctx,
@@ -926,6 +967,137 @@ export const BoundPreparedDocumentSchema = z
     }
     for (const [sectionIndex, section] of document.sections.entries()) {
       for (const [itemIndex, item] of section.items.entries()) {
+        if (item.kind === 'table' && item.outcomeRows) {
+          const table = execution.tables?.find((table) => table.id === item.id);
+          const expectedRows = table ? tableOutcomeRows(execution, table) : [];
+          if (
+            exactCaptureHash(
+              item.outcomeRows.filter((row) => row.kind !== 'branch'),
+            ) !== exactCaptureHash(expectedRows)
+          ) {
+            addIssue(
+              ctx,
+              'DOCUMENT_OUTCOME_MISMATCH',
+              'Table outcomes must preserve every selected Boolean and required engineering outcome',
+              [
+                'document',
+                'sections',
+                sectionIndex,
+                'items',
+                itemIndex,
+                'outcomeRows',
+              ],
+            );
+          }
+          const method = execution.methods?.find(
+            (method) => method.id === table?.methodId,
+          );
+          const expectedBranches =
+            table && method
+              ? table.cases
+                  .flatMap((caseItem) =>
+                    methodInvocationBindings(
+                      execution,
+                      method,
+                      caseItem.invocationId,
+                    ).flatMap(({ invocation, callPath }) =>
+                      (execution.branchOutcomes ?? [])
+                        .filter(
+                          (branch) => branch.invocationId === invocation.id,
+                        )
+                        .map((branch) =>
+                          JSON.stringify([
+                            caseItem.heading,
+                            invocation.id,
+                            callPath.join(' / '),
+                            branch.symbolId,
+                            branch.nodeKey,
+                            branch.value,
+                            branch.label,
+                          ]),
+                        ),
+                    ),
+                  )
+                  .sort()
+              : [];
+          const actualBranches = item.outcomeRows
+            .flatMap((row) =>
+              row.kind === 'branch'
+                ? row.cells.flatMap((cell) =>
+                    cell.results.map((result) =>
+                      JSON.stringify([
+                        cell.heading,
+                        result.invocationId,
+                        result.callPath ?? '',
+                        result.symbolId,
+                        result.nodeKey,
+                        result.conditionHolds,
+                        result.value,
+                      ]),
+                    ),
+                  )
+                : [],
+            )
+            .sort();
+          if (
+            exactCaptureHash(actualBranches) !==
+            exactCaptureHash(expectedBranches)
+          ) {
+            addIssue(
+              ctx,
+              'DOCUMENT_OUTCOME_MISMATCH',
+              'Selected-rule cells must preserve complete case and call evidence',
+              [
+                'document',
+                'sections',
+                sectionIndex,
+                'items',
+                itemIndex,
+                'outcomeRows',
+              ],
+            );
+          }
+          for (const row of item.outcomeRows) {
+            if (
+              !table ||
+              row.cells.length !== table.cases.length ||
+              row.cells.some(
+                (cell, index) => cell.heading !== table.cases[index]?.heading,
+              )
+            ) {
+              addIssue(
+                ctx,
+                'DOCUMENT_OUTCOME_MISMATCH',
+                'Outcome cells must align with the captured case order',
+                [
+                  'document',
+                  'sections',
+                  sectionIndex,
+                  'items',
+                  itemIndex,
+                  'outcomeRows',
+                ],
+              );
+            }
+          }
+        }
+        if (
+          item.kind === 'table' &&
+          execution.cso.schemaVersion === '1.3.0' &&
+          !item.outcomeRows &&
+          execution.tables?.some(
+            (table) =>
+              table.id === item.id &&
+              tableOutcomeRows(execution, table).length > 0,
+          )
+        ) {
+          addIssue(
+            ctx,
+            'DOCUMENT_OUTCOME_MISMATCH',
+            'Selected Boolean rows cannot be omitted',
+            ['document', 'sections', sectionIndex, 'items', itemIndex],
+          );
+        }
         if (item.kind === 'method') {
           const method = execution.methods?.find(
             (method) => method.id === item.id,
@@ -1221,6 +1393,8 @@ const methodNotationIds = (content: PreparedMethodContent[]): string[] =>
       return [...item.inputs, ...item.outputs].map(
         (quantity) => quantity.symbolId,
       );
+    if (item.kind === 'boolean')
+      return item.predicateSymbolId ? [item.predicateSymbolId] : [];
     if (item.kind === 'check' || item.kind === 'applicability') {
       return [item.predicateSymbolId];
     }
@@ -1244,11 +1418,25 @@ const validateNotation = (document: PreparedDocument, ctx: z.RefinementCtx) => {
               ...methodNotationIds(item.content),
               ...helperNotationIds(item.helpers),
             ]
-          : (item.branchNotes ?? []).flatMap((note) => [
-              note.quantitySymbolId,
-              note.branchSymbolId,
-              note.conditionSymbolId,
-            ]);
+          : [
+              ...(item.branchNotes ?? []).flatMap((note) => [
+                note.quantitySymbolId,
+                note.branchSymbolId,
+                note.conditionSymbolId,
+              ]),
+              ...(item.outcomeRows ?? []).flatMap((row) => [
+                ...(row.predicateSymbolId ? [row.predicateSymbolId] : []),
+                ...(row.kind === 'branch'
+                  ? row.cells.flatMap((cell) =>
+                      cell.results.flatMap((result) => [
+                        result.quantitySymbolId,
+                        result.branchSymbolId,
+                        result.conditionSymbolId,
+                      ]),
+                    )
+                  : []),
+              ]),
+            ];
       const declared = item.symbols ?? [];
       const symbols = new Set(declared.map((symbol) => symbol.id));
       if (item.kind === 'method') {

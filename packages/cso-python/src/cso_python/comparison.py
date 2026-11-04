@@ -152,7 +152,7 @@ def _place_method(planner, inv, call: ast.Call, section: Json, ids: set[str]) ->
         )
     plan = planner.ensure_plan(inv, target, function_name)
     quantities = _quantities(planner, inv, target, definition, plan, call)
-    content, helpers, checks, applicability = _method_content(
+    content, helpers, checks, applicability, booleans = _method_content(
         planner,
         inv,
         target,
@@ -182,6 +182,8 @@ def _place_method(planner, inv, call: ast.Call, section: Json, ids: set[str]) ->
         "helpers": _unique_helpers(helpers, set()),
         "location": span(inv.module.id, call),
     }
+    if booleans:
+        record["booleans"] = booleans
     if checks:
         record["checks"] = checks
     if applicability:
@@ -454,7 +456,7 @@ def _method_content(
     at: ast.AST,
     stack: set[tuple[str, str]],
     cache: dict[tuple[str, str], Json],
-) -> tuple[list[Json], list[Json], list[Json], list[Json]]:
+) -> tuple[list[Json], list[Json], list[Json], list[Json], list[Json]]:
     glyphs = {
         (
             item["selectionName"] if item["role"] == "input" else item["variableName"]
@@ -471,6 +473,7 @@ def _method_content(
     helpers: list[Json] = []
     checks: list[Json] = []
     applicability: list[Json] = []
+    booleans: list[Json] = []
     _walk_steps(
         planner,
         inv,
@@ -486,6 +489,7 @@ def _method_content(
         at,
         checks,
         applicability,
+        booleans,
         {item["variableName"] for item in quantities},
     )
     seen = _content_variables(content)
@@ -503,7 +507,7 @@ def _method_content(
             "UNSUPPORTED_METHOD_CONTENT",
             "Method content must include every explained quantity",
         )
-    return content, helpers, checks, applicability
+    return content, helpers, checks, applicability, booleans
 
 
 def _walk_steps(
@@ -521,6 +525,7 @@ def _walk_steps(
     at: ast.AST,
     checks: list[Json],
     applicability: list[Json],
+    booleans: list[Json],
     names: set[str],
 ) -> None:
     for step in steps:
@@ -563,6 +568,7 @@ def _walk_steps(
                 at,
                 checks,
                 applicability,
+                booleans,
                 names,
             )
             content.append(
@@ -641,6 +647,13 @@ def _walk_steps(
                 content.append(
                     {"kind": "text", "localId": data["id"], "content": data["content"]}
                 )
+                continue
+            if name == "boolean":
+                declared = _boolean_declaration(
+                    planner, inv, module, definition, glyphs, node.value, booleans
+                )
+                booleans.append(declared)
+                content.append({"kind": "boolean", "localId": declared["id"]})
                 continue
             if name in {"check", "applicable"}:
                 declared = _check_declaration(
@@ -747,7 +760,9 @@ def _helper(
     helper_id = identity("method", owner_id, f"{loaded.id}::{function_name}")
     stack.add(key)
     quantities = _quantities(planner, inv, loaded, definition, plan, at)
-    content, nested, helper_checks, helper_applicability = _method_content(
+    (
+        content, nested, helper_checks, helper_applicability, helper_booleans
+    ) = _method_content(
         planner,
         inv,
         loaded,
@@ -772,6 +787,8 @@ def _helper(
         "content": content,
         "helpers": nested,
     }
+    if helper_booleans:
+        record["booleans"] = helper_booleans
     if helper_checks:
         record["checks"] = helper_checks
     if helper_applicability:
@@ -856,6 +873,7 @@ def _place_table(planner, inv, call: ast.Call, section: Json, ids: set[str]) -> 
             "cases",
             "inputs",
             "outputs",
+            "booleans",
             "cases_axis",
             "column_cap",
         },
@@ -896,6 +914,11 @@ def _place_table(planner, inv, call: ast.Call, section: Json, ids: set[str]) -> 
         if "outputs" in found
         else list(method["outputNames"])
     )
+    known_booleans = [item["id"] for item in method.get("booleans", [])]
+    booleans = (
+        _names(planner, inv, found["booleans"], known_booleans)
+        if "booleans" in found else known_booleans
+    )
     cases, cells = _cases(planner, inv, found["cases"].value, method, inputs, outputs)
     record = {
         "id": table_id,
@@ -910,6 +933,8 @@ def _place_table(planner, inv, call: ast.Call, section: Json, ids: set[str]) -> 
         "cells": cells,
         "location": span(inv.module.id, call),
     }
+    if method.get("booleans"):
+        record["booleans"] = booleans
     if "column_cap" in found:
         record["columnCap"] = _column_cap(planner, inv, found["column_cap"])
     ids.add(table_id)
@@ -1089,6 +1114,43 @@ def _overlaps(owned: set[str], invocation_id: str) -> bool:
     )
 
 
+def _boolean_declaration(
+    planner, inv, module, definition, glyphs, call, booleans
+) -> Json:
+    found = _keywords(planner, inv, call)
+    required = {"id", "description", "predicate"}
+    _require(planner, inv, found, required, required)
+    local_id = _text(planner, inv, found["id"])
+    if any(item["id"] == local_id for item in booleans):
+        planner.error(
+            inv, found["id"], "DUPLICATE_IDENTITY", "Duplicate Boolean identity"
+        )
+    predicate = found["predicate"].value
+    if isinstance(predicate, ast.Constant) and type(predicate.value) is bool:
+        expression = {"kind": "literal", "value": predicate.value}
+        predicate_text = str(predicate.value)
+    else:
+        nodes = [
+            {key: value for key, value in node.items() if key != "_ast"}
+            for node in lower_expression(
+                module, definition.function, set(definition.parameters), predicate,
+                given=False, condition=True,
+            )
+        ]
+        expression = {"kind": "predicate", "nodes": nodes}
+        predicate_text = _formula_text(nodes, glyphs)
+    return {
+        "id": local_id,
+        "description": _text(planner, inv, found["description"]),
+        "predicateText": predicate_text,
+        "expression": expression,
+    }
+
+
+def collect_boolean_outcomes(planner) -> list[Json]:
+    return _collect_condition_outcomes(planner, "booleans", "booleanId")
+
+
 def _check_declaration(
     planner,
     inv,
@@ -1188,9 +1250,13 @@ def _collect_condition_outcomes(planner, field: str, identity_field: str) -> lis
                     or invocation.module.id != plan["moduleId"]
                 ):
                     continue
-                value, used = _check_value(
-                    condition["nodes"], _named_values(invocation)
-                )
+                expression = condition.get("expression")
+                if expression is not None and expression["kind"] == "literal":
+                    value, used = expression["value"], set()
+                else:
+                    value, used = _check_value(
+                        expression["nodes"] if expression else condition["nodes"], _named_values(invocation)
+                    )
                 outcomes.append(
                     {
                         "methodId": plan["id"],

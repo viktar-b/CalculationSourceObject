@@ -250,6 +250,21 @@ export const PreparedFormulaSheet = ({
             </section>
           );
         }
+        if (item.kind === 'boolean') {
+          return (
+            <p
+              key={`boolean-${item.localId}-${index}`}
+              className="cso-branch-note"
+              data-boolean={item.localId}
+              data-formula={item.predicateText}
+            >
+              {item.description}{' '}
+              {item.predicateSymbolId
+                ? notation.formula(item.predicateSymbolId, false)
+                : item.predicateText}
+            </p>
+          );
+        }
         if (item.kind === 'check' || item.kind === 'applicability') {
           return (
             <p

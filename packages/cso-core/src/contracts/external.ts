@@ -154,7 +154,8 @@ export function validateExternalCalls(
       params: { diagnosticCode: 'EXTERNAL_BOUNDARY_MISMATCH' },
     });
   if (
-    external !== (execution.cso.schemaVersion === '1.2.0') ||
+    (execution.cso.schemaVersion !== '1.3.0' &&
+      external !== (execution.cso.schemaVersion === '1.2.0')) ||
     external !== (execution.externalCalls !== undefined) ||
     external !== (execution.runId !== undefined) ||
     external !== (execution.environment !== undefined) ||
