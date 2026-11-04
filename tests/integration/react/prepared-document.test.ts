@@ -328,7 +328,7 @@ describe('Prepared document rendering and preservation', () => {
     ).toHaveLength(payload.observations.length);
     expect(
       renderToStaticMarkup(createElement(PreparedFormulaSheet, { document })),
-    ).toContain('Numerical verification is reported separately');
+    ).toContain('Numerical verification is reported separately.');
   });
   test('retains standalone text, repeated symbols, child order and parent restoration', () => {
     const document = PreparedDocumentSchema.parse(

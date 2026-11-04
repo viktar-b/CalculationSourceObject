@@ -61,8 +61,8 @@ const FractionFunctionMathml = ({
 }): ReactElement => {
   return (
     <mfrac>
-      <mrow>{numerator}</mrow>
-      <mrow>{denominator}</mrow>
+      <mrow style={{ fontSize: '1em' }}>{numerator}</mrow>
+      <mrow style={{ fontSize: '1em' }}>{denominator}</mrow>
     </mfrac>
   );
 };

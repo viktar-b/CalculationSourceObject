@@ -40,7 +40,7 @@ def compare(
     )
     text(
         id="notation",
-        content="lin = linear spring; cub = cubic term; eq = static equilibrium; tan = tangent stiffness; nat = natural frequency; exc = excitation; vis = viscous; lim = specified limit. Call scopes ls, bp and hm distinguish the three candidates.",
+        content="lin = linear spring; cub = cubic term; eq = static equilibrium; tan = tangent stiffness; nat = natural frequency; exc = excitation; vis = viscous; lim = specified limit. The qualifiers ls, bp and hm identify the three candidates; se identifies static equilibrium and hr identifies harmonic response.",
     )
     method(
         id="design-method",

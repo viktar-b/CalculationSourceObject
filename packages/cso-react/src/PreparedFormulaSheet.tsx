@@ -188,40 +188,65 @@ export const PreparedFormulaSheet = ({
           return (
             <section
               key={`external-${item.binding}`}
-              className="cso-method-external"
+              className="cso-method-external cso-external-call"
               data-method-external={item.binding}
             >
-              <h4>{readableName(item.binding)}</h4>
-              <SymbolicValueNote />
-              <p>
-                External source: {item.adapter.moduleId},{' '}
-                {item.adapter.function}
-              </p>
-              <p>
-                CSO does not check the formulas inside this external
-                calculation.
-              </p>
-              <h5>Inputs</h5>
-              {item.inputs.map((input) => (
-                <div key={input.name} data-external-method-input={input.name}>
-                  {notation.row(input.symbolId, symbolIndex++)}
-                </div>
-              ))}
-              <h5>Calculation procedure</h5>
-              {item.declaration.interface.description
-                .split(/\n\s*\n/u)
-                .map((paragraph, paragraphIndex) => (
-                  <p key={`paragraph-${paragraphIndex}`}>{paragraph}</p>
-                ))}
-              <h5>Outputs</h5>
-              {item.outputs.map((output) => (
-                <div
-                  key={output.name}
-                  data-external-method-output={output.name}
-                >
-                  {notation.row(output.symbolId, symbolIndex++)}
-                </div>
-              ))}
+              <table>
+                <thead>
+                  <tr>
+                    <th colSpan={2}>
+                      <h4>{readableName(item.binding)}</h4>
+                      <SymbolicValueNote />
+                      <p>
+                        External source: {item.adapter.moduleId},{' '}
+                        {item.adapter.function}
+                      </p>
+                      <p>
+                        CSO does not check the formulas inside this external
+                        calculation.
+                      </p>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th colSpan={2}>Inputs</th>
+                  </tr>
+                  {item.inputs.map((input) => (
+                    <tr
+                      key={input.name}
+                      data-external-method-input={input.name}
+                    >
+                      <td colSpan={2} className="cso-external-quantity-cell">
+                        {notation.row(input.symbolId, symbolIndex++)}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <th colSpan={2}>Calculation procedure</th>
+                  </tr>
+                  {item.declaration.interface.description
+                    .split(/\n\s*\n/u)
+                    .map((paragraph, paragraphIndex) => (
+                      <tr key={`paragraph-${paragraphIndex}`}>
+                        <td colSpan={2}>{paragraph}</td>
+                      </tr>
+                    ))}
+                  <tr>
+                    <th colSpan={2}>Outputs</th>
+                  </tr>
+                  {item.outputs.map((output) => (
+                    <tr
+                      key={output.name}
+                      data-external-method-output={output.name}
+                    >
+                      <td colSpan={2} className="cso-external-quantity-cell">
+                        {notation.row(output.symbolId, symbolIndex++)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </section>
           );
         }
@@ -454,21 +479,6 @@ export const PreparedFormulaSheet = ({
                     ))}
                   </tbody>
                 </table>
-                {document.verification?.externalCoverage ? (
-                  <p className="cso-external-coverage">
-                    External-result consistency:{' '}
-                    {
-                      document.verification.checks.externalResultConsistency
-                        ?.status
-                    }
-                    . Formula checks:{' '}
-                    {document.verification.checks.formulaConsistency.counts
-                      ?.checked ?? 0}
-                    . Captured external calls:{' '}
-                    {document.verification.externalCoverage.calls}. External
-                    results: {document.verification.externalCoverage.results}.
-                  </p>
-                ) : null}
                 {document.verification?.externalReferenceCoverage ? (
                   <div className="cso-external-reference-coverage">
                     <p>
@@ -921,25 +931,9 @@ export const PreparedFormulaSheet = ({
     >
       <header className="cso-document-header">
         <h1>{document.title}</h1>
-        {showSourceDetails && (
-          <p>
-            {document.source.kind === 'legacy'
-              ? 'Development preservation rendering. Numerical agreement has not been verified.'
-              : 'Execution-bound document. Numerical verification is reported separately.'}
-          </p>
-        )}
-        {showSourceDetails && document.source.kind === 'execution' && (
-          <p>
-            Function {document.source.function}. Inputs{' '}
-            {Object.entries(document.source.resolvedInputs)
-              .map(
-                ([key, value]) =>
-                  `${key} = ${Object.is(value, -0) ? '-0' : value}`,
-              )
-              .join(', ')}
-            .
-          </p>
-        )}
+        {showSourceDetails && document.source.kind === 'legacy' ? (
+          <p>Preview only. Numerical agreement has not been verified.</p>
+        ) : null}
       </header>
       <EngineeringMetadata entries={document.context} />
       {document.rootSectionIds.map((id) => {
@@ -949,6 +943,41 @@ export const PreparedFormulaSheet = ({
         }
         return renderSection(section);
       })}
+      <footer className="cso-evidence-note">
+        {!document.verification && document.source.kind === 'execution' ? (
+          <p>Numerical verification is reported separately.</p>
+        ) : null}
+        {showSourceDetails && document.source.kind === 'execution' ? (
+          <p>
+            Source calculation: {readableName(document.source.function)}.
+            {Object.keys(document.source.resolvedInputs).length ? (
+              <>
+                {' '}
+                Supplied values:{' '}
+                {Object.entries(document.source.resolvedInputs)
+                  .map(
+                    ([key, value]) =>
+                      `${readableName(key)} = ${Object.is(value, -0) ? '-0' : value}`,
+                  )
+                  .join(', ')}
+                .
+              </>
+            ) : null}
+          </p>
+        ) : null}
+        {document.verification?.externalCoverage ? (
+          <p>
+            External-result consistency:{' '}
+            {document.verification.checks.externalResultConsistency?.status}.
+            Formula checks:{' '}
+            {document.verification.checks.formulaConsistency.counts?.checked ??
+              0}
+            . Captured external calls:{' '}
+            {document.verification.externalCoverage.calls}. External results:{' '}
+            {document.verification.externalCoverage.results}.
+          </p>
+        ) : null}
+      </footer>
     </article>
   );
 };

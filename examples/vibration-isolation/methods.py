@@ -10,5 +10,5 @@ equilibrium = external_function(
         "residual": Residual,
         "iterations": Iterations,
     },
-    description="""Solve F = k x + a x³ by bisection on [0, F/k] to an interval width of 1e-12 m. Positive k and nonnegative a give a unique nonnegative root. Return displacement, force residual and iteration count. The residual and count are diagnostics, not independent accuracy certificates.""",
+    description="""Spring force is linear stiffness times displacement plus cubic stiffness times displacement cubed. Find the nonnegative displacement whose spring force equals the applied force. Positive linear stiffness and nonnegative cubic stiffness give one such displacement. Start between zero and applied force divided by linear stiffness, then halve the interval until its width is at most 1e-12 m. Report the midpoint, the remaining force imbalance and the number of halving steps. The last two indicate convergence; they are not independent accuracy checks.""",
 )

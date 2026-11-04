@@ -109,6 +109,10 @@ for (const [name, roots] of [
       if (name === 'compare')
         expect(html).toContain('class="cso-method-helper"');
       expect(html).toContain('data-method-id=');
+      expect(html.match(/External-result consistency:/gu)).toHaveLength(1);
+      expect(html).not.toContain('Function compare.');
+      if (name === 'compare')
+        expect(html).toContain('class="cso-method-external cso-external-call"');
       expect(html.match(/data-external-role="input"/gu)).toHaveLength(
         roots.length * 3,
       );
