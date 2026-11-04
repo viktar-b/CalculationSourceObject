@@ -1284,7 +1284,7 @@ def _collect_condition_outcomes(planner, field: str, identity_field: str) -> lis
                     value, used = expression["value"], set()
                 else:
                     value, used = _check_value(
-                        expression["nodes"] if expression else condition["nodes"], _named_values(invocation)
+                        expression["nodes"] if expression else condition["nodes"], _predicate_values(invocation)
                     )
                 outcomes.append(
                     {
@@ -1303,7 +1303,7 @@ def _collect_condition_outcomes(planner, field: str, identity_field: str) -> lis
     return outcomes
 
 
-def _named_values(invocation) -> dict[str, int | float]:
+def _predicate_values(invocation) -> dict[str, int | float]:
     values: dict[str, int | float] = {}
     for name, symbol in (
         *invocation.parameter_symbols.items(),
@@ -1312,6 +1312,11 @@ def _named_values(invocation) -> dict[str, int | float]:
         result = symbol.cso["valueTree"].get("result")
         if isinstance(result, dict) and isinstance(result.get("value"), (int, float)):
             values[name] = result["value"]
+    for binding, child in invocation.calls.items():
+        for name, symbol in child.outputs.items():
+            result = symbol.cso["valueTree"].get("result")
+            if isinstance(result, dict) and isinstance(result.get("value"), (int, float)):
+                values[compact([binding, name])] = result["value"]
     return values
 
 
@@ -1353,7 +1358,12 @@ def _check_value(
         if node["mode"] == "LITERAL":
             return node["literal"]["value"]
         if node["mode"] == "SYMBOL":
-            name = (node.get("ref") or {}).get("name")
+            ref = node.get("ref") or {}
+            name = (
+                compact([ref.get("call"), ref.get("output")])
+                if ref.get("kind") == "output"
+                else ref.get("name")
+            )
             if name not in values:
                 raise SourceError(
                     "INVALID_CHECK", "Check evidence is missing a captured operand"
@@ -1361,6 +1371,8 @@ def _check_value(
             return values[name]
         function_id = node["funcSpec"]["id"]
         arguments = [argument["key"] for argument in node["funcArgs"]]
+        if function_id == "fg.cnd":
+            return number(arguments[1] if predicate(arguments[0]) else arguments[2])
         if function_id == "fg.uminus":
             return -number(arguments[0])
         if function_id in _NUMERIC_CALLS:

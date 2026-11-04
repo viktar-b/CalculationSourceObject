@@ -2081,6 +2081,21 @@ export const ExecutionPayloadSchema = ExecutionPayloadBaseSchema.superRefine(
           values.set(definition.variableName, result.value);
         }
       }
+      for (const child of execution.invocations) {
+        if (
+          !('parentInvocationId' in child) ||
+          child.parentInvocationId !== invocation.id
+        )
+          continue;
+        for (const output of execution.authoring?.outputs ?? []) {
+          if (output.invocationId === child.id) {
+            values.set(
+              JSON.stringify([child.callBindingName, output.name]),
+              output.value,
+            );
+          }
+        }
+      }
       return values;
     };
     const visitPlans = (plan: MethodHelperRecord): void => {

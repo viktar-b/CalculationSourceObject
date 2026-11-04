@@ -57,6 +57,19 @@ export function deriveApplicability(execution: ExecutionPayload): {
         values.set(binding.parameterName, value);
       }
     }
+    for (const child of execution.invocations) {
+      if (
+        !('parentInvocationId' in child) ||
+        child.parentInvocationId !== invocation.id
+      )
+        continue;
+      for (const output of execution.authoring?.outputs ?? []) {
+        if (output.invocationId !== child.id) continue;
+        const key = JSON.stringify([child.callBindingName, output.name]);
+        names.set(key, output.symbolId);
+        values.set(key, output.value);
+      }
+    }
     namesByInvocation.set(invocation.id, names);
     valuesByName.set(invocation.id, values);
   }
