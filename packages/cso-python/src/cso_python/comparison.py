@@ -1114,6 +1114,35 @@ def _overlaps(owned: set[str], invocation_id: str) -> bool:
     )
 
 
+def validate_boolean_placements(planner) -> None:
+    """Do not execute Boolean report facts that have no comparison placement."""
+    def declarations(steps):
+        for step in steps:
+            node = step.node
+            if (
+                isinstance(node, ast.Expr)
+                and isinstance(node.value, ast.Call)
+                and authoring_name(node.value.func) == "boolean"
+            ):
+                yield node.value
+            yield from declarations(step.child_steps or [])
+
+    for invocation in planner.invocations:
+        if invocation.external is not None:
+            continue
+        declaration = next(declarations(invocation.source_plan.steps), None)
+        if declaration is not None and not any(
+            invocation.id == case_id or invocation.id.startswith(case_id + "/")
+            for case_id in planner.grouped_invocations
+        ):
+            planner.error(
+                invocation,
+                declaration,
+                "BOOLEAN_REQUIRES_TABLE",
+                "Boolean report values require a grouped comparison case or its helpers; add this invocation to a table",
+            )
+
+
 def _boolean_declaration(
     planner, inv, module, definition, glyphs, call, booleans
 ) -> Json:

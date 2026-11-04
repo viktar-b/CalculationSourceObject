@@ -2,9 +2,10 @@
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from cso_python.bindings import generate
-from cso_python.execution import execute
+from cso_python.execution import Execution, execute
 from cso_python.exporter import ExportError, convert_annotated_python
 
 CASE = '''from typing import Annotated, TypeAlias
@@ -98,3 +99,128 @@ class BooleanTableTest(unittest.TestCase):
         (self.root / "case.cso.py").write_text(CASE.replace('= width + 0', '= True'))
         response = self.capture()
         self.assertFalse(response["ok"], response)
+
+    def assert_unplaced_before_execution(self, source, function, inputs=None):
+        with (
+            patch.object(Execution, "run", side_effect=AssertionError("Authored execution started")) as authored,
+            patch.object(Execution, "run_external", side_effect=AssertionError("External execution started")) as external,
+        ):
+            response = execute(source, function, inputs or {})
+        self.assertFalse(response["ok"], response)
+        self.assertEqual(response["diagnostics"][0]["code"], "BOOLEAN_REQUIRES_TABLE")
+        self.assertIn("grouped comparison case", response["diagnostics"][0]["message"])
+        self.assertIn("location", response["diagnostics"][0])
+        authored.assert_not_called()
+        external.assert_not_called()
+        return response
+
+    def test_standalone_boolean_facts_are_rejected_before_execution_and_export(self):
+        self.assert_unplaced_before_execution(self.root / "case.cso.py", "case", {"width": 2})
+        with self.assertRaisesRegex(ExportError, "grouped comparison case"):
+            convert_annotated_python(self.root / "case.cso.py", function_name="case", inputs={"width": 2})
+
+    def write_wrapper(self):
+        (self.root / "wrapper.cso.py").write_text('''from typing import Annotated, TypeAlias
+from cso_python import calculation, section, symbol
+from _cso_bindings.case import case
+Width: TypeAlias = Annotated[float, symbol(glyph="w_{wrapper}", description="Width", unit="m")]
+@calculation(id="wrapper", title="Wrapper")
+@section(title="Wrapper", root=True)
+def wrapper(width: Width):
+    child = case(width=width)
+    return {"result": child["result"]}
+''')
+        generate(self.root)
+
+    def test_ordinary_wrapper_does_not_silently_drop_imported_boolean_facts(self):
+        self.write_wrapper()
+        response = self.assert_unplaced_before_execution(self.root / "wrapper.cso.py", "wrapper", {"width": 2})
+        self.assertEqual(len(response["diagnostics"][0]["callChain"]), 1)
+
+    def test_extra_ungrouped_call_is_rejected_even_when_its_function_has_a_table(self):
+        for position in ("before", "after"):
+            with self.subTest(position=position):
+                source = COMPARE.replace("SELECTION", "")
+                anchor = '    table(' if position == "before" else '    return '
+                source = source.replace(anchor, '    spare = case(width=3)\n' + anchor)
+                (self.root / "compare.cso.py").write_text(source)
+                generate(self.root)
+                response = self.assert_unplaced_before_execution(self.root / "compare.cso.py", "compare")
+                self.assertEqual(response["diagnostics"][0]["location"]["moduleId"], "case.cso.py")
+
+    def test_grouped_nested_boolean_helpers_remain_supported_and_protocol_gated(self):
+        self.write_wrapper()
+        source = COMPARE.replace("SELECTION", "").replace(
+            "from _cso_bindings.case import case", "from _cso_bindings.wrapper import wrapper as case"
+        )
+        (self.root / "compare.cso.py").write_text(source)
+        generate(self.root)
+        response = execute(self.root / "compare.cso.py", "compare", {})
+        self.assertTrue(response["ok"], response)
+        self.assertEqual(response["protocolVersion"], "5")
+        self.assertEqual(len(response["execution"]["booleanOutcomes"]), 8)
+        with (
+            patch.object(Execution, "run", side_effect=AssertionError("Authored execution started")) as authored,
+            patch.object(Execution, "run_external", side_effect=AssertionError("External execution started")) as external,
+        ):
+            response = execute(self.root / "compare.cso.py", "compare", {}, supports_booleans=False)
+        self.assertFalse(response["ok"], response)
+        self.assertEqual(response["diagnostics"][0]["code"], "INCOMPATIBLE_CONTRACT")
+        authored.assert_not_called()
+        external.assert_not_called()
+
+    def test_boolean_guards_precede_external_adapter_execution(self):
+        self.write_wrapper()
+        marker = self.root / "adapter-ran.txt"
+        (self.root / "metadata.py").write_text('''from typing import Annotated, TypeAlias
+from cso_python import external_function, symbol
+Width: TypeAlias = Annotated[float, symbol(glyph="w_{adapter}", description="Width", unit="m")]
+identity = external_function(path="adapter.py", function="identity", inputs={"width": Width}, outputs={"width": Width}, description="Retain the supplied width.")
+''')
+        (self.root / "adapter.py").write_text(
+            f"from pathlib import Path\nPath({str(marker)!r}).write_text('imported')\ndef identity(*, width):\n    return width\n"
+        )
+        wrapper = (self.root / "wrapper.cso.py").read_text().replace(
+            "from _cso_bindings.case import case",
+            "from _cso_bindings.case import case\nfrom _cso_bindings._external.metadata import identity",
+        ).replace(
+            "    child = case(width=width)",
+            '    supplied = identity(width=width)\n    child = case(width=supplied["width"])',
+        )
+        (self.root / "wrapper.cso.py").write_text(wrapper)
+        generate(self.root)
+        self.assertFalse(marker.exists())
+        self.assert_unplaced_before_execution(self.root / "wrapper.cso.py", "wrapper", {"width": 2})
+        self.assertFalse(marker.exists())
+        source = COMPARE.replace("SELECTION", "").replace(
+            "from _cso_bindings.case import case", "from _cso_bindings.wrapper import wrapper as case"
+        )
+        (self.root / "compare.cso.py").write_text(source)
+        generate(self.root)
+        response = execute(self.root / "compare.cso.py", "compare", {}, supports_booleans=False)
+        self.assertFalse(response["ok"], response)
+        self.assertEqual(response["diagnostics"][0]["code"], "INCOMPATIBLE_CONTRACT")
+        self.assertFalse(marker.exists())
+        response = execute(self.root / "compare.cso.py", "compare", {})
+        self.assertTrue(response["ok"], response)
+        self.assertEqual(response["protocolVersion"], "5")
+        self.assertTrue(marker.exists())
+
+    def test_static_empty_comparison_preserves_its_boolean_method(self):
+        source = COMPARE.replace("SELECTION", "").replace(
+            '    first = case(width=0)\n    second = case(width=2.0)\n', ""
+        ).replace('{"Zero": first, "Positive": second}', "{}").replace(
+            '    return {"result": first["result"]}', '    return {}'
+        )
+        # Public output declarations remain required, independently of empty cases.
+        source = source.replace('    return {}', '    ready: Annotated[int, symbol(glyph="n_{ready}", description="Ready", unit="")] = 0\n    return {"ready": ready}').replace(
+            'from cso_python import calculation, section, method, table',
+            'from typing import Annotated\nfrom cso_python import calculation, section, method, table, symbol',
+        )
+        (self.root / "compare.cso.py").write_text(source)
+        generate(self.root)
+        response = execute(self.root / "compare.cso.py", "compare", {})
+        self.assertTrue(response["ok"], response)
+        self.assertEqual(response["protocolVersion"], "5")
+        self.assertNotIn("booleanOutcomes", response["execution"])
+        self.assertEqual(len(response["execution"]["methods"][0]["booleans"]), 4)

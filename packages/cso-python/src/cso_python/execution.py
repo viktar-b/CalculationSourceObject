@@ -22,6 +22,7 @@ from .comparison import (
     collect_branch_outcomes,
     collect_boolean_outcomes,
     collect_check_outcomes,
+    validate_boolean_placements,
 )
 from .exporter import authored_output_to_stderr
 from .glyphs import qualify_glyphs
@@ -92,6 +93,7 @@ class Execution:
         self.root = self.planner.plan(
             self.planner.capture.entry, function, supplied=inputs
         )
+        validate_boolean_placements(self.planner)
         self.external_methods = _uses_external_methods(self.planner.methods)
         self.has_external = bool(self.planner.external_calls) or self.external_methods
         if self.has_external and not supports_external:
