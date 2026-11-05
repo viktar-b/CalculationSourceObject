@@ -35,7 +35,7 @@ test('forwarding stays inspectable in quantity rows while authored aliases and c
 from cso_python import calculation, section, symbol
 @calculation(id="leaf", title="Area")
 @section(title="Area", root=True)
-def leaf(length: Annotated[float, symbol(glyph="l", description="Length", unit="m")], factor: Annotated[int, symbol(glyph="n", description="Factor", unit="")]):
+def leaf(length: Annotated[float, symbol(glyph="l", description="Length", unit="m")], factor: Annotated[int, symbol(glyph="n", description="Factor", unit="")], offset: Annotated[float, symbol(glyph="d", description="Offset", unit="m")]):
     area: Annotated[float, symbol(glyph="A", description="Area", unit="m^2")] = length * length
     return {"area": area}
 `,
@@ -48,9 +48,9 @@ from _cso_bindings.leaf import leaf
 @calculation(id="wrapper", title="Composition")
 @section(title="Composition", root=True)
 def wrapper(length: Annotated[float, symbol(glyph="l", description="Length", unit="m")]):
-    first = leaf(length=length, factor=2)
+    first = leaf(length=length, factor=2, offset=0.0000123456)
     longer: Annotated[float, symbol(glyph="l_{long}", description="Longer length", unit="m")] = length + 1
-    second = leaf(length=longer, factor=3)
+    second = leaf(length=longer, factor=3, offset=-0.0)
     renamed: Annotated[float, symbol(glyph="B", description="Review area", unit="m^2")] = first["area"]
     converted: Annotated[float, symbol(glyph="C", description="Area in square millimetres", unit="mm^2")] = renamed * 1000000
     __return_0: Annotated[float, symbol(glyph="D", description="Explicit legacy-looking name", unit="m^2")] = first["area"]
@@ -144,7 +144,12 @@ def empty():
     ).resolves.toBe(2);
     await expect(
       page.locator('[data-binding-origin="literal"]').allTextContents(),
-    ).resolves.toEqual(['First: Given 2', 'Second: Given 3']);
+    ).resolves.toEqual([
+      'First: Given 2',
+      'Second: Given 3',
+      'First: Given 1.23456e-05',
+      'Second: Given -0.0',
+    ]);
     const table = document.sections
       .flatMap((section) => section.items)
       .find((item) => item.kind === 'table');

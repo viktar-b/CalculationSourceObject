@@ -3,7 +3,6 @@ import { UnitMathBlock } from '../mathml/UnitMathBlock.tsx';
 import { getValueNodeByKey } from '@cs-object/core';
 import type { NumericKind, SheetSymbol } from '@cs-object/core';
 import type { ReactElement, ReactNode } from 'react';
-import { NumericalValue } from './NumericalValue.tsx';
 import { FormulaSheetCommentCell } from './cells/FormulaSheetCommentCell.tsx';
 import { FormulaSheetDescriptionCell } from './cells/FormulaSheetDescriptionCell.tsx';
 import { FormulaSheetSpacerCell } from './cells/FormulaSheetSpacerCell.tsx';
@@ -53,10 +52,8 @@ export const bindingOrigin = ({
     return (
       <span data-binding-origin="literal" data-binding-call={label}>
         {label ? `${label}: ` : ''}Given{' '}
-        <NumericalValue
-          value={root.value.value}
-          numericKind={root.value.numericKind}
-        />
+        {root.draft ||
+          (Object.is(root.value.value, -0) ? '-0' : String(root.value.value))}
       </span>
     );
   return undefined;

@@ -34,6 +34,8 @@ Keep each function's inputs and outputs in the standard indexed quantity rows,
 with the binding's origin in the comment cell. Preserve existing comments too.
 Helper input rows identify each explicit connection's source; multiple calls
 remain distinct.
+Literal connections show the complete supplied number without result-display
+rounding.
 Computed arguments still have a separate derivation.
 
 Direct forwarded returns use the existing captured quantity identity in case
