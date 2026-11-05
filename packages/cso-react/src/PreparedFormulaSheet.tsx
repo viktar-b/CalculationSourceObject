@@ -722,7 +722,7 @@ export const PreparedFormulaSheet = ({
                         data-node-key={result.nodeKey}
                         data-formula={result.value}
                       >
-                        {results.length > 1 && result.callPath ? (
+                        {result.callPath ? (
                           <span className="cso-result-status">
                             {readableName(result.callPath)}
                           </span>
@@ -793,7 +793,7 @@ export const PreparedFormulaSheet = ({
                             : undefined
                         }
                       >
-                        {results.length > 1 && result.callPath ? (
+                        {result.callPath ? (
                           <span className="cso-result-status">
                             {readableName(result.callPath)}
                           </span>

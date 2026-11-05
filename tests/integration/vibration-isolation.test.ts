@@ -139,6 +139,22 @@ for (const [name, roots] of [
         roots.length * 3,
       );
       if (name === 'compare') {
+        const helperChecks = (
+          html.match(
+            /<div[^>]*data-check-result="[^"]+"[^>]*>[\s\S]*?<\/div>/gu,
+          ) ?? []
+        ).filter((block) =>
+          block.includes(
+            'data-invocation-id="root/linear_soft/harmonic_response"',
+          ),
+        );
+        expect(helperChecks.length).toBeGreaterThan(0);
+        for (const block of helperChecks)
+          expect(block).toContain('Harmonic response');
+        const helperBranch = html.match(
+          /<div[^>]*data-branch-note="Linear \/ 20 Hz"[^>]*>[\s\S]*?<\/div>/u,
+        )?.[0];
+        expect(helperBranch).toContain('Harmonic response');
         expect(
           execution.applicabilityOutcomes?.some((outcome) => !outcome.value),
         ).toBe(true);
