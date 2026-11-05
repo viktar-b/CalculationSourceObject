@@ -66,6 +66,16 @@ const reference = (
   };
 };
 
+/** Keep names distinct from call bindings and their public output names. */
+const referenceKey = (node: FormulaNode): string | undefined => {
+  const ref = reference(node);
+  return ref.kind === 'output' && ref.call && ref.output
+    ? JSON.stringify([ref.call, ref.output])
+    : ref.kind === 'name'
+      ? ref.name
+      : undefined;
+};
+
 const literalNumber = (node: FormulaNode): number | undefined => {
   const literal = node.literal;
   if (
@@ -253,11 +263,16 @@ export function reproducePredicate(
     used.add(key);
     if (node.mode === 'LITERAL') return literalNumber(node);
     if (node.mode === 'SYMBOL') {
-      const name = reference(node).name;
+      const name = referenceKey(node);
       return name === undefined ? undefined : values.get(name);
     }
     const operation = functionId(node);
     const keys = argumentKeys(node);
+    if (operation === 'fg.cnd') {
+      const selected = predicate(keys[0] ?? '');
+      if (selected === undefined) return undefined;
+      return numberValue(keys[selected ? 1 : 2] ?? '');
+    }
     if (operation === 'fg.uminus') {
       const value = numberValue(keys[0] ?? '');
       return value === undefined ? undefined : -value;
@@ -356,6 +371,14 @@ const usedDependencies = (
     }
     const operation = functionId(node);
     const keys = argumentKeys(node);
+    if (
+      operation &&
+      (operation === 'fg.and' ||
+        operation === 'fg.or' ||
+        comparisons[operation])
+    ) {
+      return predicate(key) !== undefined;
+    }
     if (operation === 'fg.cnd') {
       const selected = predicate(keys[0] ?? '');
       if (selected === undefined) return false;
@@ -390,9 +413,9 @@ export function usedReferenceNames(
   return usedDependencies(
     nodes,
     rootKey,
-    (node) => reference(node).name,
+    (node) => referenceKey(node),
     (node) => {
-      const name = reference(node).name;
+      const name = referenceKey(node);
       return name === undefined ? undefined : values.get(name);
     },
   );

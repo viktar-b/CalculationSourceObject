@@ -105,7 +105,7 @@ function checkProject(name, expected, doubled, derivation) {
   );
   assert(html.includes('cso-symbol-row'));
   assert(
-    html.includes('External algorithm excluded from CSO formula verification.'),
+    html.includes('CSO does not check the formulas inside this external calculation.'),
   );
   assert.throws(
     () =>

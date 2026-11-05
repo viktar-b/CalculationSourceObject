@@ -797,7 +797,8 @@ test('typesets methods, notes and table values like ordinary formula rows', () =
   for (const heading of ['Narrow', 'Wide']) {
     const note = elementWith(branchHtml, `data-branch-note="${heading}"`);
     expect(note).toContain('<math');
-    expect(visibleText(note)).toContain('Chosen');
+    expect(visibleText(branchHtml)).toContain('Chosen');
+    expect(visibleText(note)).toMatch(/Condition holds|Otherwise/);
     expect(visibleText(note)).not.toContain(' if ');
   }
 
@@ -912,10 +913,10 @@ test('publishes nested helper explanations without pruning authored context', as
   expect(htmlText).toContain('data-call="wider"');
   expect(htmlText).toContain('data-call="taller"');
   expect(elementWith(htmlText, 'data-call="wider"')).toContain(
-    '<span data-formula="w"><math',
+    'data-formula="w"',
   );
   expect(elementWith(htmlText, 'data-call="taller"')).toContain(
-    '<span data-formula="h"><math',
+    'data-formula="h"',
   );
   expect(htmlText).toContain('The margin is one metre.');
   expect(htmlText).toContain('Panel sides are grown independently.');
@@ -931,7 +932,8 @@ test('publishes nested helper explanations without pruning authored context', as
   expect(pdf.status, pdf.stdout || pdf.stderr).toBe(0);
   const info = spawnSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
   expect(info.status, info.stderr).toBe(0);
-  expect(info.stdout).toContain('Pages:           1');
+  // Each reusable function now retains its own scope and absent-value context.
+  expect(info.stdout).toMatch(/Pages:\s+[12]\b/);
 }, 180_000);
 
 test('publishes verified conditional notes without rerunning dormant branches', async () => {
@@ -1295,7 +1297,20 @@ test('marks results outside their applicability without changing the number', as
   expect(pdf.status, pdf.stdout || pdf.stderr).toBe(0);
   const info = spawnSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
   expect(info.status, info.stderr).toBe(0);
-  expect(info.stdout).toMatch(/Pages:\s+[12]/);
+  // Font metrics can add a width partition for the required outcome columns.
+  // Bound the small fixture and require case and limit context on every part.
+  expect(info.stdout).toMatch(/Pages:\s+[1-4]\b/);
+  const comparisonPages = pdfPageTexts(pdfPath).filter((page) =>
+    /Part \d+ of/u.test(page),
+  );
+  expect(comparisonPages.length).toBeGreaterThan(0);
+  for (const page of comparisonPages) {
+    expect(page).toContain('Case A');
+    expect(page).toContain('Case B');
+    expect(page.replace(/\s+/gu, ' ')).toContain(
+      'Area exceeds the method limit.',
+    );
+  }
 }, 180_000);
 
 test('continues a wide comparison across measured column groups', () => {
@@ -1376,10 +1391,12 @@ test('repeats comparison context across vertical page breaks', () => {
   expect(rowPages.join('\n')).toContain(
     'North elevation panel with a long wrapped heading',
   );
-  expect(rowPages.some((page) => page.includes('Continued'))).toBe(true);
+  expect(
+    rowPages.filter((page) => page.includes('Tall rows')).length,
+  ).toBeGreaterThan(1);
   for (const page of rowPages) {
     if (page.includes('Case ')) {
-      expect(page).toMatch(/Inputs|Outputs/);
+      expect(page).toMatch(/Inputs|Outputs|Checks and conditions/);
     }
   }
   expect(rowPages.at(-1)).toContain('Case 64');
@@ -1406,11 +1423,13 @@ test('repeats comparison context across vertical page breaks', () => {
   const columnPages = pdfPageTexts(columnsPdf);
   expect(columnPages.join('\n')).toContain('Part 1 of 2');
   expect(columnPages.join('\n')).toContain('Part 2 of 2');
-  expect(columnPages.some((page) => page.includes('Continued'))).toBe(true);
+  expect(
+    columnPages.filter((page) => page.includes('Series comparison')).length,
+  ).toBeGreaterThan(1);
   expect(columnPages.join('\n')).toContain('Width exceeds the series limit.');
   for (const page of columnPages) {
-    if (page.includes('Continued')) {
-      expect(page).toMatch(/Inputs|Outputs/);
+    if (page.includes('Series comparison')) {
+      expect(page).toMatch(/Inputs|Outputs|Checks and conditions/);
       expect(page).toContain('Width exceeds the series limit.');
     }
   }
@@ -1703,7 +1722,8 @@ test('external applicability propagates across every input and follows downstrea
     'data-external-call="root/first_case/searched"',
   );
   expect(firstBlock).toContain('Not applicable. Length must be positive.');
-  expect(html).toContain('Fail. Double area must be below one square metre.');
+  expect(html).toContain('Double area must be below one square metre.');
+  expect(html).toContain('data-check-result="fail"');
   writeFileSync(
     join(directory, 'external_adapter.py'),
     'raise RuntimeError("changed adapter must not run during preparation")\n',

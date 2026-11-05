@@ -20,7 +20,9 @@ from typing import Any
 from .comparison import (
     collect_applicability_outcomes,
     collect_branch_outcomes,
+    collect_boolean_outcomes,
     collect_check_outcomes,
+    validate_boolean_placements,
 )
 from .exporter import authored_output_to_stderr
 from .glyphs import qualify_glyphs
@@ -85,17 +87,33 @@ class Execution:
         inputs: Json,
         *,
         supports_external: bool = True,
+        supports_booleans: bool = True,
     ):
         self.planner = Planner(source)
         self.root = self.planner.plan(
             self.planner.capture.entry, function, supplied=inputs
         )
+        validate_boolean_placements(self.planner)
         self.external_methods = _uses_external_methods(self.planner.methods)
         self.has_external = bool(self.planner.external_calls) or self.external_methods
         if self.has_external and not supports_external:
             raise SourceError(
                 "INCOMPATIBLE_CONTRACT",
                 "External functions require an execution consumer supporting protocol 4 and retained call evidence; standalone CSO export is unsupported",
+                stage="source",
+            )
+        def uses_booleans(plan):
+            return bool(plan.get("booleans")) or any(
+                uses_booleans(helper) for helper in plan.get("helpers", [])
+            )
+
+        self.has_booleans = any(
+            uses_booleans(method) for method in self.planner.methods
+        )
+        if self.has_booleans and not supports_booleans:
+            raise SourceError(
+                "INCOMPATIBLE_CONTRACT",
+                "Boolean report values require protocol 5 and retained execution evidence; standalone CSO export is unsupported",
                 stage="source",
             )
         qualify_glyphs(self.planner.invocations)
@@ -550,6 +568,12 @@ class Execution:
                     key=lambda item: (item[0].lower(), item[1]),
                 ),
             }
+        if self.has_booleans:
+            protocol = "5"
+            execution["cso"]["schemaVersion"] = "1.3.0"
+            boolean_outcomes = collect_boolean_outcomes(self.planner)
+            if boolean_outcomes:
+                execution["booleanOutcomes"] = boolean_outcomes
         return {
             "protocolVersion": protocol,
             "ok": True,
@@ -569,12 +593,14 @@ def versions() -> Json:
 
 
 def execute(
-    source: Path, function: str, inputs: Json, *, supports_external: bool = True
+    source: Path, function: str, inputs: Json, *,
+    supports_external: bool = True, supports_booleans: bool = True,
 ) -> Json:
     execution = Execution.__new__(Execution)
     try:
         execution.__init__(
-            source, function, inputs, supports_external=supports_external
+            source, function, inputs,
+            supports_external=supports_external, supports_booleans=supports_booleans,
         )
         return execution.response()
     except (SourceError, OSError, ValueError, UnicodeError, RuntimeError) as error:
@@ -751,7 +777,10 @@ def execute_from_argv(argv: list[str]) -> int:
                 args.source,
                 args.function[0],
                 inputs,
-                supports_external="4" in args.supported_execution_protocol,
+                supports_external=any(
+                    version in args.supported_execution_protocol for version in ("4", "5")
+                ),
+                supports_booleans="5" in args.supported_execution_protocol,
             )
     except (SourceError, ValueError) as error:
         diagnostic = (

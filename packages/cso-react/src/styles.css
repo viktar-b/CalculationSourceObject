@@ -131,17 +131,29 @@ math {
 .cso-symbol-row { break-inside: avoid; page-break-inside: avoid; }
 .cso-symbol-placement { overflow-wrap: anywhere; }
 .cso-method, .cso-comparison { margin: 3mm 0 5mm; }
+.cso-method, .cso-method-helper { border-left: 2px solid #667085; padding-left: 3mm; }
+.cso-document .cso-symbolic-note { font-size: 11px; color: #475467; margin: 1mm 0 3mm; }
+.cso-procedure-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.cso-procedure-table > thead { display: table-header-group; }
+.cso-procedure-table > thead > tr > th { text-align: left; font-weight: 400; }
+.cso-procedure-table > tbody > tr > td { padding: 0; }
+.cso-symbolic-value { width: 100%; text-align: center; color: #667085; }
+.cso-result-status { display: block; max-width: 24ch; white-space: normal; font-size: 10px; text-align: left; color: #475467; }
 .cso-external-call { margin: 3mm 0 5mm; }
 .cso-external-call table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
 .cso-external-call th, .cso-external-call td { border: 1px solid #d0d5dd; padding: 2mm; overflow-wrap: anywhere; text-align: left; }
 .cso-external-call thead { display: table-header-group; }
 .cso-external-call thead th { background: #f8fafc; }
+.cso-external-call thead p { font-weight: 400; font-size: 11px; }
 .cso-external-call h3, .cso-external-call p { margin: 0 0 1mm; }
 .cso-external-call tr { break-inside: avoid; }
+.cso-external-quantities { break-inside: avoid; }
 .cso-external-call td:last-child { font-variant-numeric: tabular-nums; }
 .cso-external-call .cso-external-quantity-cell { padding: 0; }
 .cso-external-coverage { margin-top: 2mm !important; font-size: 10px; }
+.cso-evidence-note { margin-top: 5mm; font-size: 10px; color: #475467; }
 .cso-method h3, .cso-comparison h3 { font-size: 13px; font-weight: 650; margin: 0 0 2mm; }
+.cso-document h3, .cso-document h4, .cso-document h5 { break-after: avoid; }
 .cso-method-quantity, .cso-method-text, .cso-method-call, .cso-branch-note { margin: 1mm 0; }
 .cso-method-quantity math, .cso-method-call math, .cso-branch-note math { vertical-align: middle; }
 .cso-method-helper, .cso-method-section { margin: 2mm 0 2mm 4mm; }
@@ -152,20 +164,24 @@ math {
 .cso-comparison table { width: max-content; min-width: 100%; border-collapse: collapse; table-layout: auto; font-size: 11px; }
 .cso-comparison th, .cso-comparison td { border: 1px solid #d0d5dd; padding: 1.75mm 2.5mm; overflow-wrap: anywhere; white-space: pre-wrap; vertical-align: middle; }
 .cso-comparison th { text-align: left; font-weight: 600; }
+.cso-comparison th[data-comparison-context] { font-weight: 400; }
+.cso-comparison [data-comparison-context] .cso-result-status, .cso-comparison [data-comparison-context] .cso-comparison-description { max-width: none; }
 .cso-comparison thead th { background: #f8fafc; }
 .cso-comparison tbody th[data-quantity] { font-weight: 400; }
 .cso-comparison td { text-align: right; font-variant-numeric: tabular-nums; }
+.cso-comparison td[data-outcome-kind] { text-align: center; white-space: normal; }
 .cso-comparison th[data-case-heading] { text-align: right; }
 .cso-comparison tbody th[data-case-heading] { text-align: left; }
 .cso-comparison th[scope="colgroup"] { background: #f2f4f7; color: #344054; font-size: 10px; }
 .cso-comparison [data-comparison-label] { position: sticky; left: 0; z-index: 1; background: white; }
 .cso-comparison thead [data-comparison-label] { background: #f8fafc; }
 .cso-comparison-quantity { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 3mm; }
+.cso-comparison-description { display: block; max-width: 36ch; white-space: pre-wrap; }
 .cso-comparison-notation { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: 2mm; white-space: nowrap; }
 .cso-comparison-unit { min-width: 2.5em; color: #475467; }
 .cso-comparison thead .cso-comparison-quantity { grid-template-columns: 1fr; gap: 1.5mm; }
 .cso-comparison thead .cso-comparison-notation { justify-content: flex-start; }
-.cso-comparison td[data-applicability="not-applicable"] { text-align: left; color: #475467; }
+.cso-comparison td[data-applicability="not-applicable"] { color: #475467; }
 .cso-comparison math { flex-wrap: nowrap !important; white-space: nowrap; }
 .cso-comparison-scroll { overflow-x: auto; max-width: 100%; }
 .cso-comparison-empty { font-style: italic; }
@@ -174,11 +190,10 @@ math {
 }
 @media print {
   .cso-comparison-scroll, .cso-comparison > .cso-branch-note { display: none; }
-  .cso-comparison-part { break-inside: avoid; }
-  .cso-comparison-part:has(.cso-comparison-slice + .cso-comparison-slice) { break-inside: auto; }
-  .cso-comparison-slice { break-inside: avoid; }
-  .cso-comparison-slice + .cso-comparison-slice { break-before: page; }
-  .cso-comparison-part + .cso-comparison-part { break-before: page; margin-top: 4mm; }
+  .cso-comparison:has(.cso-comparison-parts) > h3 { display: none; }
+  .cso-comparison-part, .cso-comparison-slice { break-inside: auto; }
+  .cso-comparison-part + .cso-comparison-part { margin-top: 4mm; }
+  .cso-comparison-part tr { break-inside: avoid; }
   .cso-comparison-part table { width: 100%; }
   .cso-comparison th, .cso-comparison td { padding-block: 1mm; }
   [data-formula-sheet] { width: var(--cso-print-content-width) !important; min-width: 0 !important; min-height: 0 !important; padding: 0 !important; border: none !important; display: block !important; }

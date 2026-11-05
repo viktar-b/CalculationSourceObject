@@ -27,6 +27,44 @@ is not a LaTeX engine; commands such as `\mathrm` and `\frac` are unsupported.
 
 ## Inputs and reusable calculations
 
+### Report components and prose
+
+Calculation reports use eight fixed components. Compose these components rather
+than adding a new visual style for an individual calculation.
+
+| Component | Use |
+| --- | --- |
+| Report header | Calculation title and essential identification |
+| Section | Heading and content in authored order |
+| Reusable calculation | Named procedure with its own left rule, including nested functions |
+| Quantity row | Index, description, variable, value, unit and comment |
+| Derivation row | Formula and, where evaluated, its numerical substitution |
+| Text note | Engineering assumptions, reasoning, references and qualifications |
+| Figure | Authored engineering image with caption and alternative text |
+| Table | Compared quantities or external inputs, procedure and outputs |
+
+Use titles a reader can understand without programming knowledge. Prefer
+"Calculation procedure" to "method" in report prose. The source declaration
+remains `method(...)`. Keep meaningful engineering names and qualified notation.
+
+Each reusable calculation definition, including a nested calculation, has its
+own left rule. External-function tables use their grid without a separate rule,
+both within reusable definitions and for evaluated calls.
+Definition quantity rows retain the value column and display × where no case
+value is defined. Each function explains
+this briefly: "Reusable function for downstream use. Values are not defined yet."
+The explanation also applies when no downstream cases have run. Zero is a value,
+and an inapplicable computed number retains its separate qualification.
+
+Write prose for engineering assumptions, derivations, choices and limitations.
+Use fixed headings, rows and cells to explain report structure. Omit tautological
+sentences such as "The method defines the calculation" or instructions announcing
+that inputs and results follow. Keep the brief absent-value explanation with its
+reusable function. Use the existing figure component for engineering images.
+
+The [rendering guide](rendering.md#choose-verification-by-change) owns layout
+checks and [inspection](rendering.md#printing-and-inspection).
+
 ### Reuse a calculation
 
 Start with the [two-panel walkthrough](../examples/two-panel/README.md).
@@ -114,6 +152,56 @@ version 3. Protocol 2 and prepared document version 2 remain valid when the
 source has no method or table. Rebuild a prepared document from the retained
 execution with `prepareExecutionDocument`. Do not rebind an older execution to
 a new numerical run in order to add a method.
+
+### Boolean values and table outcomes
+
+Use `boolean(...)` for a True/False fact that a table should show. For example,
+inside a reusable calculation:
+
+```python
+boolean(id="cubic-spring", description="Cubic spring included", predicate=cubic_coefficient > 0)
+```
+
+The predicate accepts the supported numeric comparisons with `and`/`or`, or a
+literal `True` or `False`. Give the declaration a meaningful description.
+This declaration does not create a numerical parameter or public numeric output.
+Numeric parameters, outputs and external adapter results retain their existing
+`int`/`float` requirements and reject Python booleans.
+
+`table(..., booleans=("cubic-spring",))` selects Boolean declarations by ID from
+its reusable calculation. Omit `booleans` to include all of them, or use `()` to
+hide optional root Boolean rows. Boolean facts from nested reusable functions
+remain visible for each case, along with their complete definitions. Required
+checks, applicability and selected rules remain visible regardless of row selection.
+
+Boolean facts require grouped table cases. A Boolean-declaring calculation may
+be used as a table case or inside its reusable functions; an ungrouped invocation
+fails before execution with `BOOLEAN_REQUIRES_TABLE`. Static procedures and empty
+comparisons remain supported. This prevents silently discarding report facts.
+
+| Table cell | Meaning and display |
+| --- | --- |
+| Number | Recorded number with its declared unit; retain it beside any qualification |
+| Undefined reusable value | × with the brief reason in that function's scope |
+| Boolean | True or False, without implying acceptance |
+| Engineering check | Pass or Fail against the authored criterion; Not applicable when qualified |
+| Applicability | Applicable or Not applicable, with its condition and originating reason |
+| Selected rule | The chosen expression and the condition's recorded True/False outcome |
+
+Use readable case headings, indexed quantity labels, qualified variables and
+units. Keep descriptions and predicates together. Wrap prose at normal report
+size; keep each formula legible. Align numeric cells by value and outcome cells
+consistently. Use explicit status words so meaning survives grayscale printing.
+Every cell remains bound to its case and call, including repeated helper calls.
+Both table orientations retain these roles and repeat identifying headings in
+printed continuations. No cases means "No cases evaluated", not a successful
+verdict. See the [Boolean report decision](adr/0014-boolean-report-values.md).
+
+Boolean declarations use execution protocol 5, CSO schema `1.3.0` and prepared
+document version 5. Update Python, core, React and CLI together before using this
+feature. Older captures retain their existing versions and meaning. A consumer
+that supports only protocol 4 rejects Boolean captures before numerical execution.
+Math-only CSO export rejects Boolean report evidence rather than dropping it.
 
 ### Parameters and public outputs
 
@@ -328,8 +416,8 @@ Only the selected conditional branch is evaluated.
 
 `and` / `or` are supported only between comparisons in conditional tests.
 Numeric selection expressions such as `quantity or fallback`, mixed numeric and
-comparison operands, Boolean quantities and bare numeric conditional tests are
-rejected. Core checks every Value tree node, including
+comparison operands, Boolean numerical quantities and bare numeric conditional
+tests are rejected. Use the separate `boolean(...)` report declaration for table facts. Core checks every Value tree node, including
 dormant and disconnected nodes, for supported operations, operand roles,
 numeric literals, references and cycles before evaluation.
 Every captured literal must satisfy the numeric kind and range contract, even

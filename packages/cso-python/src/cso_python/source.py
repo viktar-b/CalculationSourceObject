@@ -26,6 +26,7 @@ HELPERS = {
     "table",
     "check",
     "applicable",
+    "boolean",
     "documented_result",
     "calculation_call",
     "text",

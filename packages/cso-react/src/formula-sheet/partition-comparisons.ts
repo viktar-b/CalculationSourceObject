@@ -293,13 +293,6 @@ export function renderComparisonParts(
       part.className = 'cso-comparison-part';
       part.setAttribute('data-comparison-part', String(partIndex + 1));
       part.setAttribute('data-part-count', String(plan.groups.length));
-      if (plan.groups.length > 1) {
-        const label = document.createElement('p');
-        label.className = 'cso-branch-note';
-        label.setAttribute('data-comparison-part-label', '');
-        label.textContent = `Part ${partIndex + 1} of ${plan.groups.length}`;
-        part.appendChild(label);
-      }
       for (const note of comparison.querySelectorAll(
         ':scope > p.cso-branch-note',
       )) {
@@ -314,6 +307,72 @@ export function renderComparisonParts(
           if (!keepColumn(cell, kept)) cell.remove();
         }
       }
+      const columns = document.createElement('colgroup');
+      const widths = [
+        plan.labelWidth,
+        ...group.map((index) => plan.columnWidths[index] || 0),
+      ];
+      const dataWidth = widths.slice(1).reduce((sum, width) => sum + width, 0);
+      widths.forEach((width, index) => {
+        const column = document.createElement('col');
+        column.style.width = `${index === 0 ? width : dataWidth ? (width / dataWidth) * (plan.availableWidth - plan.labelWidth) : 0}px`;
+        columns.appendChild(column);
+      });
+      clone.prepend(columns);
+      clone.style.tableLayout = 'fixed';
+      const contextRow = document.createElement('tr');
+      const context = document.createElement('th');
+      context.colSpan = group.length + 1;
+      context.setAttribute('data-comparison-context', '');
+      const title = document.createElement('strong');
+      title.textContent =
+        comparison.querySelector(':scope > h3')?.textContent || 'Comparison';
+      if (plan.groups.length > 1)
+        title.textContent += `. Part ${partIndex + 1} of ${plan.groups.length}`;
+      context.appendChild(title);
+      for (const limit of table.querySelectorAll(
+        'th[data-outcome-kind="applicability"]',
+      )) {
+        const note = document.createElement('div');
+        note.className = 'cso-result-status';
+        note.appendChild(document.createTextNode('Applicability limit '));
+        note.appendChild(
+          limit.firstElementChild?.cloneNode(true) ||
+            document.createTextNode(''),
+        );
+        context.appendChild(note);
+      }
+      if (comparison.getAttribute('data-cases-axis') === 'columns') {
+        const labels: string[] = [];
+        let group = '';
+        let indexes: string[] = [];
+        const save = () => {
+          if (group && indexes.length)
+            labels.push(
+              `${group} ${indexes[0]}-${indexes[indexes.length - 1]}`,
+            );
+        };
+        for (const row of clone.tBodies[0]?.rows || []) {
+          const banner = row.querySelector('[data-comparison-banner]');
+          if (banner) {
+            save();
+            group = banner.textContent || '';
+            indexes = [];
+          } else {
+            const index = row
+              .querySelector('[data-formula-sheet-item-index]')
+              ?.textContent?.replace('.', '');
+            if (index) indexes.push(index);
+          }
+        }
+        save();
+        const key = document.createElement('div');
+        key.className = 'cso-result-status';
+        key.textContent = labels.join(' · ');
+        context.appendChild(key);
+      }
+      contextRow.appendChild(context);
+      clone.tHead?.prepend(contextRow);
       let rowNumber = 0;
       for (const row of clone.querySelectorAll('tr')) {
         const label = row.querySelector<HTMLElement>('[data-comparison-label]');
@@ -339,7 +398,7 @@ export function renderComparisonParts(
       part.appendChild(clone);
       parts.appendChild(part);
     });
-    const split = splitComparisonParts(parts, comparison);
+    const split = splitComparisonParts(parts);
     if (split) {
       const overflowPx = Math.max(0, split.required - split.available);
       const layout: ComparisonLayoutDiagnostic['layout'] = {
@@ -370,175 +429,46 @@ export function renderComparisonParts(
   // Nested so page.evaluate serializes the helpers with this function.
   function splitComparisonParts(
     parts: HTMLElement,
-    comparison: Element,
   ): { row: number; required: number; available: number } | undefined {
-    function continuationAllowance(part: HTMLElement): number {
-      const sample = document.createElement('p');
-      sample.className = 'cso-branch-note';
-      sample.textContent = 'Continued';
-      part.appendChild(sample);
-      const height = sample.getBoundingClientRect().height;
-      sample.remove();
-      return height;
-    }
+    // Measure readable rows, then let native table headers follow page flow.
+    // The repeating header retains each group's indexed range and qualifications.
     const frame = document.createElement('div');
     frame.className = 'cso-comparison';
-    frame.style.position = 'absolute';
-    frame.style.left = '0';
-    frame.style.top = '0';
-    frame.style.display = 'block';
-    frame.style.visibility = 'hidden';
-    const contentWidth =
+    Object.assign(frame.style, {
+      position: 'absolute',
+      left: '0',
+      top: '0',
+      visibility: 'hidden',
+    });
+    frame.style.width =
       getComputedStyle(document.documentElement)
         .getPropertyValue('--cso-print-content-width')
         .trim() || '190mm';
-    frame.style.width = contentWidth;
     const probe = document.createElement('div');
     probe.style.height = 'calc(297mm - 24mm)';
     frame.appendChild(probe);
-    const host =
-      document.querySelector('[data-formula-sheet]') || document.body;
-    host.appendChild(frame);
+    (
+      document.querySelector('[data-formula-sheet]') || document.body
+    ).appendChild(frame);
     frame.appendChild(parts);
-    const availableHeight = probe.getBoundingClientRect().height;
+    const available = probe.getBoundingClientRect().height;
     probe.remove();
-    const sheet = comparison.closest('[data-formula-sheet]') || document.body;
-    const offset = Math.max(
-      0,
-      comparison.getBoundingClientRect().bottom -
-        sheet.getBoundingClientRect().top,
-    );
-    const usedOnPage = availableHeight > 0 ? offset % availableHeight : 0;
-    let opening = Math.max(0, availableHeight - usedOnPage);
     let unfit: { row: number; required: number; available: number } | undefined;
-    for (const part of [
-      ...parts.querySelectorAll<HTMLElement>(':scope > section'),
-    ]) {
+    for (const part of parts.querySelectorAll<HTMLElement>(
+      ':scope > section',
+    )) {
       const table = part.querySelector('table');
-      const body = table?.querySelector('tbody');
+      const body = table?.tBodies[0];
       if (!table || !body) continue;
-      table.style.width = '100%';
-      const thead = table.querySelector('thead');
-      let chromeHeight =
-        (thead?.getBoundingClientRect().height ?? 0) +
-        continuationAllowance(part);
-      const bodyRows = [
-        ...body.querySelectorAll<HTMLTableRowElement>(':scope > tr'),
-      ];
-      const notes = [
-        ...part.querySelectorAll<HTMLElement>(':scope > p.cso-branch-note'),
-      ].filter((note) => !note.hasAttribute('data-comparison-part-label'));
-      const rowsAxis = comparison.getAttribute('data-cases-axis') === 'rows';
-      const inputs = bodyRows.map((row) => ({
-        height: row.getBoundingClientRect().height,
-        repeat: row.querySelector('[data-comparison-banner]') !== null,
-      }));
-      if (!rowsAxis) {
-        for (const note of notes)
-          chromeHeight += note.getBoundingClientRect().height;
-      } else {
-        for (const note of notes) {
-          const heading = note.getAttribute('data-case');
-          const noteHeight = note.getBoundingClientRect().height;
-          if (!heading) {
-            chromeHeight += noteHeight;
-            continue;
-          }
-          const match = bodyRows.find((row) =>
-            [...row.querySelectorAll('[data-case-heading]')].some(
-              (cell) => cell.getAttribute('data-case-heading') === heading,
-            ),
-          );
-          const input = match ? inputs[bodyRows.indexOf(match)] : undefined;
-          if (input && !input.repeat) input.height += noteHeight;
-          else chromeHeight += noteHeight;
-        }
-      }
-      const partitioned = rowPartitioner(
-        inputs,
-        chromeHeight,
-        availableHeight,
-        opening,
+      const check = rowPartitioner(
+        [...body.rows].map((row) => ({
+          height: row.getBoundingClientRect().height,
+          repeat: Boolean(row.querySelector('[data-comparison-banner]')),
+        })),
+        table.tHead?.getBoundingClientRect().height || 0,
+        available,
       );
-      opening = availableHeight;
-      if (partitioned.unfit) {
-        unfit = partitioned.unfit;
-        break;
-      }
-      if (partitioned.groups.length < 2) continue;
-      const label = part.querySelector('[data-comparison-part-label]');
-      if (label) label.remove();
-      for (const note of notes) note.remove();
-      table.remove();
-      partitioned.groups.forEach((indexes, sliceIndex) => {
-        const slice = document.createElement('section');
-        slice.className = 'cso-comparison-slice';
-        slice.setAttribute('data-comparison-slice', String(sliceIndex + 1));
-        slice.setAttribute(
-          'data-comparison-slice-count',
-          String(partitioned.groups.length),
-        );
-        if (sliceIndex === 0 && label) slice.appendChild(label);
-        if (sliceIndex > 0) {
-          const continued = document.createElement('p');
-          continued.className = 'cso-branch-note';
-          continued.setAttribute('data-comparison-continued', '');
-          continued.textContent = 'Continued';
-          slice.appendChild(continued);
-        }
-        const keptRows = indexes
-          .map((index) => bodyRows[index])
-          .filter((row) => row);
-        for (const note of notes) {
-          const heading = note.getAttribute('data-case');
-          const matches =
-            !rowsAxis ||
-            !heading ||
-            keptRows.some(
-              (row) =>
-                row &&
-                [...row.querySelectorAll('[data-case-heading]')].some(
-                  (cell) => cell.getAttribute('data-case-heading') === heading,
-                ),
-            );
-          if (matches) slice.appendChild(note.cloneNode(true));
-        }
-        const sliceTable = table.cloneNode(true) as HTMLTableElement;
-        const sliceBody = sliceTable.querySelector('tbody');
-        const sliceRows = sliceBody
-          ? [...sliceBody.querySelectorAll<HTMLTableRowElement>(':scope > tr')]
-          : [];
-        sliceRows.forEach((row, index) => {
-          if (!indexes.includes(index)) row.remove();
-        });
-        for (const cell of sliceTable.querySelectorAll<HTMLElement>('[id]')) {
-          cell.removeAttribute('id');
-        }
-        let rowNumber = 0;
-        for (const row of sliceTable.querySelectorAll('tr')) {
-          const rowLabel = row.querySelector<HTMLElement>(
-            '[data-comparison-label]',
-          );
-          if (!rowLabel) continue;
-          const rowId = `${table.id || 'cso-row'}-s${sliceIndex}-r${rowNumber}`;
-          rowNumber += 1;
-          rowLabel.id = rowId;
-          for (const cell of row.querySelectorAll<HTMLTableCellElement>(
-            '[data-comparison-column]',
-          )) {
-            const column = cell.getAttribute('data-comparison-column');
-            const header = sliceTable.querySelector<HTMLElement>(
-              `thead [data-comparison-column="${column}"]`,
-            );
-            if (header && !header.id) header.id = `${rowId}-c${column}`;
-            if (cell.tagName === 'TD' && header?.id) {
-              cell.setAttribute('headers', `${rowId} ${header.id}`);
-            }
-          }
-        }
-        slice.appendChild(sliceTable);
-        part.appendChild(slice);
-      });
+      if (check.unfit) unfit = check.unfit;
     }
     frame.remove();
     return unfit;

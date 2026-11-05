@@ -123,10 +123,10 @@ test('external call pages repeat their identity and retain all indexed quantitie
       )
     )
       continue;
-    expect(page).toContain('evaluated');
+    expect(page).toContain('Evaluated');
     expect(page).toContain('External source: adapter.py, evaluate');
     expect(page.replace(/\s+/gu, ' ')).toContain(
-      'External algorithm excluded from CSO formula verification.',
+      'CSO does not check the formulas inside this external calculation.',
     );
   }
   expect(readFileSync(fixture.callsPath, 'utf8')).toBe('called\n');
@@ -205,13 +205,14 @@ test('publishes complete mixed method and grouped-case external blocks from one 
   const rawText = pageTexts(pdf, 'raw').join('\n').replace(/\s+/gu, ' ');
   expect(text).toContain('How the external calculation is used');
   expect(text).toContain('Selected external results');
-  expect(text).toContain('First / inner_case / searched');
-  expect(text).toContain('Second / inner_case / searched');
+  expect(text).toContain('First / inner case / searched');
+  expect(text).toContain('Second / inner case / searched');
   expect(
     rawText
       .replace(/\s+/gu, '')
       .match(/Keepthisdiagnosticevenwhenthecomparisonomitsit\./gu),
   ).toHaveLength(3);
-  expect(text).toContain('Fail. Double area must be below one square metre.');
+  expect(text).toContain('Double area must be below one square metre:');
+  expect(text).toContain('Fail');
   retain('mixed', project);
 }, 120_000);

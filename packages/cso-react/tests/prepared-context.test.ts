@@ -2,10 +2,7 @@ import {
   CalculationSourceObjectSchema,
   PreparedDocumentSchema,
 } from '@cs-object/core';
-import {
-  PreparedFormulaSheet,
-  prepareLegacyDocument,
-} from '@cs-object/react';
+import { PreparedFormulaSheet, prepareLegacyDocument } from '@cs-object/react';
 import React, { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
@@ -172,8 +169,12 @@ describe('prepared engineering context', () => {
         showSourceDetails: false,
       }),
     );
-    expect(full).toContain('Development preservation rendering.');
-    expect(compact).not.toContain('Development preservation rendering.');
+    expect(full).toContain(
+      'Preview only. Numerical agreement has not been verified.',
+    );
+    expect(compact).not.toContain(
+      'Preview only. Numerical agreement has not been verified.',
+    );
     expect(compact.slice(compact.indexOf('</header>'))).toBe(
       full.slice(full.indexOf('</header>')),
     );

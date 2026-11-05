@@ -256,8 +256,10 @@ test('explains a dependency shared by direct and nested calls once while keeping
     table.engineeringChecks?.flatMap((check) => check.results),
   ).toHaveLength(6);
   expect(table.branchNotes).toHaveLength(6);
-  expect(html).toContain('First / first / first');
-  expect(html).toContain('First / second');
+  for (const outcome of execution.checkOutcomes ?? [])
+    expect(html).toContain(`data-invocation-id="${outcome.invocationId}"`);
+  expect(html).toContain('First / first');
+  expect(html).toContain('data-case="Second"');
 });
 
 test('preserves method and helper context and visible outcomes with hidden quantities in both orientations', () => {
@@ -285,12 +287,14 @@ test('preserves method and helper context and visible outcomes with hidden quant
         target === 'wrapper' ? [false, false, true, true] : [false, true],
       );
       expect(table.branchNotes).toHaveLength(target === 'wrapper' ? 4 : 2);
-      expect(html).toMatch(/First[^<]*.*Fail\./);
-      expect(html).toMatch(/Second[^<]*.*Pass\./);
+      expect(html).toMatch(/data-case="First"[^>]*data-check-result="fail"/);
+      expect(html).toMatch(/data-case="Second"[^>]*data-check-result="pass"/);
       if (target === 'wrapper') {
         expect(html).toContain('Both rectangles use the same dimensions.');
-        expect(html).toContain('First / first');
-        expect(html).toContain('First / second');
+        for (const outcome of execution.checkOutcomes ?? [])
+          expect(html).toContain(
+            `data-invocation-id="${outcome.invocationId}"`,
+          );
         const tampered = structuredClone(document);
         const method = tampered.sections
           .flatMap((section) => section.items)

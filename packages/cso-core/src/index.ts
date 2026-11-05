@@ -127,6 +127,7 @@ export {
 } from './sheet-model/literals.ts';
 export { assertNever } from './shared/assertNever.ts';
 export { formatNumerical } from './shared/formatNumerical.ts';
+export type { NumericKind } from './contracts/numbers.ts';
 
 export { scopedGlyph, symbolDisplayIdentity } from './contracts/glyphs.ts';
 export { notationIdentity } from './notation/identity.ts';
@@ -270,3 +271,9 @@ export {
 } from './contracts/definition.ts';
 
 export { methodInvocationBindings } from './verification/method-bindings.ts';
+
+export { tableOutcomeRows } from './verification/table-outcomes.ts';
+export {
+  PreparedOutcomeRowSchema,
+  type PreparedOutcomeRow,
+} from './contracts/table-outcomes.ts';

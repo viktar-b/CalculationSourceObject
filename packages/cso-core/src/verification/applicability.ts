@@ -27,6 +27,7 @@ const append = (current: readonly string[], reason: string): string[] =>
 export function deriveApplicability(execution: ExecutionPayload): {
   readonly reasonsBySymbolId: ReadonlyMap<string, readonly string[]>;
   readonly reasonsByCheck: ReadonlyMap<string, readonly string[]>;
+  readonly reasonsByApplicability: ReadonlyMap<string, readonly string[]>;
 } {
   const plans = (execution.methods ?? []) as readonly ApplicabilityPlan[];
   const reasons = new Map<string, string[]>();
@@ -54,6 +55,19 @@ export function deriveApplicability(execution: ExecutionPayload): {
       const value = invocation.resolvedInputs[binding.parameterName];
       if (typeof value === 'number') {
         values.set(binding.parameterName, value);
+      }
+    }
+    for (const child of execution.invocations) {
+      if (
+        !('parentInvocationId' in child) ||
+        child.parentInvocationId !== invocation.id
+      )
+        continue;
+      for (const output of execution.authoring?.outputs ?? []) {
+        if (output.invocationId !== child.id) continue;
+        const key = JSON.stringify([child.callBindingName, output.name]);
+        names.set(key, output.symbolId);
+        values.set(key, output.value);
       }
     }
     namesByInvocation.set(invocation.id, names);
@@ -118,10 +132,20 @@ export function deriveApplicability(execution: ExecutionPayload): {
     }
   }
   const checkReasons = new Map<string, string[]>();
+  const applicabilityReasons = new Map<string, string[]>();
   const recordCheck = (plan: ApplicabilityPlan, invocationId: string): void => {
     const names = namesByInvocation.get(invocationId);
     const values = valuesByName.get(invocationId) ?? new Map();
-    for (const check of plan.checks ?? []) {
+    for (const { condition: check, into } of [
+      ...(plan.checks ?? []).map((condition) => ({
+        condition,
+        into: checkReasons,
+      })),
+      ...(plan.applicability ?? []).map((condition) => ({
+        condition,
+        into: applicabilityReasons,
+      })),
+    ]) {
       const collected: string[] = [];
       const absorb = (symbolId: string | undefined) => {
         if (!symbolId) return;
@@ -138,7 +162,7 @@ export function deriveApplicability(execution: ExecutionPayload): {
       );
       for (const name of used ?? []) absorb(names?.get(name));
       if (collected.length > 0) {
-        checkReasons.set(`${invocationId}|${check.id}`, collected);
+        into.set(`${invocationId}|${check.id}`, collected);
       }
     }
   };
@@ -154,5 +178,9 @@ export function deriveApplicability(execution: ExecutionPayload): {
     };
     for (const plan of plans) walkPlans(plan);
   }
-  return { reasonsBySymbolId: reasons, reasonsByCheck: checkReasons };
+  return {
+    reasonsBySymbolId: reasons,
+    reasonsByCheck: checkReasons,
+    reasonsByApplicability: applicabilityReasons,
+  };
 }

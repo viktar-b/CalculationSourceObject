@@ -267,6 +267,11 @@ export const validateMethodBindings = (
           ...methodCalls(plan.content),
           ...methodExternalCalls(plan.content),
         ].flatMap((call) => call.inputs.map((input) => input.nodes)),
+        ...(plan.booleans ?? []).flatMap((condition) =>
+          condition.expression.kind === 'predicate'
+            ? [condition.expression.nodes]
+            : [],
+        ),
         ...(plan.checks ?? []).map((check) => check.nodes),
         ...(plan.applicability ?? []).map((condition) => condition.nodes),
       ];

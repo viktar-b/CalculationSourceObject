@@ -34,6 +34,8 @@ export function runPythonExecution(
       stringifyJson(options.inputs),
       '--supported-execution-protocol',
       '4',
+      '--supported-execution-protocol',
+      '5',
     ],
     maxBuffer: 64 * 1024 * 1024,
     timeout: timeoutMs ?? options.executionTimeoutMs,

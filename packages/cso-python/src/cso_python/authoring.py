@@ -128,6 +128,10 @@ def check(
     """Record an engineering criterion without changing the numeric result."""
 
 
+def boolean(*, id: str, description: str, predicate: bool) -> None:
+    """Record a Boolean value without assigning an engineering verdict."""
+
+
 def applicable(
     *,
     id: str,
@@ -146,6 +150,7 @@ def table(
     cases: dict[str, Any],
     inputs: tuple[str, ...] | None = None,
     outputs: tuple[str, ...] | None = None,
+    booleans: tuple[str, ...] | None = None,
     cases_axis: str = "columns",
     column_cap: int | None = None,
 ) -> None:

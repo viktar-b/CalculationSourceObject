@@ -1009,7 +1009,7 @@ class Planner:
             elif (
                 isinstance(node, ast.Expr)
                 and isinstance(node.value, ast.Call)
-                and authoring_name(node.value.func) == "applicable"
+                and authoring_name(node.value.func) in {"applicable", "boolean"}
             ):
                 continue
             elif (

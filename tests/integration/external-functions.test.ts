@@ -122,7 +122,7 @@ test('captured external results supply downstream formula authorities with expli
   );
   expect(html).toContain('Square the supplied length.');
   expect(html).toContain(
-    'External algorithm excluded from CSO formula verification.',
+    'CSO does not check the formulas inside this external calculation.',
   );
   expect(html).toContain('data-external-quantity="count"');
   expect(html).toContain('External-result consistency: passed');

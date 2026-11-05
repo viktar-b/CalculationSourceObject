@@ -11,6 +11,7 @@ and human engineering approval.
 - Before creating or modifying `.cso.py` sources, read [authoring](docs/authoring.md).
   It defines descriptive names, compact qualified glyphs, shared metadata and
   reference-rebinding rules. Apply the same notation to diagram labels.
+  For report prose and visual components, use its report component guidance.
 - Before changing package ownership or execution flow, read [the code map](docs/code-map.md),
   [CONTEXT.md](CONTEXT.md) and the relevant [ADRs](docs/adr/).
 - For document content, notation, layout or print changes, use

@@ -230,7 +230,10 @@ export const createSheetFromCalculationSourceObject = (
   document: CalculationSourceObject,
   options: ValueTreeSheetOptions,
 ): ValueTreeSheet => {
-  if (document.schemaVersion === '1.2.0') {
+  if (
+    document.schemaVersion === '1.2.0' ||
+    document.schemaVersion === '1.3.0'
+  ) {
     throw new Error(
       'External-call evidence cannot be preserved in a math-only sheet or generated Python. Use retained evidence or prepared HTML/PDF.',
     );
