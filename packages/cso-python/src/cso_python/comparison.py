@@ -530,6 +530,17 @@ def _walk_steps(
 ) -> None:
     for step in steps:
         node = step.node
+        if isinstance(node, ast.Assert):
+            from .source_plan import input_precondition_text
+
+            content.append(
+                {
+                    "kind": "text",
+                    "localId": f"input-precondition-{node.lineno}",
+                    "content": input_precondition_text(node),
+                }
+            )
+            continue
         if isinstance(node, ast.Return):
             continue
         if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):

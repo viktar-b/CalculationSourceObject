@@ -166,6 +166,22 @@ class Execution:
         tree = copy.deepcopy(module.tree)
 
         class Observer(ast.NodeTransformer):
+            def visit_Assert(self, node):
+                # A call survives Python -O; authored preconditions are never optional.
+                hook = ast.Expr(
+                    value=ast.Call(
+                        func=ast.Name(id="__cso_require_input__", ctx=ast.Load()),
+                        args=[
+                            node.test,
+                            node.msg,
+                            ast.Constant(module.id),
+                            ast.Constant(node.lineno),
+                        ],
+                        keywords=[],
+                    )
+                )
+                return ast.copy_location(hook, node)
+
             def visit_AnnAssign(self, node):
                 hook = ast.Expr(
                     value=ast.Call(
@@ -183,6 +199,20 @@ class Execution:
             if isinstance(node, ast.FunctionDef) and node.name in selected:
                 Observer().generic_visit(node)
         return ast.fix_missing_locations(tree)
+
+    @staticmethod
+    def require_input(predicate: bool, message: str, module_id: str, line: int) -> None:
+        if not predicate:
+            raise SourceError(
+                "INPUT_PRECONDITION_FAILED",
+                message,
+                stage="execution",
+                location={
+                    "moduleId": module_id,
+                    "start": {"line": line, "column": 0},
+                    "end": {"line": line, "column": 0},
+                },
+            )
 
     def observe(self, name: str, raw: Any) -> None:
         active = ACTIVE.get()
@@ -232,6 +262,7 @@ class Execution:
             "__name__": "_cso_captured_module",
             "__file__": str(module.path),
             "__cso_observe__": self.observe,
+            "__cso_require_input__": self.require_input,
         }
         self.modules[module.path] = namespace
 
