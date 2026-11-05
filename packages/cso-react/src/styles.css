@@ -131,7 +131,7 @@ math {
 .cso-symbol-row { break-inside: avoid; page-break-inside: avoid; }
 .cso-symbol-placement { overflow-wrap: anywhere; }
 .cso-method, .cso-comparison { margin: 3mm 0 5mm; }
-.cso-method, .cso-method-helper, .cso-external-call { border-left: 2px solid #667085; padding-left: 3mm; }
+.cso-method, .cso-method-helper, .cso-method-external { border-left: 2px solid #667085; padding-left: 3mm; }
 .cso-document .cso-symbolic-note { font-size: 11px; color: #475467; margin: 1mm 0 3mm; }
 .cso-procedure-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .cso-procedure-table > thead { display: table-header-group; }

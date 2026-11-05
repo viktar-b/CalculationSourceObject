@@ -47,8 +47,11 @@ Use titles a reader can understand without programming knowledge. Prefer
 "Calculation procedure" to "method" in report prose. The source declaration
 remains `method(...)`. Keep meaningful engineering names and qualified notation.
 
-Every reusable function has its own visible scope. Its quantity rows retain the
-value column and display × where no case value is defined. Each function explains
+Every reusable function has its own visible scope, with a left rule only around
+its definition. Evaluated external-function tables stay in
+the calculation flow and use their table grid without an additional left rule.
+Definition quantity rows retain the value column and display × where no case
+value is defined. Each function explains
 this briefly: "Reusable function for downstream use. Values are not defined yet."
 The explanation also applies when no downstream cases have run. Zero is a value,
 and an inapplicable computed number retains its separate qualification.
