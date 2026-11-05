@@ -154,6 +154,8 @@ export const sheetFunctionSpecs = [
       SheetOperatorPriority.Equality,
     ),
   },
+  { id: 'fg.not', glyph: 'not' },
+  { id: 'fg.xor', glyph: 'xor' },
   { id: 'fg.noop', glyph: '' },
   {
     id: 'fg.or',

@@ -395,11 +395,15 @@ def lower_expression(
         key = f"n{len(nodes) + 1}"
         item: Json = {"key": key, "location": span(module.id, node)}
         nodes.append(item)
-        if condition and not isinstance(node, (ast.Compare, ast.BoolOp)):
+        is_not = isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not)
+        is_xor = isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitXor)
+        if condition and not (
+            isinstance(node, (ast.Compare, ast.BoolOp)) or is_not or is_xor
+        ):
             fail(
                 node,
                 "UNSUPPORTED_SYNTAX",
-                "A conditional test requires numeric comparisons joined by and/or",
+                "A conditional test requires comparisons combined with and, or, not or Boolean ^",
             )
         if numeric_literal(node):
             value = literal(node, module.id)
@@ -428,6 +432,19 @@ def lower_expression(
                     {"key": lower(node.body)},
                     {"key": lower(node.orelse)},
                 ],
+            )
+        elif is_not or is_xor:
+            if not condition:
+                fail(
+                    node,
+                    "UNSUPPORTED_SYNTAX",
+                    "NOT and Boolean XOR are supported only in conditional tests",
+                )
+            operands = [node.operand] if is_not else [node.left, node.right]
+            item.update(
+                mode="FUNCTION",
+                funcSpec={"id": "fg.not" if is_not else "fg.xor"},
+                funcArgs=[{"key": lower(value, condition=True)} for value in operands],
             )
         elif isinstance(node, ast.BoolOp):
             if not condition:

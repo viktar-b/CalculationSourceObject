@@ -75,6 +75,35 @@ class SourcePlanTest(unittest.TestCase):
         }
         self.assertIn("a", names)
 
+    def test_plan_preserves_boolean_not_xor_grouping_without_execution(self):
+        quantity = 'Annotated[float, symbol(glyph="q_{in}", description="Input", unit="")]'
+        result = 'Annotated[float, symbol(glyph="q_{out}", description="Result", unit="")]'
+        path = self.write(
+            "boolean.cso.py",
+            source(
+                f"result: {result} = 1 if not (quantity > 0) ^ (quantity < 2) else 0\n"
+                'return {"result": result}',
+                parameters=f"quantity: {quantity} = 1",
+            ),
+        )
+        with patch.object(Execution, "run") as run:
+            planned = symbolic_plan(path, "calculate")
+            run.assert_not_called()
+        self.assertTrue(planned["ok"], planned)
+        nodes = next(
+            quantity["nodes"] for quantity in planned["plan"]["quantities"]
+            if quantity["variableName"] == "result"
+        )
+        by_key = {node["key"]: node for node in nodes}
+        condition = by_key[nodes[0]["funcArgs"][0]["key"]]
+        self.assertEqual(condition["funcSpec"]["id"], "fg.not")
+        xor = by_key[condition["funcArgs"][0]["key"]]
+        self.assertEqual(xor["funcSpec"]["id"], "fg.xor")
+        self.assertEqual(
+            [by_key[arg["key"]]["funcSpec"]["id"] for arg in xor["funcArgs"]],
+            ["fg.gt", "fg.lt"],
+        )
+
     def test_formula_edit_changes_revision_not_interface_fingerprint(self):
         path = self.write(
             "root.cso.py",
