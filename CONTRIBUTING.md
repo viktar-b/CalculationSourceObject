@@ -27,6 +27,33 @@ Use `<type>(<scope>): <description>` for PR titles, for example
 `feat(demo): show original Python alongside calculation examples`. Choose the
 type and scope to match the change, such as `fix(demo)` for a demo bug fix.
 
+### Closing issues
+
+Use a separate closing keyword for every issue the PR fully resolves. Put each
+reference on its own line in the PR description:
+
+```text
+Closes #123
+Closes #456
+```
+
+A comma-separated list after one keyword does not close every listed issue.
+Use ordinary references for related issues that remain incomplete. See
+[GitHub's issue-linking syntax](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue).
+
+Before merging a PR targeting `main`, compare its intended closing list with
+GitHub's recognized links in the Development sidebar or with
+`gh pr view <number> --json closingIssuesReferences`.
+
+For stacked PRs, keep the intended closing list for every PR. GitHub documents
+automatic closure for PRs targeting the default branch; verify the result for
+each issue after a grouped stack merge.
+
+After the changes reach `main`, check the actual state of every intended issue
+before reporting the work complete. If an issue's acceptance criteria are met
+but it remains open, close it as completed and link the merged PR. Leave
+incomplete issues open and record the remaining work.
+
 ## Local setup
 
 Follow [docs/development.md](docs/development.md).
