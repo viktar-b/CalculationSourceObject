@@ -47,7 +47,8 @@ The project uses its own `.venv`; activation and execution-policy changes are
 unnecessary. See the generated project's `README.md` for browser and API usage.
 
 The initializer creates an owned project template, installs its exact CLI
-dependency, prepares `.venv`, and installs Chromium. It preserves generated
+dependency, prepares `.venv`, exports its installed Python authoring contract to
+`authoring-contract.md`, and installs Chromium. It preserves generated
 files after setup failure; run `npm run setup` in the project to retry.
 Existing destinations are never overwritten.
 
@@ -66,3 +67,13 @@ Before a registry release, use the repository's
 [local archive workflow](../../docs/development.md#local-package-consumers).
 An initializer archive alone still installs the dependency versions named by
 its template; it does not select sibling archives automatically.
+
+
+Shared language rules belong to the Python package. The template's `authoring.md`
+owns the brief, local commands, report registration and review workflow. Setup
+exports the exact installed wheel's contract, so no shared rule copy is released
+with the initializer. `--skip-install` leaves that export pending until setup.
+Before releasing either package, follow the Python package's
+[release checks](../cso-python/README.md#release-checks), including the external
+installed-consumer recipe and local link checks. Keep the exact Python pin in
+`template/requirements.txt` synchronized with the intended Python release.

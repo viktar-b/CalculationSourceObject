@@ -25,4 +25,4 @@ where = ["src"]
 include = ["cso_python*"]
 
 [tool.setuptools.package-data]
-cso_python = ["py.typed"]
+cso_python = ["py.typed", "authoring.md"]

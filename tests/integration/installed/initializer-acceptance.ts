@@ -27,6 +27,7 @@ import {
   RunSchema,
   writeJson,
 } from './_initializer-evidence.ts';
+import { exerciseGuidance } from './_initializer-guidance.ts';
 import {
   createCommandRunner,
   type DevServer,
@@ -218,6 +219,7 @@ try {
     ).trim(),
   );
   assert(pythonLocation.startsWith(`${join(project, '.venv')}${sep}`));
+  await exerciseGuidance({ project, installedPython, environment, run });
 
   dev = await startDev({
     project,
