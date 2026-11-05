@@ -133,6 +133,11 @@ Python authoring functions or numerically verified operations. Logical `and` /
 [authoring guide](authoring.md#supported-source-and-document-content) defines
 accepted argument forms and numerical roles.
 
+Derivations wrap between complete equation parts. Each equals sign stays with
+its right-hand expression. Compound AND/OR predicates use continuation lines
+with their operators and grouping retained, so wide conditionals can use more
+height without shrinking notation or dropping a branch.
+
 Declare each authored function once in Python's
 [function calls](../packages/cso-python/src/cso_python/function_calls.py) module.
 Source preflight and planning derive allowed imports, spellings, argument counts
