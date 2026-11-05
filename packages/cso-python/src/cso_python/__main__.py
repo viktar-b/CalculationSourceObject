@@ -8,6 +8,10 @@ from .exporter import add_export_arguments, export_from_args
 
 def main(argv: list[str] | None = None) -> int:
     arguments = sys.argv[1:] if argv is None else argv
+    if arguments and arguments[0] == "authoring":
+        from .guidance import authoring_from_argv
+
+        return authoring_from_argv(arguments[1:])
     if arguments and arguments[0] == "bindings":
         from .bindings import bindings_from_argv
         return bindings_from_argv(arguments[1:])
@@ -36,6 +40,7 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser(
         "describe", help="Describe a calculation without executing authored code."
     )
+    commands.add_parser("authoring", help="Read version-matched calculation authoring guidance.")
     commands.add_parser("bindings", help="Generate typed calculation handles")
     add_export_arguments(export)
     return export_from_args(parser.parse_args(argv))
