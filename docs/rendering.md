@@ -47,7 +47,8 @@ expressions and conversions remain calculations.
 
 This is presentation of the retained plan: keep every formula tree, binding,
 call path, unit, qualification and diagnostic in the evidence. Older prepared
-reports retain their original presentation; regenerate to get compact bindings.
+reports retain equality rows for previously captured direct returns. Regenerate
+captures and prepare reports again to get compact return rows.
 
 ### Narrative and evidence
 
