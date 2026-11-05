@@ -143,14 +143,20 @@ const fixtureHashes = Object.fromEntries(
 process.stdout.write(`Installed acceptance artifacts: ${root}\n`);
 try {
   mkdirSync(archives);
-  run(repo, 'npm', ['run', 'build:lib']);
-  run(join(repo, 'packages/cso-cli'), 'npm', ['run', 'build']);
+  run(repo, 'npm', ['run', 'build:cli']);
+  run(repo, 'npm', ['run', 'build', '--workspace', 'create-cs-object']);
   for (const directory of [
     'packages/cso-core',
     'packages/cso-react',
     'packages/cso-cli',
+    'packages/create-cs-object',
   ]) {
-    run(join(repo, directory), 'npm', ['pack', '--pack-destination', archives]);
+    run(join(repo, directory), 'npm', [
+      'pack',
+      '--ignore-scripts',
+      '--pack-destination',
+      archives,
+    ]);
   }
   const core = uniqueArchive('cs-object-core-', '.tgz');
   const react = uniqueArchive('cs-object-react-', '.tgz');
@@ -223,24 +229,6 @@ try {
     'import cso_python; print(cso_python.__file__)',
   ]).trim();
   assert(pythonLocation.startsWith(pythonVenv));
-  const copiedRepo = join(pythonOnly, 'copied tests');
-  mkdirSync(join(copiedRepo, 'packages/cso-python'), { recursive: true });
-  cpSync(
-    join(repo, 'packages/cso-python/tests'),
-    join(copiedRepo, 'packages/cso-python/tests'),
-    { recursive: true, filter: (path) => !path.includes('__pycache__') },
-  );
-  run(pythonOnly, python, [
-    '-m',
-    'pip',
-    'install',
-    '-r',
-    join(copiedRepo, 'packages/cso-python/tests/requirements.txt'),
-  ]);
-  const testOutput = run(pythonOnly, python, [
-    join(copiedRepo, 'packages/cso-python/tests/run.py'),
-  ]);
-  writeFileSync(join(root, 'python-tests.stdout.txt'), testOutput);
   const functionName = 'rectangle';
   const rectangle = join(
     repo,
@@ -513,6 +501,8 @@ def rectangle(
     full,
     environment.PYTHON,
   ]);
+  run(repo, 'npm', ['run', 'test:library-archives', '--', archives]);
+  run(repo, 'npm', ['run', 'test:initializer', '--', archives]);
   const binaries = run(full, process.execPath, [
     '-e',
     "console.log(require.resolve('playwright/package.json'))",

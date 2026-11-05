@@ -14,7 +14,10 @@ import { chromium } from 'playwright';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const artifactRoot = mkdtempSync(join(tmpdir(), 'cso-library-archives-'));
-const archiveDirectory = join(artifactRoot, 'archives');
+const suppliedArchives = process.argv[2];
+const archiveDirectory = suppliedArchives
+  ? resolve(suppliedArchives)
+  : join(artifactRoot, 'archives');
 const environment = { ...process.env };
 Reflect.deleteProperty(environment, 'NODE_PATH');
 Reflect.deleteProperty(environment, 'PYTHONPATH');
@@ -74,15 +77,17 @@ const packedArchive = (prefix: string): string => {
 };
 
 process.stdout.write(`Library consumer artifacts: ${artifactRoot}\n`);
-mkdirSync(archiveDirectory);
-for (const packageName of ['@cs-object/core', '@cs-object/react']) {
-  run(repoRoot, 'npm', [
-    'pack',
-    '--workspace',
-    packageName,
-    '--pack-destination',
-    archiveDirectory,
-  ]);
+if (!suppliedArchives) {
+  mkdirSync(archiveDirectory);
+  for (const packageName of ['@cs-object/core', '@cs-object/react']) {
+    run(repoRoot, 'npm', [
+      'pack',
+      '--workspace',
+      packageName,
+      '--pack-destination',
+      archiveDirectory,
+    ]);
+  }
 }
 const coreArchive = packedArchive('cs-object-core-');
 const reactArchive = packedArchive('cs-object-react-');
