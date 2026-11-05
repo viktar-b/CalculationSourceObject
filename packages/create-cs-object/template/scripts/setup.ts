@@ -55,16 +55,22 @@ try {
     '-r',
     join(project, 'requirements.txt'),
   ]);
+  run(python, [
+    '-I',
+    '-X',
+    'utf8',
+    '-m',
+    'cso_python',
+    'authoring',
+    '--out',
+    join(project, 'authoring-contract.md'),
+  ]);
   const require = createRequire(import.meta.url);
   const cliRequire = createRequire(
     require.resolve('@cs-object/cli/package.json'),
   );
   const playwright = dirname(cliRequire.resolve('playwright/package.json'));
-  run(process.execPath, [
-    join(playwright, 'cli.js'),
-    'install',
-    'chromium',
-  ]);
+  run(process.execPath, [join(playwright, 'cli.js'), 'install', 'chromium']);
   process.stdout.write('Setup complete. Run npm run dev.\n');
 } catch (error) {
   process.stderr.write(

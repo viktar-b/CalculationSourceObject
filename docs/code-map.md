@@ -51,7 +51,8 @@ Installable libraries and tools live in `packages/`. `apps/demo` is the
 application that consumes them. The initializer keeps its template inside its
 package and creates user projects outside this repository.
 
-- Python owns source parsing, execution, generated handles and authoring rules.
+- Python owns source parsing, execution, generated handles and the wheel-shipped
+  authoring contract. `python -m cso_python authoring` exports that installed guide.
 - Core owns public schemas, reference identity, notation parsing, formula evaluation and conversion.
   It needs no Python, React, browser or filesystem access to verify supplied data.
 - React owns preparation, MathML rendering and engineering presentation.
@@ -77,7 +78,7 @@ the distinction between evidence and the displayed calculation.
 - [Core exports](../packages/cso-core/src/index.ts) and
   [React exports](../packages/cso-react/src/index.ts) define the public APIs.
 - [Rendering](rendering.md) maps JSON adapters, sheet schemas and notation to code.
-- [Authoring](authoring.md) defines the rules for new `.cso.py` calculations.
+- [Authoring](authoring.md) points to the Python-owned contract for new `.cso.py` calculations.
 - [Integration checks](../tests/integration/README.md) own canonical examples,
   synthetic fixtures and tests across installed packages.
 
