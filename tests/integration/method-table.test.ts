@@ -356,7 +356,7 @@ def forwarded(width: Width, height: Height) -> CalculationResults:
       .replace(
         '    return {"chosen": chosen, "guarded": guarded}',
         `    check(id="nonnegative", targets=("chosen",), explanation="The chosen value is nonnegative.", predicate=not (chosen < 0) ^ (guarded < 0))
-    applicable(id="positive", targets=("chosen",), explanation="Both dimensions must be positive.", predicate=not ((width <= 0) ^ (height > 0)))
+    applicable(id="positive", targets=("chosen",), explanation="Exactly one dimension must be positive.", predicate=not ((width <= 0) ^ (height > 0)))
     return {"chosen": chosen, "guarded": guarded}`,
       )
       .replace('width > height', 'not ((width > height) ^ (width == height))')

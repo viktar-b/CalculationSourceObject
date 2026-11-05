@@ -626,3 +626,61 @@ test.each([false, true])(
     expect(html.match(/fence="true">\(/g)).toHaveLength(4);
   },
 );
+
+test.each(['fg.and', 'fg.or'])(
+  'fences XOR as an operand of %s',
+  (functionId) => {
+    const parsed = SheetDocumentSchema.parse({
+      ...sheet,
+      symbols: [
+        {
+          ...sheet.symbols[0],
+          valueTree: {
+            rootKey: 'root',
+            result: { kind: 'empty' },
+            nodes: [
+              {
+                key: 'root',
+                kind: 'function',
+                functionId,
+                argKeys: ['xor', 'third'],
+              },
+              {
+                key: 'xor',
+                kind: 'function',
+                functionId: 'fg.xor',
+                argKeys: ['first', 'second'],
+              },
+              {
+                key: 'first',
+                kind: 'literal',
+                value: { kind: 'number', value: 1 },
+              },
+              {
+                key: 'second',
+                kind: 'literal',
+                value: { kind: 'number', value: 2 },
+              },
+              {
+                key: 'third',
+                kind: 'literal',
+                value: { kind: 'number', value: 3 },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const html = renderToStaticMarkup(
+      createElement(ValueTreeMathmlRenderer, {
+        sheet: parsed,
+        valueTree: parsed.symbols[0].valueTree,
+        viewOptions: {},
+        noRootContainer: true,
+      }),
+    );
+    expect(htmlText(html)).toBe(
+      `( ( 1.00 ) xor ( 2.00 ) ) ${functionId === 'fg.and' ? 'and' : 'or'} 3.00`,
+    );
+  },
+);
