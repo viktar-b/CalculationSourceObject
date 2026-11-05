@@ -346,6 +346,34 @@ def forwarded(width: Width, height: Height) -> CalculationResults:
   writeFileSync(join(directory, 'panel_publish.cso.py'), panelCompare);
   writeFileSync(join(directory, 'route.cso.py'), route);
   writeFileSync(join(directory, 'branch_compare.cso.py'), branchCompare);
+  writeFileSync(
+    join(directory, 'boolean_route.cso.py'),
+    route
+      .replace(
+        'from cso_python import CalculationResults, calculation, section, symbol',
+        'from cso_python import CalculationResults, applicable, calculation, check, section, symbol',
+      )
+      .replace(
+        '    return {"chosen": chosen, "guarded": guarded}',
+        `    check(id="nonnegative", targets=("chosen",), explanation="The chosen value is nonnegative.", predicate=not (chosen < 0) ^ (guarded < 0))
+    applicable(id="positive", targets=("chosen",), explanation="Both dimensions must be positive.", predicate=not ((width <= 0) ^ (height > 0)))
+    return {"chosen": chosen, "guarded": guarded}`,
+      )
+      .replace('width > height', 'not ((width > height) ^ (width == height))')
+      .replace('width > 0', 'not (width <= 0)')
+      .replace('glyph="w"', 'glyph="w_{in}"')
+      .replace('glyph="h"', 'glyph="h_{in}"')
+      .replace('glyph="c"', 'glyph="c_{sel}"')
+      .replace('glyph="g"', 'glyph="g_{sel}"'),
+  );
+  writeFileSync(
+    join(directory, 'boolean_compare.cso.py'),
+    branchCompare.replace(
+      'from _cso_bindings.route import route',
+      'from _cso_bindings.boolean_route import route',
+    ),
+  );
+
   writeFileSync(join(directory, 'checked.cso.py'), checkedRectangle);
   writeFileSync(join(directory, 'checked_compare.cso.py'), checkedCompare);
   writeFileSync(join(directory, 'checked_hidden.cso.py'), checkedHidden);
@@ -1754,4 +1782,51 @@ test('external applicability propagates across every input and follows downstrea
     { cwd: directory, encoding: 'utf8' },
   );
   expect(JSON.parse(fresh.stdout).ok).toBe(false);
+});
+
+test('NOT/XOR method branches retain matching selection, used operands and formula text', () => {
+  const execution = capture('boolean_compare.cso.py', 'compare');
+  const report = verifyExecution({ execution });
+  expect(report.ok, JSON.stringify(report.diagnostics)).toBe(true);
+  expect(execution.branchOutcomes?.map((outcome) => outcome.value)).toEqual([
+    false,
+    true,
+    true,
+    true,
+  ]);
+  expect(execution.checkOutcomes?.map((outcome) => outcome.value)).toEqual([
+    true,
+    true,
+    true,
+  ]);
+  expect(
+    execution.applicabilityOutcomes?.map((outcome) => outcome.value),
+  ).toEqual([false, false, false]);
+  const chosen = execution.methods?.[0]?.quantities.find(
+    (quantity) => quantity.variableName === 'chosen',
+  );
+  expect(chosen?.formulaText).toContain(
+    'not (((w_{in} > h_{in}) xor (w_{in} == h_{in})))',
+  );
+  const xor = chosen?.nodes.find((node) => node.funcSpec?.id === 'fg.xor');
+  if (!xor?.funcArgs) throw new Error('Missing XOR operands');
+  for (const outcome of execution.branchOutcomes?.filter((outcome) =>
+    outcome.symbolId.includes('"chosen"'),
+  ) ?? []) {
+    expect(outcome.usedKeys).toEqual(
+      expect.arrayContaining(xor.funcArgs.map((arg) => arg.key)),
+    );
+  }
+  const html = renderToStaticMarkup(
+    createElement(PreparedFormulaSheet, {
+      document: prepareExecutionDocument({ execution, assets: [] }),
+    }),
+  );
+  expect(html).toContain('>not</mo>');
+  expect(html).toContain('>xor</mo>');
+  const tampered = structuredClone(execution);
+  const outcome = tampered.branchOutcomes?.[0];
+  if (!outcome) throw new Error('Missing branch outcome');
+  outcome.value = !outcome.value;
+  expect(verifyExecution({ execution: tampered }).ok).toBe(false);
 });

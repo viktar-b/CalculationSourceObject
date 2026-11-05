@@ -430,6 +430,10 @@ def _formula_text(
             if function_id in {"fg.and", "fg.or"}:
                 joiner = " and " if function_id == "fg.and" else " or "
                 return f"({joiner.join(walk(argument) for argument in arguments)})"
+            if function_id == "fg.not":
+                return f"not ({walk(arguments[0])})"
+            if function_id == "fg.xor":
+                return f"(({walk(arguments[0])}) xor ({walk(arguments[1])}))"
             comparison = _COMPARISONS.get(function_id)
             if comparison and len(arguments) == 2:
                 return f"{walk(arguments[0])} {comparison} {walk(arguments[1])}"
@@ -1341,6 +1345,12 @@ def _check_value(
                 if predicate(argument):
                     return True
             return False
+        if function_id == "fg.not":
+            return not predicate(arguments[0])
+        if function_id == "fg.xor":
+            left = predicate(arguments[0])
+            right = predicate(arguments[1])
+            return left != right
         left = number(arguments[0])
         right = number(arguments[1])
         return {
@@ -1538,6 +1548,12 @@ def _predicate_value(nodes, values, key: str, used: set[str]) -> bool:
             if _predicate_value(nodes, values, argument, used):
                 return True
         return False
+    if function_id == "fg.not":
+        return not _predicate_value(nodes, values, arguments[0], used)
+    if function_id == "fg.xor":
+        left = _predicate_value(nodes, values, arguments[0], used)
+        right = _predicate_value(nodes, values, arguments[1], used)
+        return left != right
     if function_id not in _COMPARISONS:
         raise SourceError(
             "INVALID_CONDITIONAL",

@@ -409,12 +409,19 @@ Iterable and keyword forms are not supported. Non-finite results are rejected.
 Conditional expressions
 `value_if_true if comparison else value_if_false` support numeric
 comparisons `<`, `<=`, `>`, `>=`, `==`, and `!=`, including nested conditionals.
-Join comparisons with `and` / `or`, or use comparison chains such as
-`lower < quantity <= upper`. Evaluation proceeds left to right and stops when
-the result is decided; a chain evaluates its shared numeric operand once.
-Only the selected conditional branch is evaluated.
+Combine comparisons with `and`, `or`, unary `not` and Boolean-only `^`
+exclusive OR, or use comparison chains such as
+`lower < quantity <= upper`. AND/OR and comparison chains evaluate left to
+right and stop when the result is decided. A chain evaluates its shared
+numeric operand once.
+Only the selected conditional branch is evaluated. `not` negates one Boolean
+predicate. `^` evaluates both Boolean operands in source order and is true when
+they differ. Python precedence applies. Parenthesize comparisons around `^`,
+for example `(quantity > 0) ^ (quantity < 2)`. Use `not (quantity > 0)`
+to negate a comparison, or `not (quantity > 0 and quantity < 2)` to negate a group.
 
-`and` / `or` are supported only between comparisons in conditional tests.
+`and`, `or`, `not` and `^` are supported only on Boolean predicates in
+conditional tests. Integer bitwise XOR and numeric truthiness are unsupported.
 Numeric selection expressions such as `quantity or fallback`, mixed numeric and
 comparison operands, Boolean numerical quantities and bare numeric conditional
 tests are rejected. Use the separate `boolean(...)` report declaration for table facts. Core checks every Value tree node, including

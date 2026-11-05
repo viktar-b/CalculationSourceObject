@@ -129,6 +129,41 @@ export const renderSpecialValueFunction = ({
   functionId,
   argReactNodes,
 }: SpecialValueFunctionRenderProps): ReactElement | undefined => {
+  if (functionId === 'fg.not' && argReactNodes.length === 1) {
+    return (
+      <mrow>
+        <mo form="prefix" rspace="0.3em">
+          not
+        </mo>
+        <mrow>
+          <mo fence="true">(</mo>
+          {argReactNodes[0]}
+          <mo fence="true">)</mo>
+        </mrow>
+      </mrow>
+    );
+  }
+
+  if (functionId === 'fg.xor' && argReactNodes.length === 2) {
+    return (
+      <mrow>
+        <mrow>
+          <mo fence="true">(</mo>
+          {argReactNodes[0]}
+          <mo fence="true">)</mo>
+        </mrow>
+        <mo form="infix" lspace="0.3em" rspace="0.3em">
+          xor
+        </mo>
+        <mrow>
+          <mo fence="true">(</mo>
+          {argReactNodes[1]}
+          <mo fence="true">)</mo>
+        </mrow>
+      </mrow>
+    );
+  }
+
   if (functionId === 'fg.abs' && argReactNodes.length === 1) {
     return <AbsoluteValueFunctionMathml value={argReactNodes[0]} />;
   }

@@ -208,7 +208,7 @@ function roundInteger(value: number): number {
   return rounded === 0 ? 0 : rounded;
 }
 
-export type ValueRole = 'number' | 'comparison';
+export type ValueRole = 'number' | 'predicate';
 type OperandRole = ValueRole | 'integer';
 type Arity = { readonly min: number; readonly max: number | null };
 type TypedEvaluation = (
@@ -231,7 +231,7 @@ type Operation = (
   | { readonly kind: 'conditional'; readonly operands: readonly OperandRole[] }
   | {
       readonly kind: 'logical';
-      readonly operator: 'and' | 'or';
+      readonly operator: 'and' | 'or' | 'not' | 'xor';
       readonly operands: readonly OperandRole[];
     }
 ) & { readonly arity?: Arity };
@@ -503,7 +503,7 @@ const operations = new Map<string, Operation>([
     {
       kind: 'logical',
       operator: 'and',
-      operands: ['comparison'],
+      operands: ['predicate'],
       arity: { min: 2, max: null },
     },
   ],
@@ -512,9 +512,14 @@ const operations = new Map<string, Operation>([
     {
       kind: 'logical',
       operator: 'or',
-      operands: ['comparison'],
+      operands: ['predicate'],
       arity: { min: 2, max: null },
     },
+  ],
+  ['fg.not', { kind: 'logical', operator: 'not', operands: ['predicate'] }],
+  [
+    'fg.xor',
+    { kind: 'logical', operator: 'xor', operands: ['predicate', 'predicate'] },
   ],
   ['fg.rad', floatUnary((degrees) => degrees * (Math.PI / 180))],
   ['fg.deg', floatUnary((radians) => radians * (180 / Math.PI))],
@@ -579,7 +584,7 @@ const operations = new Map<string, Operation>([
   ],
   [
     'fg.cnd',
-    { kind: 'conditional', operands: ['comparison', 'number', 'number'] },
+    { kind: 'conditional', operands: ['predicate', 'number', 'number'] },
   ],
 ]);
 

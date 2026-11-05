@@ -104,3 +104,53 @@ test('conditional numeric operands preserve their selected output dependency', (
   });
   expect(usedReferenceNames(conditional, 'n1', values)).toEqual(['width']);
 });
+
+test.each([
+  [-1, -1, false],
+  [-1, 1, true],
+  [1, -1, true],
+  [1, 1, false],
+] satisfies [number, number, boolean][])(
+  'NOT/XOR track eager operands and lazy dependencies at %s, %s',
+  (width, child, expected) => {
+    const nodes = [
+      {
+        key: 'root',
+        mode: 'FUNCTION',
+        funcSpec: { id: 'fg.xor' },
+        funcArgs: [{ key: 'guard' }, { key: 'n1' }],
+      },
+      {
+        key: 'guard',
+        mode: 'FUNCTION',
+        funcSpec: { id: 'fg.gt' },
+        funcArgs: [{ key: 'width' }, { key: 'n3' }],
+      },
+      { key: 'width', mode: 'SYMBOL', ref: { kind: 'name', name: 'width' } },
+      {
+        key: 'not',
+        mode: 'FUNCTION',
+        funcSpec: { id: 'fg.not' },
+        funcArgs: [{ key: 'root' }],
+      },
+      ...direct,
+    ];
+    const values = new Map([
+      ['width', width],
+      [outputKey, child],
+    ]);
+    expect(reproducePredicate(nodes, 'root', values)).toEqual({
+      value: expected,
+      usedKeys: ['guard', 'n1', 'n2', 'n3', 'root', 'width'],
+    });
+    expect(reproducePredicate(nodes, 'not', values)?.value).toBe(!expected);
+    expect(usedReferenceNames(nodes, 'root', values)).toEqual([
+      'width',
+      outputKey,
+    ]);
+    expect(usedReferenceNames(nodes, 'not', values)).toEqual([
+      'width',
+      outputKey,
+    ]);
+  },
+);
