@@ -20,6 +20,9 @@ npm run test:packages
 
 `test:packages` creates fresh npm archives and a Python wheel, installs them into
 consumers outside the checkout, and checks those installed packages together.
+It reuses the same archives and wheel for library and initializer acceptance.
+`test:library-archives` and `test:initializer` can also run independently; an
+optional archive-directory argument reuses an already prepared artifact set.
 The package/app isolation gate is `npm run test:isolation`.
 
 The [initializer acceptance](installed/initializer-acceptance.ts) runs
