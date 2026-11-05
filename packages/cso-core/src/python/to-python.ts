@@ -34,13 +34,15 @@ const PythonPrecedence = {
   Conditional: 1,
   LogicalOr: 2,
   LogicalAnd: 3,
-  Compare: 4,
-  AddSubtract: 5,
-  MultiplyDivide: 6,
-  Unary: 7,
-  Power: 8,
-  Call: 9,
-  Atom: 10,
+  LogicalNot: 4,
+  Compare: 5,
+  BitwiseXor: 6,
+  AddSubtract: 7,
+  MultiplyDivide: 8,
+  Unary: 9,
+  Power: 10,
+  Call: 11,
+  Atom: 12,
 } as const;
 
 const leadingDigitPattern = /^[0-9]/;
@@ -450,6 +452,18 @@ const functionExpressionRenderers: Readonly<
       ...comparisonOptions,
     }),
   'fg.noop': passthroughExpression,
+  'fg.not': (args) => {
+    requireArgCount('fg.not', args, 1);
+    return {
+      code: `not (${args[0].code})`,
+      precedence: PythonPrecedence.LogicalNot,
+      usesMath: combineMathUsage(args),
+    };
+  },
+  'fg.xor': (args) =>
+    binaryExpression('fg.xor', args, '^', PythonPrecedence.BitwiseXor, {
+      parenthesizeEqualRight: true,
+    }),
   'fg.or': (args) =>
     logicalExpression('fg.or', args, 'or', PythonPrecedence.LogicalOr),
   'fg.pi': (args) => {

@@ -406,6 +406,21 @@ const syntaxCases = [
   },
 ];
 
+syntaxCases.push(
+  {
+    id: 'fg.not',
+    expression: '1 if not quantity > 0 else 2',
+    expected: 2,
+    kind: 'int',
+  },
+  {
+    id: 'fg.xor',
+    expression: '1 if (quantity > 0) ^ (quantity < 1) else 2',
+    expected: 2,
+    kind: 'int',
+  },
+);
+
 const displayOnlyFunctions = ['fg.noop', 'fg.stub'];
 
 it('classifies display-only functions separately from verified Python operations', () => {
@@ -726,5 +741,199 @@ it.each(['min', 'max'])(
         (d) => d.code === 'INVALID_FUNCTION_ARITY',
       ),
     ).toBe(true);
+  },
+);
+
+it.each([
+  ['not (quantity > 0)', '-1', 1],
+  ['not (quantity > 0)', '1', 0],
+  ['(quantity > 0) ^ (quantity < 2)', '-1', 1],
+  ['(quantity > 0) ^ (quantity < 2)', '1', 0],
+  ['(quantity > 0) ^ (quantity < 2)', '3', 1],
+  ['(quantity > 0) ^ (quantity < 0)', '0', 0],
+  ['not not (quantity > 0)', '1', 1],
+  ['not (quantity > 0) ^ (quantity < 2)', '1', 1],
+  ['(not quantity > 0) ^ (quantity < 2)', '1', 1],
+  ['(quantity > 0) ^ (not quantity < 2)', '1', 1],
+  ['not (quantity > 0 and quantity < 2)', '1', 0],
+  [
+    '(0 < quantity <= 2) ^ (quantity == 1) or not quantity != 3 and quantity > 2',
+    '1',
+    0,
+  ],
+  [
+    '(0 < quantity <= 2) ^ (quantity == 1) or not quantity != 3 and quantity > 2',
+    '3',
+    1,
+  ],
+  ['(quantity > 0) ^ ((quantity < 2) ^ (quantity == 1))', '1', 1],
+  ['not (quantity != 0 and 1 / quantity > 0)', '0', 1],
+  ['not (quantity == 0 or 1 / quantity > 0)', '0', 0],
+  ['(quantity < 0 or math.sqrt(quantity) > 0) ^ (quantity == -1)', '-1', 0],
+  ['not (0 < quantity < math.sqrt(quantity))', '-1', 1],
+  ['(not quantity > 0) or quantity < 2 or math.sqrt(-1) > 0', '1', 1],
+] satisfies [string, string, number][])(
+  'Boolean predicate %s at %s agrees with its independent truth table and replay',
+  (condition, input, expected) => {
+    const { execution, output } = successfulCapture(
+      `1 if ${condition} else 0`,
+      input,
+    );
+    expect(output.value).toBe(expected);
+    const report = verifyExecution({ execution });
+    expect(report.ok, JSON.stringify(report.diagnostics)).toBe(true);
+    expect(exportReplay(execution, output.symbolId).result).toEqual({
+      value: expected,
+      kind: 'int',
+    });
+  },
+);
+
+it.each([
+  'not quantity',
+  'quantity ^ 1',
+  '(quantity > 0) ^ 1',
+  '1 ^ (quantity > 0)',
+  'quantity > 0 ^ quantity < 2',
+  'not True',
+  '(not quantity > 0) == (quantity < 2)',
+])('rejects non-Boolean or misplaced operands in %s', (condition) => {
+  expect(capture(`1 if ${condition} else 0`)).toMatchObject({
+    ok: false,
+    diagnostics: [expect.objectContaining({ code: 'UNSUPPORTED_SYNTAX' })],
+  });
+});
+
+it.each(['not (quantity > 0)', '(quantity > 0) ^ (quantity < 2)', '3 ^ 1'])(
+  'rejects standalone predicate or integer bitwise quantity %s',
+  (expression) => {
+    expect(capture(expression)).toMatchObject({
+      ok: false,
+      diagnostics: [expect.objectContaining({ code: 'UNSUPPORTED_SYNTAX' })],
+    });
+  },
+);
+
+it.each([
+  [
+    'not (quantity > 0 and 1 / quantity > 0)',
+    'fg.gt',
+    'fg.ge',
+    'DIVISION_BY_ZERO',
+  ],
+  [
+    'not (quantity < 0 or math.sqrt(quantity) > 0)',
+    'fg.lt',
+    'fg.gt',
+    'NEGATIVE_SQUARE_ROOT',
+  ],
+  [
+    '(quantity > 0) ^ (1 / quantity > 0)',
+    'fg.or',
+    'fg.xor',
+    'DIVISION_BY_ZERO',
+  ],
+] satisfies [string, string, string, string][])(
+  'selected arithmetic and eager XOR fail in %s',
+  (condition, from, to, code) => {
+    const eager = from === 'fg.or';
+    const safe = eager
+      ? condition.replace(' ^ ', ' or ').replace('1 / quantity', '1 / 0')
+      : condition;
+    const input = code === 'NEGATIVE_SQUARE_ROOT' ? '-1' : eager ? '1' : '0';
+    const { execution } = successfulCapture(`1 if ${safe} else 0`, input);
+    const nodes = execution.cso.sections.flatMap((section) =>
+      section.items.flatMap((item) =>
+        item.kind === 'symbol' ? item.symbol.valueTree.nodes : [],
+      ),
+    );
+    const changed = nodes.find((node) => node.funcSpec?.id === from);
+    if (!changed?.funcSpec) throw new Error('Missing predicate');
+    changed.funcSpec.id = to;
+    const report = verifyExecution({ execution });
+    expect(report.ok).toBe(false);
+    expect(report.diagnostics.map((d) => d.code)).toContain(code);
+  },
+);
+
+it.each([
+  ['1 if (quantity > 0) ^ (1 / quantity > 0) else 0', '0'],
+  ['1 if (quantity < 0) ^ (math.sqrt(quantity) > 0) else 0', '-1'],
+  ['1 if not (quantity >= 0 and 1 / quantity > 0) else 0', '0'],
+] satisfies [string, string][])(
+  'capture reports selected invalid arithmetic in %s',
+  (expression, input) => {
+    expect(capture(expression, input)).toMatchObject({
+      ok: false,
+      diagnostics: [expect.objectContaining({ code: 'EXECUTION_FAILED' })],
+    });
+  },
+);
+
+it.each(['fg.not', 'fg.xor'])(
+  '%s validates malformed dormant predicates and numeric roots',
+  (id) => {
+    for (const change of [
+      'arity',
+      'extra-arity',
+      'role',
+      'cycle',
+      'unsupported',
+      'reference',
+      'literal',
+      'root',
+    ]) {
+      const { execution } = successfulCapture(
+        '1 if quantity > 0 else (2 if not ((quantity < 1) ^ (quantity == 2)) else 3)',
+      );
+      const nodes = execution.cso.sections.flatMap((section) =>
+        section.items.flatMap((item) =>
+          item.kind === 'symbol' ? item.symbol.valueTree.nodes : [],
+        ),
+      );
+      const logical = nodes.find((node) => node.funcSpec?.id === id);
+      const numeric = nodes.find(
+        (node) => node.literal?.kind === 'number' && node.literal.value === 3,
+      );
+      if (!logical?.funcArgs || !numeric)
+        throw new Error('Missing dormant nodes');
+      const originalArgs = logical.funcArgs;
+      if (change === 'arity') logical.funcArgs = [];
+      if (change === 'extra-arity')
+        logical.funcArgs = [...originalArgs, originalArgs[0]];
+      if (change === 'role') logical.funcArgs[0] = { key: numeric.key };
+      if (change === 'cycle') logical.funcArgs[0] = { key: logical.key };
+      if (change === 'unsupported') logical.funcSpec = { id: 'fg.stub' };
+      if (change === 'reference') logical.funcArgs[0] = { key: 'missing' };
+      if (change === 'literal') {
+        numeric.literal = { kind: 'string', value: 'invalid' };
+      }
+      if (change === 'root') {
+        const root = nodes.find((node) => node.funcSpec?.id === 'fg.cnd');
+        if (!root) throw new Error('Missing numeric root');
+        root.funcSpec = { id };
+        root.funcArgs = originalArgs;
+      }
+      const report = verifyExecution({ execution });
+      expect(report.ok, change).toBe(false);
+      expect(
+        report.diagnostics.map((d) => d.code),
+        change,
+      ).toContain(
+        change.includes('arity')
+          ? 'INVALID_FUNCTION_ARITY'
+          : change === 'role'
+            ? 'INVALID_CONDITIONAL'
+            : change === 'cycle'
+              ? 'FORMULA_CYCLE'
+              : change === 'unsupported'
+                ? 'UNSUPPORTED_FUNCTION'
+                : change === 'reference'
+                  ? 'MISSING_FORMULA_OPERAND'
+                  : change === 'literal'
+                    ? 'NONNUMERIC_LITERAL'
+                    : 'NONNUMERIC_FORMULA',
+      );
+    }
   },
 );
