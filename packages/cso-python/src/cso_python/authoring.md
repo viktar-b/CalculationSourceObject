@@ -385,6 +385,14 @@ numeric coordinates and return their Euclidean norm as a float. The empty call
 returns `0.0`.
 Iterable and keyword forms are not supported. Non-finite results are rejected.
 
+Leading `assert comparison, "Actionable input requirement"` statements enforce
+input preconditions before calculation content. Predicates use the numeric
+comparison rules below and may reference only parameters. Messages must be
+nonempty string literals. Failed assertions stop execution with
+`INPUT_PRECONDITION_FAILED`, including under Python optimization. Reports retain
+the requirement and condition as text. These input guards are separate from
+engineering checks and independently verified numerical formulas.
+
 Conditional expressions
 `value_if_true if comparison else value_if_false` support numeric
 comparisons `<`, `<=`, `>`, `>=`, `==`, and `!=`, including nested conditionals.

@@ -2,6 +2,9 @@
 
 import hashlib
 import shutil
+import subprocess
+import sys
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -34,6 +37,59 @@ class AuthoringV2Test(unittest.TestCase):
 
     def tearDown(self):
         self.temp.cleanup()
+
+    def test_input_precondition_stops_before_arithmetic_and_retains_requirement(self):
+        self.edit(
+            "defaulted_step.cso.py",
+            "    adjusted:",
+            '    assert amount > 0, "amount must be positive"\n    adjusted:',
+        )
+        self.edit("defaulted_step.cso.py", "amount + increment", "increment / amount")
+        response = self.run_case("adjust", amount=0)
+        self.assertFalse(response["ok"])
+        diagnostic = response["diagnostics"][0]
+        self.assertEqual(diagnostic["code"], "INPUT_PRECONDITION_FAILED")
+        self.assertEqual(diagnostic["message"], "amount must be positive")
+        self.assertIn("start", diagnostic["location"])
+        execution = self.success(self.run_case("adjust", amount=2))
+        self.assertIn("amount must be positive", str(execution["cso"]))
+        optimized = subprocess.run(
+            [sys.executable, "-I", "-O", "-m", "cso_python", "execute",
+             str(self.root / "defaulted_step.cso.py"), "--function", "adjust",
+             "--inputs-json", '{"amount": 0}'],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(json.loads(optimized.stdout)["diagnostics"][0]["code"],
+                         "INPUT_PRECONDITION_FAILED")
+
+    def test_input_preconditions_must_precede_calculation_content(self):
+        self.edit("defaulted_step.cso.py", "    return",
+                  '    assert amount > 0, "late requirement"\n    return')
+        response = self.run_case("adjust", amount=1)
+        self.assertFalse(response["ok"])
+        self.assertEqual(response["diagnostics"][0]["code"], "UNSUPPORTED_SYNTAX")
+
+    def test_input_preconditions_reject_unconstrained_predicates(self):
+        for assertion in [
+            'assert amount, "numeric truthiness"',
+            "assert amount > 0",
+            "assert amount > 0, amount",
+            'assert adjusted > 0, "only parameters"',
+            'assert print(amount) > 0, "no effects"',
+        ]:
+            with self.subTest(assertion=assertion):
+                original = (self.root / "defaulted_step.cso.py").read_text()
+                self.edit(
+                    "defaulted_step.cso.py",
+                    "    adjusted:",
+                    f"    {assertion}\n    adjusted:",
+                )
+                response = self.run_case("adjust", amount=1)
+                self.assertFalse(response["ok"])
+                self.assertEqual(
+                    response["diagnostics"][0]["code"], "UNSUPPORTED_SYNTAX"
+                )
+                (self.root / "defaulted_step.cso.py").write_text(original)
 
     def add_hidden_assignment(self):
         self.edit(
