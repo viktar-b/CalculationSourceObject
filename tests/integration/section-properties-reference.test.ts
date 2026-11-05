@@ -212,6 +212,22 @@ it.each([
         'Outside this interval these quantities are inapplicable',
       );
       expect(retainedText).toContain('Input requirement:');
+      for (const output of response.execution.authoring?.outputs ?? []) {
+        if (
+          !output.name.includes('wedge') &&
+          !output.name.startsWith('the_width_at_the_pna')
+        )
+          continue;
+        const topTaper =
+          output.name.includes('top_trapz') ||
+          output.name.endsWith('top_trapezoid');
+        const lower = topTaper ? depth - topInner : bottomOuter;
+        const upper = topTaper ? depth - topOuter : bottomInner;
+        if (pna < lower - 1e-8 || pna > upper + 1e-8) {
+          expect(output.value, `Inactive ${output.name}`).toBe(0);
+        }
+        expect(output.value, output.name).toBeGreaterThanOrEqual(-1e-8);
+      }
       const report = verifyExecution({ execution: response.execution });
       expect(report.ok, JSON.stringify(report.diagnostics)).toBe(true);
       const expected: Record<string, number> = {
