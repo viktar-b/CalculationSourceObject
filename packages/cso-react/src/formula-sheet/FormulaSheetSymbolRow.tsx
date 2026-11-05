@@ -2,7 +2,8 @@ import { GlyphMathBlock } from '../mathml/GlyphMathBlock.tsx';
 import { UnitMathBlock } from '../mathml/UnitMathBlock.tsx';
 import { getValueNodeByKey } from '@cs-object/core';
 import type { NumericKind, SheetSymbol } from '@cs-object/core';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
+import { NumericalValue } from './NumericalValue.tsx';
 import { FormulaSheetCommentCell } from './cells/FormulaSheetCommentCell.tsx';
 import { FormulaSheetDescriptionCell } from './cells/FormulaSheetDescriptionCell.tsx';
 import { FormulaSheetSpacerCell } from './cells/FormulaSheetSpacerCell.tsx';
@@ -18,6 +19,47 @@ export type FormulaSheetSymbolRowProps = FormulaSheetRowProps<SheetSymbol> & {
   readonly symbolicOnly?: boolean;
   readonly showFormula?: boolean;
   readonly numericKind?: NumericKind;
+  readonly compactBinding?: boolean;
+  readonly bindingOrigin?: ReactNode;
+};
+
+export const bindingOrigin = ({
+  sheet,
+  symbol,
+  label,
+  computedReference = false,
+}: {
+  sheet: FormulaSheetRowProps<SheetSymbol>['sheet'];
+  symbol: SheetSymbol;
+  label?: string;
+  computedReference?: boolean;
+}): ReactNode => {
+  const root = getValueNodeByKey(symbol.valueTree, symbol.valueTree.rootKey);
+  const source =
+    root.kind === 'symbol'
+      ? sheet.symbols.find((item) => item.id === root.symbolId)
+      : computedReference && root.kind === 'function'
+        ? symbol
+        : undefined;
+  if (root.kind === 'symbol' && !source)
+    throw new Error(`Missing binding origin '${root.symbolId}'`);
+  if (source)
+    return (
+      <span data-binding-origin={source.id} data-binding-call={label}>
+        {label ? `${label}: ` : ''}From <GlyphMathBlock glyph={source.glyph} />
+      </span>
+    );
+  if (root.kind === 'literal' && root.value.kind === 'number')
+    return (
+      <span data-binding-origin="literal" data-binding-call={label}>
+        {label ? `${label}: ` : ''}Given{' '}
+        <NumericalValue
+          value={root.value.value}
+          numericKind={root.value.numericKind}
+        />
+      </span>
+    );
+  return undefined;
 };
 
 export const FormulaSheetSymbolRow = ({
@@ -27,6 +69,8 @@ export const FormulaSheetSymbolRow = ({
   symbolicOnly = false,
   showFormula = true,
   numericKind,
+  compactBinding = false,
+  bindingOrigin: suppliedOrigin,
 }: FormulaSheetSymbolRowProps): ReactElement => {
   const { glyph: symbolGlyph } = symbol;
   const symbolUnit = symbol.unit ?? '';
@@ -37,6 +81,9 @@ export const FormulaSheetSymbolRow = ({
     symbol.valueTree.rootKey,
   );
   const symbolIsSolidLiteral = rootNode.kind === 'literal';
+  const origin =
+    suppliedOrigin ??
+    (compactBinding ? bindingOrigin({ sheet, symbol }) : undefined);
 
   return (
     <div className="cso-symbol-row flex min-w-0 flex-col">
@@ -78,16 +125,18 @@ export const FormulaSheetSymbolRow = ({
             <UnitMathBlock unit={symbolUnit} optional={true} />
           </FormulaSheetUnitCell>
           <FormulaSheetCommentCell>
+            {origin ? <div>{origin}</div> : null}
             {symbolComment || ' '}
           </FormulaSheetCommentCell>
         </div>
 
         {showFormula &&
+          !origin &&
           (!symbolIsSolidLiteral ||
             (symbolicOnly &&
               rootNode.kind === 'literal' &&
               rootNode.value.kind !== 'empty')) && (
-            <div className="flex min-w-0">
+            <div className="flex min-w-0" data-derivation="true">
               <div className="w-full min-w-0 overflow-visible border-t border-gray-300 text-[14px]">
                 <div className="my-2 flex min-w-0">
                   <FormulaSheetSpacerCell />

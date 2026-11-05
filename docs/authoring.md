@@ -129,6 +129,12 @@ and x-axis inertia formulas this way.
 
 A composed method may return a helper's public output directly. Its table cell
 keeps that output's captured symbol identity; no copied assignment is required.
+Prefer direct forwarding when an input or result keeps its meaning. The report
+shows its origin in the quantity row rather than as another calculation step.
+An explicitly annotated assignment declares an intentional new review quantity
+or notation, so it retains a derivation even when its expression is a reference.
+Use one when that distinction matters, for example to name the target of a
+criterion. Arithmetic and unit conversions always retain their derivations.
 Method quantities use the ordinary formula-row layout without case substitutions.
 Select all inputs needed to review the cases, including shared dimensions.
 Cases in columns usually fit a few cases with many quantities; rows suit many
