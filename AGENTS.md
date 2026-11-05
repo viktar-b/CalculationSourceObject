@@ -7,7 +7,8 @@ and human engineering approval.
 
 ## Read when relevant
 
-- Before creating or updating a pull request, read [CONTRIBUTING.md](CONTRIBUTING.md).
+- Before creating, updating or merging a pull request, read
+  [CONTRIBUTING.md](CONTRIBUTING.md) for PR and issue-closing checks.
 - Before creating or modifying `.cso.py` sources, read [authoring](docs/authoring.md).
   It defines descriptive names, compact qualified glyphs, shared metadata and
   reference-rebinding rules. Apply the same notation to diagram labels.
