@@ -4,6 +4,7 @@ import {
   compareNumbers,
   evaluateOperation,
   validateNumber,
+  resolveOperation,
 } from '../src/verification/numeric.ts';
 
 describe('numeric verification', () => {
@@ -253,3 +254,25 @@ describe('numeric comparison evidence', () => {
     ).toEqual(extreme.comparison);
   });
 });
+
+it.each([
+  ['fg.not', 1, ['predicate']],
+  ['fg.xor', 2, ['predicate', 'predicate']],
+] satisfies [string, number, string[]][])(
+  '%s declares Boolean roles and rejects wrong arity or numeric evaluation',
+  (id, count, operands) => {
+    expect(resolveOperation(id, count)).toMatchObject({
+      ok: true,
+      operation: { kind: 'logical', operands },
+    });
+    for (const invalid of [count - 1, count + 1])
+      expect(resolveOperation(id, invalid)).toMatchObject({
+        ok: false,
+        code: 'INVALID_FUNCTION_ARITY',
+      });
+    expect(evaluateOperation(id, Array(count).fill(1))).toMatchObject({
+      ok: false,
+      code: 'INVALID_CONDITIONAL',
+    });
+  },
+);

@@ -632,3 +632,130 @@ test.each(['fg.noop', 'fg.stub'])(
     expect(markup.match(/<mo fence="true">/g)).toHaveLength(2);
   },
 );
+
+test.each([false, true])(
+  'groups nested NOT/XOR in symbolic and substituted MathML, numerical=%s',
+  (numerical) => {
+    const valueTree = {
+      rootKey: 'root',
+      result: { kind: 'number', value: 1 },
+      nodes: [
+        {
+          key: 'root',
+          kind: 'function',
+          functionId: 'fg.not',
+          argKeys: ['xor'],
+        },
+        {
+          key: 'xor',
+          kind: 'function',
+          functionId: 'fg.xor',
+          argKeys: ['left', 'right'],
+        },
+        {
+          key: 'left',
+          kind: 'function',
+          functionId: 'fg.gt',
+          argKeys: ['quantity', 'zero'],
+        },
+        {
+          key: 'right',
+          kind: 'function',
+          functionId: 'fg.not',
+          argKeys: ['less'],
+        },
+        {
+          key: 'less',
+          kind: 'function',
+          functionId: 'fg.lt',
+          argKeys: ['quantity', 'zero'],
+        },
+        { key: 'quantity', kind: 'symbol', symbolId: 'side-length' },
+        { key: 'zero', kind: 'literal', value: { kind: 'number', value: 0 } },
+      ],
+    };
+    const parsed = SheetDocumentSchema.parse({
+      ...sheet,
+      symbols: [
+        ...sheet.symbols,
+        { ...sheet.symbols[0], id: 'logic', glyph: 'q_{out}', valueTree },
+      ],
+    });
+    const html = renderToStaticMarkup(
+      createElement(ValueTreeMathmlRenderer, {
+        sheet: parsed,
+        valueTree: parsed.symbols[1].valueTree,
+        viewOptions: { numerical },
+        noRootContainer: true,
+      }),
+    );
+    expect(htmlText(html)).toBe(
+      numerical
+        ? 'not ( ( 50.00 &gt; 0 ) xor ( not ( 50.00 &lt; 0 ) ) )'
+        : 'not ( ( a t &gt; 0 ) xor ( not ( a t &lt; 0 ) ) )',
+    );
+    expect(html.match(/form="prefix"/g)).toHaveLength(2);
+    expect(html).toContain(
+      'form="infix" lspace="0.3em" rspace="0.3em">xor</mo>',
+    );
+    expect(html.match(/fence="true">\(/g)).toHaveLength(4);
+  },
+);
+
+test.each(['fg.and', 'fg.or'])(
+  'fences XOR as an operand of %s',
+  (functionId) => {
+    const parsed = SheetDocumentSchema.parse({
+      ...sheet,
+      symbols: [
+        {
+          ...sheet.symbols[0],
+          valueTree: {
+            rootKey: 'root',
+            result: { kind: 'empty' },
+            nodes: [
+              {
+                key: 'root',
+                kind: 'function',
+                functionId,
+                argKeys: ['xor', 'third'],
+              },
+              {
+                key: 'xor',
+                kind: 'function',
+                functionId: 'fg.xor',
+                argKeys: ['first', 'second'],
+              },
+              {
+                key: 'first',
+                kind: 'literal',
+                value: { kind: 'number', value: 1 },
+              },
+              {
+                key: 'second',
+                kind: 'literal',
+                value: { kind: 'number', value: 2 },
+              },
+              {
+                key: 'third',
+                kind: 'literal',
+                value: { kind: 'number', value: 3 },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const html = renderToStaticMarkup(
+      createElement(ValueTreeMathmlRenderer, {
+        sheet: parsed,
+        valueTree: parsed.symbols[0].valueTree,
+        viewOptions: {},
+        noRootContainer: true,
+      }),
+    );
+    expect(htmlText(html)).toBe(
+      `( ( 1.00 ) xor ( 2.00 ) ) ${functionId === 'fg.and' ? 'and' : 'or'} 3.00`,
+    );
+  },
+);

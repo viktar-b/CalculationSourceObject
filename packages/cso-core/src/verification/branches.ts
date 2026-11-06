@@ -157,6 +157,16 @@ export function reproduceBranches(
       }
       return false;
     }
+    if (operation === 'fg.not') {
+      const value = predicate(keys[0] ?? '', used);
+      return value === undefined ? undefined : !value;
+    }
+    if (operation === 'fg.xor') {
+      const left = predicate(keys[0] ?? '', used);
+      if (left === undefined) return undefined;
+      const right = predicate(keys[1] ?? '', used);
+      return right === undefined ? undefined : left !== right;
+    }
     const compare = comparisons[operation];
     if (!compare) return undefined;
     const left = numberValue(keys[0] ?? '', used);
@@ -250,6 +260,16 @@ export function reproducePredicate(
       }
       return false;
     }
+    if (operation === 'fg.not') {
+      const value = predicate(keys[0] ?? '');
+      return value === undefined ? undefined : !value;
+    }
+    if (operation === 'fg.xor') {
+      const left = predicate(keys[0] ?? '');
+      if (left === undefined) return undefined;
+      const right = predicate(keys[1] ?? '');
+      return right === undefined ? undefined : left !== right;
+    }
     const compare = comparisons[operation];
     if (!compare) return undefined;
     const left = numberValue(keys[0] ?? '');
@@ -321,6 +341,16 @@ const usedDependencies = (
       }
       return false;
     }
+    if (operation === 'fg.not') {
+      const value = predicate(keys[0] ?? '');
+      return value === undefined ? undefined : !value;
+    }
+    if (operation === 'fg.xor') {
+      const left = predicate(keys[0] ?? '');
+      if (left === undefined) return undefined;
+      const right = predicate(keys[1] ?? '');
+      return right === undefined ? undefined : left !== right;
+    }
     const compare = comparisons[operation];
     if (!compare) return undefined;
     const left = numberValue(keys[0] ?? '');
@@ -375,6 +405,8 @@ const usedDependencies = (
       operation &&
       (operation === 'fg.and' ||
         operation === 'fg.or' ||
+        operation === 'fg.not' ||
+        operation === 'fg.xor' ||
         comparisons[operation])
     ) {
       return predicate(key) !== undefined;
@@ -458,6 +490,8 @@ export function branchLabel(
     if (operation === 'fg.and' || operation === 'fg.or') {
       return `(${text.join(operation === 'fg.and' ? ' and ' : ' or ')})`;
     }
+    if (operation === 'fg.not') return `not (${text[0]})`;
+    if (operation === 'fg.xor') return `((${text[0]}) xor (${text[1]}))`;
     const comparison = {
       'fg.lt': '<',
       'fg.le': '<=',

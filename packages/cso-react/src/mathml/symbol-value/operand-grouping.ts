@@ -11,7 +11,10 @@ interface ExplicitOperandGroupInput {
   readonly node: SheetValueNode;
   readonly numerical: boolean;
   readonly literalsAsDrafts: boolean;
-  readonly parentFunctionId: Extract<SheetValueNode, { kind: 'function' }>['functionId'];
+  readonly parentFunctionId: Extract<
+    SheetValueNode,
+    { kind: 'function' }
+  >['functionId'];
   readonly argumentIndex: number;
 }
 
@@ -49,6 +52,9 @@ export const requiresExplicitOperandGroup = ({
         (literal.value < 0 || Object.is(literal.value, -0));
 
   return (
+    ((parentFunctionId === 'fg.and' || parentFunctionId === 'fg.or') &&
+      node.kind === 'function' &&
+      node.functionId === 'fg.xor') ||
     (argumentIndex === 0 &&
       ((parentFunctionId === 'fg.pow' &&
         (node.kind === 'function' || negative)) ||
@@ -57,6 +63,7 @@ export const requiresExplicitOperandGroup = ({
       (parentFunctionId === 'fg.add' ||
         parentFunctionId === 'fg.multiply' ||
         parentFunctionId === 'fg.subtract') &&
-      (negative || (node.kind === 'function' && node.functionId === 'fg.uminus')))
+      (negative ||
+        (node.kind === 'function' && node.functionId === 'fg.uminus')))
   );
 };

@@ -138,6 +138,22 @@ See [authoring](../../docs/authoring.md#binding-generation-and-project-layout)
 for regeneration and distribution rules, and the [two-panel walkthrough](../two-panel/README.md)
 for a smaller introduction.
 
+## Supported tapered geometry
+
+All eight dimensions must be positive. Each flange must be wider than the web,
+and each inner flange thickness must exceed its outer thickness. Zero taper
+heights, zero gradients and reversed tapers are unsupported. The section depth
+must be at least the sum of the inner flange thicknesses. Equality permits
+meeting tapers with zero clear web depth; a negative clear web depth is rejected.
+The shared area/inertia calculation enforces these requirements before arithmetic.
+The lower-boundary coordinate may be zero, positive or negative.
+
+Taper wedge widths, areas, lever arms and modulus terms apply only when the PNA
+lies within that taper, including its boundaries. Outside that interval their
+formulas select zero without extrapolation. Reports mark those placeholders
+"Not applicable". The whole-component branches still calculate the principal
+plastic moduli.
+
 ## Tapered-section corrections
 
 The elastic x-axis modulus uses the farther extreme fiber, so it governs both

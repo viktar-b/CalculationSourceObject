@@ -115,6 +115,46 @@ def compile_source_plan(
         )
 
     steps = _statements(module, definition.function.body, False, register)
+    preconditions_open = True
+    for step in steps:
+        node = step.node
+        if isinstance(node, ast.Assert):
+            if not preconditions_open:
+                raise SourceError(
+                    "UNSUPPORTED_SYNTAX",
+                    "Input assertions must precede calculation content",
+                    location=span(module.id, node),
+                )
+            if (
+                not isinstance(node.msg, ast.Constant)
+                or not isinstance(node.msg.value, str)
+                or not node.msg.value.strip()
+            ):
+                raise SourceError(
+                    "UNSUPPORTED_SYNTAX",
+                    "Input assertions require a nonempty literal message",
+                    location=span(module.id, node),
+                )
+            nodes = lower_expression(
+                module,
+                definition.function,
+                parameter_names,
+                node.test,
+                given=False,
+                condition=True,
+            )
+            if any(
+                isinstance(part, ast.Name) and part.id not in parameter_names
+                for part in ast.walk(node.test)
+            ):
+                raise SourceError(
+                    "UNSUPPORTED_SYNTAX",
+                    "Input assertions may reference only parameters",
+                    location=span(module.id, node),
+                )
+            expressions[id(node.test)] = nodes
+        else:
+            preconditions_open = False
     for output in definition.outputs.values():
         register(output.selection, given=False)
     quantities: list[Json] = []
@@ -164,6 +204,12 @@ def _statements(
         ):
             continue
         node = _prepare_statement(module, original)
+        if grouped and isinstance(node, ast.Assert):
+            raise SourceError(
+                "UNSUPPORTED_SYNTAX",
+                "Input assertions must precede calculation content",
+                location=span(module.id, node),
+            )
         child_steps = None
         if isinstance(node, ast.With):
             child_steps = _statements(module, node.body, True, register)
@@ -259,6 +305,10 @@ def _collect(
                 }
             )
         else:
+            if isinstance(node, ast.Assert):
+                content.append(
+                    {"kind": "text", "content": input_precondition_text(node)}
+                )
             described = _describe_call(node)
             if described is not None:
                 calls.append(described)
@@ -345,11 +395,15 @@ def lower_expression(
         key = f"n{len(nodes) + 1}"
         item: Json = {"key": key, "location": span(module.id, node)}
         nodes.append(item)
-        if condition and not isinstance(node, (ast.Compare, ast.BoolOp)):
+        is_not = isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not)
+        is_xor = isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitXor)
+        if condition and not (
+            isinstance(node, (ast.Compare, ast.BoolOp)) or is_not or is_xor
+        ):
             fail(
                 node,
                 "UNSUPPORTED_SYNTAX",
-                "A conditional test requires numeric comparisons joined by and/or",
+                "A conditional test requires comparisons combined with and, or, not or Boolean ^",
             )
         if numeric_literal(node):
             value = literal(node, module.id)
@@ -378,6 +432,19 @@ def lower_expression(
                     {"key": lower(node.body)},
                     {"key": lower(node.orelse)},
                 ],
+            )
+        elif is_not or is_xor:
+            if not condition:
+                fail(
+                    node,
+                    "UNSUPPORTED_SYNTAX",
+                    "NOT and Boolean XOR are supported only in conditional tests",
+                )
+            operands = [node.operand] if is_not else [node.left, node.right]
+            item.update(
+                mode="FUNCTION",
+                funcSpec={"id": "fg.not" if is_not else "fg.xor"},
+                funcArgs=[{"key": lower(value, condition=True)} for value in operands],
             )
         elif isinstance(node, ast.BoolOp):
             if not condition:
@@ -544,3 +611,7 @@ def lower_expression(
 
     lower(expr, condition=condition)
     return nodes
+
+
+def input_precondition_text(node: ast.Assert) -> str:
+    return f"Input requirement: {node.msg.value} Condition: {ast.unparse(node.test)}"

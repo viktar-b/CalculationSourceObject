@@ -58,6 +58,10 @@ def calculate(
         ),
     ] = 10,
 ) -> CalculationResults:
+    assert section_depth > 0 and web_thickness > 0 and width_of_top_flange > 0 and width_of_bot_flange > 0 and outer_top_flange_thickness > 0 and inner_top_flange_thickness > 0 and outer_bot_flange_thickness > 0 and inner_bot_flange_thickness > 0, "Tapered section dimensions must all be positive."
+    assert width_of_top_flange > web_thickness and width_of_bot_flange > web_thickness, "Each flange width must exceed web_thickness; zero or reversed taper gradients are unsupported."
+    assert inner_top_flange_thickness > outer_top_flange_thickness and inner_bot_flange_thickness > outer_bot_flange_thickness, "Each inner flange thickness must exceed its outer thickness; zero or reversed taper heights are unsupported."
+    assert section_depth >= inner_top_flange_thickness + inner_bot_flange_thickness, "section_depth must be at least the sum of inner flange thicknesses; overlapping flanges are unsupported."
     text(id="scope", content="Area and centroidal x-axis second moment for an unequal tapered I-section. Dimensions must describe a valid section. The squared web parallel-axis distance corrects the Enji reference. These geometric properties do not establish structural capacity or design compliance.")
     web_depth: Annotated[
         float, symbol(id="L_t", glyph="L_{t}", description="Web depth", unit="mm")
