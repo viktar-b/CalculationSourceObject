@@ -89,7 +89,9 @@ intermediate work.
 
 Declare `method(id=..., calculation=..., title=...)` before the calls it
 explains, then `table(...)` after those calls. The method and every case share
-one symbolic plan from that source revision. A table does not rerun the
+one symbolic plan from that source revision. The report always identifies the
+original source module and Python function on the reusable definition and every
+table using it. Import aliases and display titles do not replace that identity. A table does not rerun the
 calculation or invent a second reading of the formulas.
 
 Core resolves the method's formulas through each case's parameter and helper-call
@@ -133,7 +135,8 @@ stop the run.
 
 Captures that contain method or table evidence use protocol version 3 and CSO
 schema `1.1.0`. Prepared documents that contain those items use document
-version 3. Protocol 2 and prepared document version 2 remain valid when the
+version 6, with mandatory captured function identification on the definition
+and every table. Protocol 2 and prepared document version 2 remain valid when the
 source has no method or table. Rebuild a prepared document from the retained
 execution with `prepareExecutionDocument`. Do not rebind an older execution to
 a new numerical run in order to add a method.
@@ -183,7 +186,7 @@ printed continuations. No cases means "No cases evaluated", not a successful
 verdict.
 
 Boolean declarations use execution protocol 5, CSO schema `1.3.0` and prepared
-document version 5. Update Python, core, React and CLI together before using this
+document version 6. Update Python, core, React and CLI together before using this
 feature. Older captures retain their existing versions and meaning. A consumer
 that supports only protocol 4 rejects Boolean captures before numerical execution.
 Math-only CSO export rejects Boolean report evidence rather than dropping it.

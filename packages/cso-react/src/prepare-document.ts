@@ -24,6 +24,7 @@ import {
   type PreparedDocumentItem,
   PreparedDocumentItemSchema,
   PreparedDocumentSchema,
+  functionIdentityFrom,
   PreparedDocumentSectionSchema,
   type PreparedMethodContent,
   type PreparedMethodHelper,
@@ -723,6 +724,7 @@ const presentMethodHelpers = (
   helpers.map((helper) => ({
     id: helper.id,
     function: helper.function,
+    functionIdentity: functionIdentityFrom(helper),
     contextSource: HistoricalReviewSchema.shape.originalFields.parse({
       metadata: helper.metadata ?? {},
     }),
@@ -851,6 +853,7 @@ const comparisonPlacement = (
       kind: 'method',
       id: item.id,
       title: method.title,
+      functionIdentity: functionIdentityFrom(method),
       contextSource: HistoricalReviewSchema.shape.originalFields.parse({
         metadata: item.metadata ?? {},
         contentMetadata: method.metadata ?? {},
@@ -1031,6 +1034,8 @@ const comparisonPlacement = (
     kind: 'table',
     id: item.id,
     title: table.title,
+    methodId: method.id,
+    functionIdentity: functionIdentityFrom(method),
     casesAxis: table.casesAxis,
     ...(table.columnCap ? { columnCap: table.columnCap } : {}),
     ...(branchNotes.length > 0 ? { branchNotes } : {}),
@@ -1274,18 +1279,15 @@ export const prepareExecutionDocument = (
   );
   const { metadata: _sourceMetadata, ...sourceProvenance } = cso.source;
   const document = parseDocument({
-    documentVersion:
-      execution.cso.schemaVersion === '1.3.0'
-        ? '5'
-        : execution.externalCalls
-          ? '4'
-          : sections.some((section) =>
-                section.items.some(
-                  (item) => item.kind === 'method' || item.kind === 'table',
-                ),
-              )
-            ? '3'
-            : '2',
+    documentVersion: sections.some((section) =>
+      section.items.some(
+        (item) => item.kind === 'method' || item.kind === 'table',
+      ),
+    )
+      ? '6'
+      : execution.externalCalls
+        ? '4'
+        : '2',
     context: [],
     ...(verification ? { verification } : {}),
     source: {

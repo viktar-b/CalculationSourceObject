@@ -8,6 +8,7 @@ import {
   type PreparedDocumentSection,
   type PreparedMethodContent,
   type PreparedMethodHelper,
+  type PreparedFunctionIdentity,
   type PreparedOutcomeRow,
   type SheetDocument,
 } from '@cs-object/core';
@@ -158,12 +159,31 @@ const SymbolicValueNote = (): ReactElement => (
   </p>
 );
 
+const procedureAnchor = (id: string): string => `cso-procedure-${id}`;
+const FunctionIdentity = ({
+  identity,
+}: {
+  identity: PreparedFunctionIdentity;
+}): ReactElement => (
+  <p
+    className="cso-function-identity"
+    data-function-identity={`${identity.moduleId}::${identity.function}`}
+  >
+    Function:{' '}
+    <code>
+      {identity.moduleId}::{identity.function}
+    </code>
+  </p>
+);
+
 const Procedure = ({
   title,
   children,
   heading: Heading,
+  functionIdentity,
 }: {
   title: string;
+  functionIdentity: PreparedFunctionIdentity;
   children: readonly ReactNode[];
   heading: 'h3' | 'h4';
 }): ReactElement => (
@@ -172,6 +192,7 @@ const Procedure = ({
       <tr>
         <th>
           <Heading>{title}</Heading>
+          <FunctionIdentity identity={functionIdentity} />
           <SymbolicValueNote />
         </th>
       </tr>
@@ -191,6 +212,13 @@ export const PreparedFormulaSheet = ({
   showSourceDetails = true,
 }: PreparedFormulaSheetProps): ReactElement => {
   const document = PreparedDocumentSchema.parse(input);
+  const procedures = new Map(
+    document.sections
+      .flatMap((section) =>
+        section.items.flatMap((item) => (item.kind === 'method' ? [item] : [])),
+      )
+      .map((method, index) => [method.id, `P${index + 1}`]),
+  );
   const sheet = mathSheet(document);
   const sections = new Map(
     document.sections.map((section) => [section.id, section]),
@@ -442,7 +470,11 @@ export const PreparedFormulaSheet = ({
           shown.add(helper.id);
           explanation = (
             <div className="cso-method-helper" data-helper={helper.function}>
-              <Procedure title={readableName(helper.function)} heading="h4">
+              <Procedure
+                title={readableName(helper.function)}
+                heading="h4"
+                functionIdentity={helper.functionIdentity}
+              >
                 {[
                   <EngineeringMetadata
                     key="context"
@@ -713,9 +745,14 @@ export const PreparedFormulaSheet = ({
                 key={item.sourcePlacementId}
                 data-source-placement={item.sourcePlacementId}
                 data-method-id={item.id}
+                id={procedureAnchor(requiredItem(procedures, item.id))}
                 className="cso-method"
               >
-                <Procedure title={item.title} heading="h3">
+                <Procedure
+                  title={`Procedure ${requiredItem(procedures, item.id)}: ${item.title}`}
+                  heading="h3"
+                  functionIdentity={item.functionIdentity}
+                >
                   {[
                     <EngineeringMetadata
                       key="context"
@@ -972,6 +1009,22 @@ export const PreparedFormulaSheet = ({
                 className="cso-comparison"
               >
                 <h3>{item.title}</h3>
+                <p
+                  className="cso-function-identity"
+                  data-method-reference={item.methodId}
+                  data-function-identity={`${item.functionIdentity.moduleId}::${item.functionIdentity.function}`}
+                >
+                  <a
+                    href={`#${procedureAnchor(requiredItem(procedures, item.methodId))}`}
+                  >
+                    Uses procedure {requiredItem(procedures, item.methodId)}
+                  </a>
+                  {': '}
+                  <code>
+                    {item.functionIdentity.moduleId}::
+                    {item.functionIdentity.function}
+                  </code>
+                </p>
                 {!item.outcomeRows &&
                   item.engineeringChecks?.map((check) =>
                     check.results.map((result) => (

@@ -114,7 +114,7 @@ it.each([
       parameters?.every((parameter) => parameter.origin.kind === 'output'),
     ).toBe(true);
     const document = prepareExecutionDocument({ execution, assets: [] });
-    expect(document.documentVersion).toBe('3');
+    expect(document.documentVersion).toBe('6');
     const items = document.sections.flatMap((section) => section.items);
     const methodItem = items.find((item) => item.kind === 'method');
     const tableItem = items.find((item) => item.kind === 'table');
