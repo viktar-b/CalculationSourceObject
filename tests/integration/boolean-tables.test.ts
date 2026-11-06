@@ -61,7 +61,7 @@ for (const axis of ['columns', 'rows']) {
   test(`${axis}: typed values, nested engineering verdicts and selected rules align with retained cases`, () => {
     const { response, document, table } = prepare(axis);
     expect(response.protocolVersion).toBe('5');
-    expect(document.documentVersion).toBe('5');
+    expect(document.documentVersion).toBe('6');
     expect(verifyExecution({ execution: response.execution }).ok).toBe(true);
     expect(table.casesAxis).toBe(axis);
     expect(table.groups).toEqual([]);

@@ -161,6 +161,9 @@ math {
 .cso-method-external { margin: 2mm 0; }
 .cso-method-external h4, .cso-method-external h5 { font-size: 12px; font-weight: 650; margin: 2mm 0 1mm; }
 .cso-method-external p, .cso-external-reference-coverage p { margin: 1mm 0; }
+.cso-function-identity { margin: 1mm 0; font-size: 0.85em; font-weight: 400; overflow-wrap: anywhere; }
+.cso-function-identity code { white-space: normal; }
+.cso-function-identity a { color: inherit; }
 .cso-comparison table { width: max-content; min-width: 100%; border-collapse: collapse; table-layout: auto; font-size: 11px; }
 .cso-comparison th, .cso-comparison td { border: 1px solid #d0d5dd; padding: 1.75mm 2.5mm; overflow-wrap: anywhere; white-space: pre-wrap; vertical-align: middle; }
 .cso-comparison th { text-align: left; font-weight: 600; }
@@ -192,7 +195,7 @@ math {
 }
 @media print {
   .cso-comparison-scroll, .cso-comparison > .cso-branch-note { display: none; }
-  .cso-comparison:has(.cso-comparison-parts) > h3 { display: none; }
+  .cso-comparison:has(.cso-comparison-parts) > h3, .cso-comparison:has(.cso-comparison-parts) > [data-method-reference] { display: none; }
   .cso-comparison-part, .cso-comparison-slice { break-inside: auto; }
   .cso-comparison-part + .cso-comparison-part { margin-top: 4mm; }
   .cso-comparison-part tr { break-inside: avoid; }

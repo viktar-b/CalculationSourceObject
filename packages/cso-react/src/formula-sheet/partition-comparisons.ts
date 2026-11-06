@@ -330,6 +330,10 @@ export function renderComparisonParts(
       if (plan.groups.length > 1)
         title.textContent += `. Part ${partIndex + 1} of ${plan.groups.length}`;
       context.appendChild(title);
+      const methodReference = comparison.querySelector(
+        ':scope > [data-method-reference]',
+      );
+      if (methodReference) context.appendChild(methodReference.cloneNode(true));
       for (const limit of table.querySelectorAll(
         'th[data-outcome-kind="applicability"]',
       )) {

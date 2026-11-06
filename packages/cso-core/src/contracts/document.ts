@@ -8,7 +8,9 @@ import {
   exactCaptureHash,
   executionBindingKey,
   HashSchema,
+  ModuleIdSchema,
   NonemptyStringSchema,
+  PythonIdentifierSchema,
   SourceSpanSchema,
   sha256Bytes,
 } from './common.ts';
@@ -280,9 +282,29 @@ export type PreparedMethodContent =
       predicateText: string;
       predicateSymbolId: string;
     };
+export const PreparedFunctionIdentitySchema = z.strictObject({
+  moduleId: ModuleIdSchema,
+  function: PythonIdentifierSchema,
+  sourceHash: HashSchema,
+  revision: HashSchema,
+});
+export type PreparedFunctionIdentity = z.infer<
+  typeof PreparedFunctionIdentitySchema
+>;
+
+export const functionIdentityFrom = (
+  captured: PreparedFunctionIdentity,
+): PreparedFunctionIdentity => ({
+  moduleId: captured.moduleId,
+  function: captured.function,
+  sourceHash: captured.sourceHash,
+  revision: captured.revision,
+});
+
 export type PreparedMethodHelper = {
   id: string;
   function: string;
+  functionIdentity: PreparedFunctionIdentity;
   content: PreparedMethodContent[];
   helpers: PreparedMethodHelper[];
   contextSource?: Record<string, HistoricalJsonValue>;
@@ -373,6 +395,7 @@ const PreparedMethodHelperSchema: z.ZodType<PreparedMethodHelper> = z.lazy(() =>
   z.strictObject({
     id: NonemptyStringSchema,
     function: NonemptyStringSchema,
+    functionIdentity: PreparedFunctionIdentitySchema,
     content: z.array(PreparedMethodContentSchema).min(1),
     helpers: z.array(PreparedMethodHelperSchema),
     contextSource: HistoricalJsonObjectSchema.optional(),
@@ -463,6 +486,7 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
     kind: z.literal('method'),
     id: NonemptyStringSchema,
     title: NonemptyStringSchema,
+    functionIdentity: PreparedFunctionIdentitySchema,
     quantities: z.array(PreparedMethodQuantitySchema).min(1),
     content: z.array(PreparedMethodContentSchema).min(1),
     helpers: z.array(PreparedMethodHelperSchema),
@@ -474,6 +498,8 @@ export const PreparedDocumentItemSchema = z.discriminatedUnion('kind', [
     kind: z.literal('table'),
     id: NonemptyStringSchema,
     title: NonemptyStringSchema,
+    methodId: NonemptyStringSchema,
+    functionIdentity: PreparedFunctionIdentitySchema,
     casesAxis: z.enum(['columns', 'rows']),
     columnCap: z.number().int().positive().optional(),
     cases: z.array(
@@ -749,7 +775,10 @@ const externalMethodInputsMatch = (
 
 export const PreparedDocumentSchema = z
   .strictObject({
-    documentVersion: z.enum(['2', '3', '4', '5']),
+    documentVersion: z.enum(['2', '4', '6'], {
+      error:
+        'Comparison reports require prepared document version 6. Reprepare from retained execution to recover captured function identities.',
+    }),
     verification: VerificationReportSchema.optional(),
     context: ContextSchema,
     source: z.discriminatedUnion('kind', [
@@ -783,26 +812,6 @@ export const PreparedDocumentSchema = z
               preparedExternalHelpers(item.helpers))),
       ),
     );
-    const booleanContent = (items: readonly PreparedMethodContent[]): boolean =>
-      items.some(
-        (item) =>
-          item.kind === 'boolean' ||
-          (item.kind === 'section' && booleanContent(item.content)),
-      );
-    const booleanHelpers = (
-      helpers: readonly PreparedMethodHelper[],
-    ): boolean =>
-      helpers.some(
-        (helper) =>
-          booleanContent(helper.content) || booleanHelpers(helper.helpers),
-      );
-    const booleans = document.sections.some((section) =>
-      section.items.some(
-        (item) =>
-          item.kind === 'method' &&
-          (booleanContent(item.content) || booleanHelpers(item.helpers)),
-      ),
-    );
     if (
       external &&
       (document.source.kind !== 'execution' ||
@@ -828,19 +837,16 @@ export const PreparedDocumentSchema = z
         'Verification must belong to the document capture',
         ['verification'],
       );
-    if (
-      (document.documentVersion === '5') !== booleans ||
-      (!booleans &&
-        ((document.documentVersion === '4') !== external ||
-          (!external && (document.documentVersion === '3') !== comparison)))
-    ) {
+    const version = comparison ? '6' : external ? '4' : '2';
+    if (document.documentVersion !== version) {
       addIssue(
         ctx,
         'INCOMPATIBLE_CONTRACT',
-        'Comparison documents use document version 3',
+        'Comparison reports require version 6; reprepare older reports from retained execution.',
         ['documentVersion'],
       );
     }
+    validateFunctionReferences(document, ctx);
     validatePlacements(document, ctx);
     validateContentIds(document, ctx);
     validateAssets(document, ctx);
@@ -1098,6 +1104,89 @@ export const BoundPreparedDocumentSchema = z
             ['document', 'sections', sectionIndex, 'items', itemIndex],
           );
         }
+        if (item.kind === 'method' || item.kind === 'table') {
+          const capturedTable =
+            item.kind === 'table'
+              ? execution.tables?.find((table) => table.id === item.id)
+              : undefined;
+          const methodId =
+            item.kind === 'method' ? item.id : capturedTable?.methodId;
+          const capturedMethod = execution.methods?.find(
+            (method) => method.id === methodId,
+          );
+          if (
+            !capturedMethod ||
+            (item.kind === 'table' &&
+              item.methodId !== capturedTable?.methodId) ||
+            exactCaptureHash(item.functionIdentity) !==
+              exactCaptureHash(functionIdentityFrom(capturedMethod))
+          ) {
+            addIssue(
+              ctx,
+              'DOCUMENT_FUNCTION_IDENTITY_MISMATCH',
+              'Reusable definitions and tables must identify their captured function and source revision',
+              [
+                'document',
+                'sections',
+                sectionIndex,
+                'items',
+                itemIndex,
+                'functionIdentity',
+              ],
+            );
+          }
+          if (item.kind === 'method' && capturedMethod) {
+            const validateHelpers = (
+              prepared: readonly PreparedMethodHelper[],
+              captured: readonly MethodHelperRecord[],
+            ): void => {
+              if (
+                prepared.length !== captured.length ||
+                new Set(prepared.map((helper) => helper.id)).size !==
+                  prepared.length
+              )
+                addIssue(
+                  ctx,
+                  'DOCUMENT_FUNCTION_IDENTITY_MISMATCH',
+                  'Retain each captured reusable helper definition exactly once',
+                  [
+                    'document',
+                    'sections',
+                    sectionIndex,
+                    'items',
+                    itemIndex,
+                    'helpers',
+                  ],
+                );
+              for (const helper of prepared) {
+                const expected = captured.find(
+                  (candidate) => candidate.id === helper.id,
+                );
+                if (
+                  !expected ||
+                  helper.function !== helper.functionIdentity.function ||
+                  exactCaptureHash(helper.functionIdentity) !==
+                    exactCaptureHash(functionIdentityFrom(expected))
+                )
+                  addIssue(
+                    ctx,
+                    'DOCUMENT_FUNCTION_IDENTITY_MISMATCH',
+                    'Reusable helper identity must match captured evidence',
+                    [
+                      'document',
+                      'sections',
+                      sectionIndex,
+                      'items',
+                      itemIndex,
+                      'helpers',
+                    ],
+                  );
+                if (expected) validateHelpers(helper.helpers, expected.helpers);
+              }
+            };
+            validateHelpers(item.helpers, capturedMethod.helpers);
+          }
+        }
         if (item.kind === 'method') {
           const method = execution.methods?.find(
             (method) => method.id === item.id,
@@ -1257,6 +1346,52 @@ const validatePlacements = (
         }
       }
       validatePlacementIdentity(placement, ctx, path);
+    }
+  }
+};
+
+const validateFunctionReferences = (
+  document: PreparedDocument,
+  ctx: z.RefinementCtx,
+): void => {
+  const validateHelpers = (helpers: readonly PreparedMethodHelper[]): void => {
+    for (const helper of helpers) {
+      if (helper.function !== helper.functionIdentity.function)
+        addIssue(
+          ctx,
+          'DOCUMENT_FUNCTION_IDENTITY_MISMATCH',
+          'Reusable helper names must agree with their canonical function identity',
+          ['sections'],
+        );
+      validateHelpers(helper.helpers);
+    }
+  };
+  const methods = document.sections.flatMap((section) =>
+    section.items.flatMap((item) => (item.kind === 'method' ? [item] : [])),
+  );
+  for (const method of methods) validateHelpers(method.helpers);
+  if (new Set(methods.map((method) => method.id)).size !== methods.length)
+    addIssue(
+      ctx,
+      'DOCUMENT_FUNCTION_IDENTITY_MISMATCH',
+      'Reusable definition identities must be unique',
+      ['sections'],
+    );
+  for (const [sectionIndex, section] of document.sections.entries()) {
+    for (const [itemIndex, item] of section.items.entries()) {
+      if (item.kind !== 'table') continue;
+      const definition = methods.find((method) => method.id === item.methodId);
+      if (
+        !definition ||
+        exactCaptureHash(definition.functionIdentity) !==
+          exactCaptureHash(item.functionIdentity)
+      )
+        addIssue(
+          ctx,
+          'DOCUMENT_FUNCTION_IDENTITY_MISMATCH',
+          'Every table must reference a displayed reusable definition with the same function identity',
+          ['sections', sectionIndex, 'items', itemIndex, 'methodId'],
+        );
     }
   }
 };

@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   BoundPreparedDocumentSchema,
+  PreparedDocumentSchema,
   deriveApplicability,
   ExecutionResponseSchema,
   verifyExecution,
@@ -305,6 +306,16 @@ beforeAll(() => {
     { encoding: 'utf8' },
   );
   expect(installed.status, installed.stderr).toBe(0);
+  writeFileSync(
+    join(directory, 'aliased_compare.cso.py'),
+    publication
+      .replace(
+        'import rectangle\n',
+        'import rectangle as renamed_calculation\n',
+      )
+      .replace('calculation=rectangle', 'calculation=renamed_calculation')
+      .replaceAll('= rectangle(', '= renamed_calculation('),
+  );
   writeFileSync(
     join(directory, 'forwarded.cso.py'),
     `from typing import Annotated, TypeAlias
@@ -611,6 +622,104 @@ function publish(
   );
 }
 
+test('requires captured function identification on definitions and tables', () => {
+  const execution = capture('aliased_compare.cso.py', 'compare');
+  const document = prepareExecutionDocument({ execution, assets: [] });
+  const items = document.sections.flatMap((section) => section.items);
+  const definition = items.find((item) => item.kind === 'method');
+  const table = items.find((item) => item.kind === 'table');
+  const method = execution.methods?.[0];
+  if (definition?.kind !== 'method' || table?.kind !== 'table' || !method)
+    throw new Error('Missing comparison');
+  const expected = {
+    moduleId: 'rectangle.cso.py',
+    function: 'rectangle',
+    sourceHash: method.sourceHash,
+    revision: method.revision,
+  };
+  expect(document.documentVersion).toBe('6');
+  expect(definition.functionIdentity).toEqual(expected);
+  expect(table.functionIdentity).toEqual(expected);
+  expect(table.methodId).toBe(definition.id);
+  expect(
+    BoundPreparedDocumentSchema.safeParse({ execution, document }).success,
+  ).toBe(true);
+  const html = renderToStaticMarkup(
+    createElement(PreparedFormulaSheet, { document, showSourceDetails: false }),
+  );
+  expect(elementWith(html, 'data-method-id=')).toContain('Function:');
+  expect(elementWith(html, 'data-method-id=')).toContain(
+    'rectangle.cso.py::rectangle',
+  );
+  expect(elementWith(html, 'data-comparison-id=')).toContain(
+    'rectangle.cso.py::rectangle',
+  );
+  expect(html).toContain('id="cso-procedure-P1"');
+  expect(html).toContain('href="#cso-procedure-P1"');
+  expect(html).toContain('Uses procedure P1');
+  expect(html).not.toContain('::renamed_calculation');
+
+  for (const target of ['method', 'table']) {
+    const candidate = {
+      ...document,
+      sections: document.sections.map((section) => ({
+        ...section,
+        items: section.items.map((item) => {
+          if (
+            item.kind !== target ||
+            (item.kind !== 'method' && item.kind !== 'table')
+          )
+            return item;
+          const { functionIdentity: _, ...withoutIdentity } = item;
+          return withoutIdentity;
+        }),
+      })),
+    };
+    expect(PreparedDocumentSchema.safeParse(candidate).success).toBe(false);
+  }
+  for (const field of ['moduleId', 'function', 'sourceHash', 'revision']) {
+    const tampered = structuredClone(document);
+    for (const item of tampered.sections.flatMap((section) => section.items)) {
+      if (item.kind !== 'method' && item.kind !== 'table') continue;
+      if (field === 'moduleId')
+        item.functionIdentity.moduleId = 'unrelated.cso.py';
+      if (field === 'function') item.functionIdentity.function = 'unrelated';
+      if (field === 'sourceHash')
+        item.functionIdentity.sourceHash = '0'.repeat(64);
+      if (field === 'revision') item.functionIdentity.revision = '0'.repeat(64);
+    }
+    // Altering both copies consistently must still fail against captured evidence.
+    expect(PreparedDocumentSchema.safeParse(tampered).success).toBe(true);
+    expect(
+      BoundPreparedDocumentSchema.safeParse({ execution, document: tampered })
+        .success,
+    ).toBe(false);
+  }
+  const withoutDefinition = {
+    ...document,
+    sections: document.sections.map((section) => ({
+      ...section,
+      items: section.items.filter((item) => item.kind !== 'method'),
+    })),
+  };
+  expect(PreparedDocumentSchema.safeParse(withoutDefinition).success).toBe(
+    false,
+  );
+  const wrongBinding = structuredClone(document);
+  const wrongTable = wrongBinding.sections
+    .flatMap((section) => section.items)
+    .find((item) => item.kind === 'table');
+  if (wrongTable?.kind !== 'table') throw new Error('Missing table');
+  wrongTable.methodId = 'unrelated-method';
+  expect(PreparedDocumentSchema.safeParse(wrongBinding).success).toBe(false);
+  for (const documentVersion of ['3', '4', '5']) {
+    expect(
+      PreparedDocumentSchema.safeParse({ ...document, documentVersion })
+        .success,
+    ).toBe(false);
+  }
+});
+
 test('publishes one straight-line method and bound case columns', async () => {
   const execution = capture('compare.cso.py', 'compare');
   expect(execution.cso.schemaVersion).toBe('1.1.0');
@@ -618,7 +727,7 @@ test('publishes one straight-line method and bound case columns', async () => {
   const first = prepareExecutionDocument({ execution, assets: [] });
   const second = prepareExecutionDocument({ execution, assets: [] });
   expect(second).toEqual(first);
-  expect(first.documentVersion).toBe('3');
+  expect(first.documentVersion).toBe('6');
   const root = first.sections[0];
   expect(root?.items.map((item) => item.kind)).toEqual([
     'method',
@@ -1387,6 +1496,10 @@ test('continues a wide comparison across measured column groups', () => {
   expect(text.stdout).toContain('Part 1 of 3');
   expect(text.stdout).toContain('Part 3 of 3');
   expect(text.stdout.match(/Subscript:/g)?.length).toBeGreaterThanOrEqual(3);
+  expect(
+    text.stdout.replace(/\s+/g, '').match(/wide_checked.cso.py::rectangle/g)
+      ?.length,
+  ).toBeGreaterThanOrEqual(4);
   expect(text.stdout).toContain('Not applicable');
   expect(text.stdout).toContain('Perimeter exceeds twelve metres.');
   expect(text.stdout).toContain('m2');
@@ -1403,6 +1516,10 @@ test('continues a wide comparison across measured column groups', () => {
   expect(rowsText.stdout).toContain('Not applicable');
   expect(rowsText.stdout.match(/Case A/g)?.length).toBeGreaterThan(1);
   expect(rowsText.stdout.match(/Subscript:/g)?.length).toBeGreaterThan(1);
+  expect(
+    rowsText.stdout.replace(/\s+/g, '').match(/wide_checked.cso.py::rectangle/g)
+      ?.length,
+  ).toBeGreaterThan(1);
 
   const sentinel = join(directory, 'unfit-sentinel.pdf');
   writeFileSync(sentinel, 'keep');
@@ -1447,7 +1564,10 @@ test('repeats comparison context across vertical page breaks', () => {
       expect(page).toMatch(/Inputs|Outputs|Checks and conditions/);
     }
   }
-  expect(rowPages.at(-1)).toContain('Case 64');
+  const casePages = rowPages.filter((page) => page.includes('Case '));
+  expect(casePages.at(-1)).toContain('Case 64');
+  for (const page of casePages)
+    expect(page).toContain('tall_rectangle.cso.py::rectangle');
   expect(rowPages.join('\n')).toContain('Not applicable');
   expect(rowPages.join('\n')).toContain('Perimeter exceeds twelve metres.');
   const rowHash = createHash('sha256')
@@ -1524,6 +1644,24 @@ test('composed method returns keep exact case bindings in both orientations', ()
     );
     expect(html).toContain('cso-symbol-row');
     expect(html).toContain('data-quantity="area"');
+    expect(html).toContain('forwarded.cso.py::forwarded');
+    expect(html).toContain('rectangle.cso.py::rectangle');
+    const renamedHelper = structuredClone(document);
+    const helperMethod = renamedHelper.sections
+      .flatMap((section) => section.items)
+      .find((item) => item.kind === 'method');
+    const helper =
+      helperMethod?.kind === 'method' ? helperMethod.helpers[0] : undefined;
+    if (!helper) throw new Error('Missing reusable helper');
+    helper.functionIdentity.function = 'different_function';
+    expect(PreparedDocumentSchema.safeParse(renamedHelper).success).toBe(false);
+    helper.function = 'different_function';
+    expect(
+      BoundPreparedDocumentSchema.safeParse({
+        execution,
+        document: renamedHelper,
+      }).success,
+    ).toBe(false);
     const tampered = structuredClone(execution);
     const cell = tampered.tables?.[0]?.cells.find(
       (cell) => cell.symbolId === first.symbolId,
@@ -1573,7 +1711,7 @@ test('mixed external methods retain complete case-specific indexed blocks in bot
       assets: [],
       verificationReport: report,
     });
-    expect(document.documentVersion).toBe('4');
+    expect(document.documentVersion).toBe('6');
     const blocks = document.sections.flatMap((section) =>
       section.items.filter((item) => item.kind === 'externalCall'),
     );
@@ -1697,7 +1835,7 @@ test('empty external tables describe unimportable adapters without running repre
   expect(html).toContain('data-method-external="searched"');
   expect(html).toContain('Unused diagnostic count');
   expect(html).toContain('No cases evaluated');
-  expect(document.documentVersion).toBe('4');
+  expect(document.documentVersion).toBe('6');
   const methodsPath = join(directory, 'external_methods.py');
   writeFileSync(
     methodsPath,
