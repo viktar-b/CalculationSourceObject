@@ -714,6 +714,12 @@ test('publishes one straight-line method and bound case columns', async () => {
   );
   expect(htmlText).toContain('data-case-heading="Case A"');
   expect(htmlText).toContain('data-case-heading="Case B"');
+  expect(elementWith(htmlText, 'data-case-heading="Case A"')).toContain(
+    'data-case-qualifier="fp"',
+  );
+  expect(elementWith(htmlText, 'data-case-heading="Case B"')).toContain(
+    'data-case-qualifier="sp"',
+  );
   expect(htmlText).toContain('(w * h)');
 
   const sentinelPath = join(directory, 'sentinel.pdf');
@@ -765,6 +771,9 @@ test('publishes one straight-line method and bound case columns', async () => {
     'scope="row" data-comparison-label="" data-case-heading="Case A"',
   );
   expect(rowHtmlText).toContain('scope="col" data-quantity="area"');
+  expect(elementWith(rowHtmlText, 'data-case-heading="Case A"')).toContain(
+    'data-case-qualifier="fp"',
+  );
   const rowPdfPath = join(directory, 'rows.pdf');
   const rowPdf = publish('pdf', 'rows_publish.cso.py', 'compare', rowPdfPath);
   expect(rowPdf.status, rowPdf.stdout || rowPdf.stderr).toBe(0);
@@ -814,6 +823,14 @@ test('typesets methods, notes and table values like ordinary formula rows', () =
   const areaHeading = elementWith(html, 'scope="row" data-quantity="area"');
   expect(areaHeading).toContain('<msup');
   expect(areaHeading).not.toContain('m^2');
+  const firstCase = elementWith(html, 'data-case-heading="Case A"');
+  expect(firstCase).toContain('Subscript:');
+  expect(firstCase).toContain('data-case-qualifier="fp"');
+  expect(firstCase).toContain('<math');
+  // Captured downstream notation uses the same suffix as the header.
+  expect(
+    document.detachedSymbols.some((symbol) => symbol.glyph === 'A_{fp}'),
+  ).toBe(true);
 
   const branchDocument = prepareExecutionDocument({
     execution: capture('branch_compare.cso.py', 'compare'),
@@ -1369,6 +1386,7 @@ test('continues a wide comparison across measured column groups', () => {
   expect(text.status, text.stderr).toBe(0);
   expect(text.stdout).toContain('Part 1 of 3');
   expect(text.stdout).toContain('Part 3 of 3');
+  expect(text.stdout.match(/Subscript:/g)?.length).toBeGreaterThanOrEqual(3);
   expect(text.stdout).toContain('Not applicable');
   expect(text.stdout).toContain('Perimeter exceeds twelve metres.');
   expect(text.stdout).toContain('m2');
@@ -1384,6 +1402,7 @@ test('continues a wide comparison across measured column groups', () => {
   expect(rowsText.stdout).toContain('Part 1 of');
   expect(rowsText.stdout).toContain('Not applicable');
   expect(rowsText.stdout.match(/Case A/g)?.length).toBeGreaterThan(1);
+  expect(rowsText.stdout.match(/Subscript:/g)?.length).toBeGreaterThan(1);
 
   const sentinel = join(directory, 'unfit-sentinel.pdf');
   writeFileSync(sentinel, 'keep');

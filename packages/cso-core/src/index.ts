@@ -129,7 +129,11 @@ export { assertNever } from './shared/assertNever.ts';
 export { formatNumerical } from './shared/formatNumerical.ts';
 export type { NumericKind } from './contracts/numbers.ts';
 
-export { scopedGlyph, symbolDisplayIdentity } from './contracts/glyphs.ts';
+export {
+  compactGlyphScope,
+  scopedGlyph,
+  symbolDisplayIdentity,
+} from './contracts/glyphs.ts';
 export { notationIdentity } from './notation/identity.ts';
 export { parseNotation } from './notation/parse.ts';
 export type {

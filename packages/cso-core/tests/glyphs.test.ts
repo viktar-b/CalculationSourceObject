@@ -1,6 +1,16 @@
 import { expect, it } from 'vitest';
-import { symbolDisplayIdentity, scopedGlyph } from '../src/contracts/glyphs.ts';
+import {
+  compactGlyphScope,
+  scopedGlyph,
+  symbolDisplayIdentity,
+} from '../src/contracts/glyphs.ts';
+
 const glyphIdentity = (glyph: string) => symbolDisplayIdentity({ glyph });
+it('uses the same compact scope in case headings and qualified glyphs', () => {
+  expect(compactGlyphScope('case_alpha')).toBe('ca');
+  expect(compactGlyphScope('outer_frame,case_alpha')).toBe('of,ca');
+  expect(compactGlyphScope('𐐀_panel')).toBe('𐐀p');
+});
 it('preserves existing scripts and distinguishes full nested call paths', () => {
   expect(scopedGlyph('A_s', 'a,child')).toBe('A_{s,a,child}');
   expect(scopedGlyph('A_{s}', 'b,child')).toBe('A_{s,b,child}');

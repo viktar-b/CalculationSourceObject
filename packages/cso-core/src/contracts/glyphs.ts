@@ -64,9 +64,9 @@ export const addSymbolDisplayIssues = (
   }
 };
 
-export const scopedGlyph = (glyph: string, scope: string): string => {
-  // Keep full binding names in evidence and compact initials in the document.
-  const displayScope = scope
+/** Keep full binding names in evidence and compact initials in the document. */
+export const compactGlyphScope = (scope: string): string =>
+  scope
     .split(',')
     .map((binding) => {
       const words = binding.split('_').filter(Boolean);
@@ -75,6 +75,9 @@ export const scopedGlyph = (glyph: string, scope: string): string => {
         : binding;
     })
     .join(',');
+
+export const scopedGlyph = (glyph: string, scope: string): string => {
+  const displayScope = compactGlyphScope(scope);
   const subscript = subscriptPattern.exec(glyph);
   if (subscript) {
     return `${subscript[1]}_{${subscript[2] ?? subscript[3]},${displayScope}}`;
