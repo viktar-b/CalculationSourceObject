@@ -36,10 +36,11 @@ def design(
         linear_stiffness=linear_stiffness,
         cubic_coefficient=cubic_coefficient,
     )
+    # Keep a named review quantity because the travel criterion targets it.
     displacement: Deflection = static_equilibrium["displacement"]
     stored_energy: Energy = (
-        0.5 * linear_stiffness * static_equilibrium["displacement"] ** 2
-        + 0.25 * cubic_coefficient * static_equilibrium["displacement"] ** 4
+        0.5 * linear_stiffness * displacement ** 2
+        + 0.25 * cubic_coefficient * displacement ** 4
     )
     boolean(id="cubic-spring", description="Cubic spring included", predicate=cubic_coefficient > 0)
     check(
@@ -51,7 +52,7 @@ def design(
     harmonic_response = response(
         linear_stiffness=linear_stiffness,
         cubic_coefficient=cubic_coefficient,
-        displacement=static_equilibrium["displacement"],
+        displacement=displacement,
         mass=mass,
         damping=damping,
         frequency=frequency,

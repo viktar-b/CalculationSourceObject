@@ -940,11 +940,12 @@ test('publishes nested helper explanations without pruning authored context', as
   expect(htmlText.match(/data-helper="margin"/g)).toHaveLength(1);
   expect(htmlText).toContain('data-call="wider"');
   expect(htmlText).toContain('data-call="taller"');
-  expect(elementWith(htmlText, 'data-call="wider"')).toContain(
-    'data-formula="w"',
+  const helperInputs = elementWith(htmlText, 'data-helper="margin"');
+  expect(elementWith(helperInputs, 'data-binding-call="Wider"')).toContain(
+    '<mi>w</mi>',
   );
-  expect(elementWith(htmlText, 'data-call="taller"')).toContain(
-    'data-formula="h"',
+  expect(elementWith(helperInputs, 'data-binding-call="Taller"')).toContain(
+    '<mi>h</mi>',
   );
   expect(htmlText).toContain('The margin is one metre.');
   expect(htmlText).toContain('Panel sides are grown independently.');

@@ -3,6 +3,12 @@
 Two worked reports combine numerical adapters with documented symbolic methods.
 They use only the Python standard library.
 
+Input connections and direct forwarded results show their origins in the normal
+quantity rows. The named `displacement` in `design.cso.py` is intentional: it is
+the target of the static-travel criterion, so its annotated alias keeps a
+derivation. The energy and response calculations then use that review quantity.
+Other helper results are returned directly, without extra annotated copies.
+
 - `showcase.cso.py::compare` compares a linear spring, a hardening spring near resonance, and a hardening spring outside the chosen small-motion limit. Cases appear in columns.
 - `showcase.cso.py::sweep` solves equilibrium once and reuses that displacement in five frequency cases. Cases appear in rows. All three data columns fit together in one print part.
 

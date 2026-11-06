@@ -189,6 +189,12 @@ export const methodNotation = (
     description: quantity.description,
     ...(quantity.unit ? { unit: quantity.unit } : {}),
     valueTree,
+    // Source annotations cannot use this reserved namespace. Older captures
+    // retain their original, more verbose presentation.
+    ...(quantity.variableName.startsWith('__cso_return_') &&
+    quantity.role === 'output'
+      ? { metadata: { csoForwardedReturn: true } }
+      : {}),
   });
 
   const owners: Owner[] = [method, ...helpers.values()];
