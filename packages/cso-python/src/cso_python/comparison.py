@@ -298,6 +298,8 @@ def _quantities(planner, inv, module, definition, plan, at: ast.AST) -> list[Jso
         quantities.append(_quantity(name, name, "input", "input", metadata, [], glyphs))
     for quantity in plan.quantities:
         variable = quantity["variableName"]
+        if variable.startswith("__cso_"):
+            planner.error(inv, at, "DUPLICATE_IDENTITY", "Symbol names starting with __cso_ are reserved")
         nodes = quantity["nodes"]
         assignment = _declared_assignment(plan.steps, variable)
         if not isinstance(assignment, ast.AnnAssign):
@@ -345,7 +347,7 @@ def _quantities(planner, inv, module, definition, plan, at: ast.AST) -> list[Jso
     for index, (name, output) in enumerate(definition.outputs.items()):
         if name in represented:
             continue
-        variable = f"__return_{index}"
+        variable = f"__cso_return_{index}"
         while variable in occupied:
             variable += "_"
         occupied.add(variable)

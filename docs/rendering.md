@@ -27,6 +27,31 @@ It orders assignments by dependency and generates Python without executing it.
 
 ## Engineering presentation
 
+### Passing existing quantities
+
+Passing or returning an existing quantity does not create a calculation step.
+Keep each function's inputs and outputs in the standard indexed quantity rows,
+with the binding's origin in the comment cell. Preserve existing comments too.
+Helper input rows identify each explicit connection's source; multiple calls
+remain distinct.
+Literal connections show the complete supplied number without result-display
+rounding.
+Computed arguments still have a separate derivation.
+
+Direct forwarded returns use the existing captured quantity identity in case
+tables. Their symbolic rows show the source without a second equality row.
+Explicitly annotated aliases retain their full derivation as an authored change
+of notation or review quantity. Do not infer forwarding from equal values,
+matching glyphs or a numerical simplification. Arithmetic, conditional
+expressions and conversions remain calculations.
+
+This is presentation of the retained plan: keep every formula tree, binding,
+call path, unit, qualification and diagnostic in the evidence. Older prepared
+reports retain equality rows for previously captured direct returns. Regenerate
+captures and prepare reports again to get compact return rows.
+
+### Narrative and evidence
+
 Default HTML/PDF shows the engineering narrative: ordered inputs and formulas,
 substitutions, units, explanations, diagrams, assumptions, qualifications and
 results. Full source/audit data stays in machine-readable evidence. Internal
