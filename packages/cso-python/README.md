@@ -1,9 +1,17 @@
 # cs-object
 
 Author constrained `.cso.py` calculations with Python 3.11+. Runtime dependencies
-are the standard library only. Read [authoring](../../docs/authoring.md) before
-writing calculations and use [two-panel](../../examples/two-panel/README.md) for
-shared metadata and composed calls.
+are the standard library only. Read the complete language and authoring contract
+from your installed wheel before writing calculations:
+
+```sh
+python -m cso_python authoring
+python -m cso_python authoring --out authoring-contract.md
+```
+
+The export includes the installed `cs-object` version and has no checkout-relative
+links. It includes a complete composed-report recipe with a figure. The owning
+source is [authoring.md](src/cso_python/authoring.md).
 
 ## Install and run
 
@@ -114,3 +122,25 @@ keyword arguments and typed public result keys. Runtime dependencies stay empty.
 The tests use package-owned synthetic fixtures and temporary bindings; no root
 examples or Node are required. [Workspace integration](../../tests/integration/README.md)
 owns actual example, installed cross-package and PDF acceptance.
+
+
+## Release checks
+
+Ship `src/cso_python/authoring.md` in every wheel and sdist. Update that one source
+when the authoring contract changes. `python -m cso_python authoring` reads it
+from the installed package; no initializer-time copy is maintained.
+
+Before releasing, run the Python package tests and the repository's
+`npm run test:initializer` against actual archives and a wheel. The installed
+consumer checks the initializer's exact `requirements.txt` pin against wheel
+metadata, exports the installed guide, checks local Markdown links and executes
+the shipped composed-report recipe. A missing guide or stale exported copy fails
+acceptance. Release CI runs these installed consumers before publication.
+
+When upgrading the Python version used by new projects, update
+`create-cs-object/template/requirements.txt` and release a new initializer version.
+The two packages may have different version numbers. The exact dependency pin
+selects the language contract; setup exports that wheel's guide each time it runs.
+Existing projects can retain their pin. After an intentional upgrade, rerun setup
+to refresh the local contract. Do not publish an initializer pin before that Python
+version is available on PyPI.

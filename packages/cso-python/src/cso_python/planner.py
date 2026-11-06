@@ -11,7 +11,7 @@ from .annotations import Annotation, symbol_annotation
 from .definitions import Definitions
 from .exporter import derived_section_id
 from .notation import parse_notation
-from .source_plan import compile_source_plan
+from .source_plan import compile_source_plan, input_precondition_text
 from .source import (
     Capture,
     Invocation,
@@ -716,7 +716,20 @@ class Planner:
     ) -> None:
         for step in steps:
             node = step.node
-            if isinstance(node, ast.AnnAssign):
+            if isinstance(node, ast.Assert):
+                self.expression(inv, node.test)
+                local_id = f"input-precondition-{node.lineno}"
+                item_id = identity("text", inv.id, local_id)
+                ids.add(item_id)
+                section["items"].append(
+                    {
+                        "kind": "text",
+                        "id": item_id,
+                        "metadata": self.metadata(inv, local_id, node),
+                        "text": {"content": input_precondition_text(node)},
+                    }
+                )
+            elif isinstance(node, ast.AnnAssign):
                 if (
                     not isinstance(node.target, ast.Name)
                     or node.value is None

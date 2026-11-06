@@ -27,6 +27,7 @@ import {
   RunSchema,
   writeJson,
 } from './_initializer-evidence.ts';
+import { exerciseGuidance } from './_initializer-guidance.ts';
 import {
   createCommandRunner,
   type DevServer,
@@ -43,8 +44,11 @@ const repository = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const root = realpathSync(
   mkdtempSync(join(tmpdir(), 'cso installed packages initializer ')),
 );
-const archives = join(root, 'archives');
-mkdirSync(archives);
+const suppliedArchives = process.argv[2];
+const archives = suppliedArchives
+  ? resolve(suppliedArchives)
+  : join(root, 'archives');
+if (!suppliedArchives) mkdirSync(archives);
 const environment: NodeJS.ProcessEnv = { ...process.env };
 for (const key of ['NODE_PATH', 'PYTHONPATH', 'PYTHONHOME', 'VIRTUAL_ENV'])
   Reflect.deleteProperty(environment, key);
@@ -67,27 +71,43 @@ process.stdout.write(`Initializer acceptance artifacts: ${root}\n`);
 let registry: Server | undefined;
 let dev: DevServer | undefined;
 try {
-  await run({ cwd: repository, command: 'npm', args: ['run', 'build:lib'] });
-  await run({
-    cwd: repository,
-    command: 'npm',
-    args: ['run', 'build', '--workspace', '@cs-object/cli'],
-  });
-  await run({
-    cwd: repository,
-    command: 'npm',
-    args: ['run', 'build', '--workspace', 'create-cs-object'],
-  });
-  const packed = await Promise.all(
-    [
+  let packed: string[];
+  if (suppliedArchives) {
+    packed = readdirSync(archives)
+      .filter((name) => name.endsWith('.tgz'))
+      .map((name) => join(archives, name));
+  } else {
+    await run({ cwd: repository, command: 'npm', args: ['run', 'build:lib'] });
+    await run({
+      cwd: repository,
+      command: 'npm',
+      args: ['run', 'build', '--workspace', '@cs-object/cli'],
+    });
+    await run({
+      cwd: repository,
+      command: 'npm',
+      args: ['run', 'build', '--workspace', 'create-cs-object'],
+    });
+    packed = await Promise.all(
+      [
+        '@cs-object/core',
+        '@cs-object/react',
+        '@cs-object/cli',
+        'create-cs-object',
+      ].map((workspace) => pack({ workspace, repository, archives, run })),
+    );
+  }
+  const packages = await Promise.all(
+    packed.map((archive) => registryPackage({ archive, root, run })),
+  );
+  assert.deepEqual(
+    new Set(packages.map((item) => item.manifest.name)),
+    new Set([
       '@cs-object/core',
       '@cs-object/react',
       '@cs-object/cli',
       'create-cs-object',
-    ].map((workspace) => pack({ workspace, repository, archives, run })),
-  );
-  const packages = await Promise.all(
-    packed.map((archive) => registryPackage({ archive, root, run })),
+    ]),
   );
   const initializer = packages.find(
     (item) => item.manifest.name === 'create-cs-object',
@@ -107,29 +127,31 @@ try {
     'The initializer archive must not vendor release artifacts',
   );
 
-  const builder = join(root, 'wheel-builder');
-  await run({
-    cwd: root,
-    command: process.env.PYTHON ?? 'python3',
-    args: ['-m', 'venv', builder],
-  });
-  const builderPython = join(
-    builder,
-    process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python',
-  );
-  await run({
-    cwd: root,
-    command: builderPython,
-    args: [
-      '-m',
-      'pip',
-      'wheel',
-      '--no-deps',
-      '--wheel-dir',
-      archives,
-      join(repository, 'packages/cso-python'),
-    ],
-  });
+  if (!suppliedArchives) {
+    const builder = join(root, 'wheel-builder');
+    await run({
+      cwd: root,
+      command: process.env.PYTHON ?? 'python3',
+      args: ['-m', 'venv', builder],
+    });
+    const builderPython = join(
+      builder,
+      process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python',
+    );
+    await run({
+      cwd: root,
+      command: builderPython,
+      args: [
+        '-m',
+        'pip',
+        'wheel',
+        '--no-deps',
+        '--wheel-dir',
+        archives,
+        join(repository, 'packages/cso-python'),
+      ],
+    });
+  }
   const wheels = readdirSync(archives).filter((name) => name.endsWith('.whl'));
   assert.equal(wheels.length, 1);
   const wheel = join(archives, wheels[0] ?? 'missing.whl');
@@ -197,6 +219,7 @@ try {
     ).trim(),
   );
   assert(pythonLocation.startsWith(`${join(project, '.venv')}${sep}`));
+  await exerciseGuidance({ project, installedPython, environment, run });
 
   dev = await startDev({
     project,

@@ -9,6 +9,7 @@ from cso_python import (
     section,
     symbol,
     document_section,
+    applicable,
     text,
 )
 
@@ -71,6 +72,17 @@ def calculate(
         id="reference-corrections",
         content="Based on the Enji template with corrections to the web parallel-axis term, symmetric taper inertia, bottom-taper width and governing elastic modulus. Y_0 translates absolute boundary and plastic-neutral-axis coordinates; centroid distances and section properties remain relative to the lower boundary. Independent polygon checks cover five plastic-neutral-axis regions. Human engineering approval is separate.",
     )
+    area_properties = area_inertia(
+        section_depth=section_depth,
+        web_thickness=web_thickness,
+        width_of_top_flange=width_of_top_flange,
+        outer_top_flange_thickness=outer_top_flange_thickness,
+        inner_top_flange_thickness=inner_top_flange_thickness,
+        width_of_bot_flange=width_of_bot_flange,
+        outer_bot_flange_thickness=outer_bot_flange_thickness,
+        inner_bot_flange_thickness=inner_bot_flange_thickness,
+    )
+
     outer_flange_to_flange_depth: Annotated[
         float,
         symbol(
@@ -81,17 +93,6 @@ def calculate(
         ),
     ] = (
         section_depth - outer_bot_flange_thickness - outer_top_flange_thickness
-    )
-
-    area_properties = area_inertia(
-        section_depth=section_depth,
-        web_thickness=web_thickness,
-        width_of_top_flange=width_of_top_flange,
-        outer_top_flange_thickness=outer_top_flange_thickness,
-        inner_top_flange_thickness=inner_top_flange_thickness,
-        width_of_bot_flange=width_of_bot_flange,
-        outer_bot_flange_thickness=outer_bot_flange_thickness,
-        inner_bot_flange_thickness=inner_bot_flange_thickness,
     )
 
     tapered_top_flange_segment_horizontal_length: Annotated[
@@ -694,6 +695,8 @@ def calculate(
             * (distance_to_plastic_neutral_axis_from_lower_boundary - outer_bot_flange_thickness / 2)
         )
 
+        text(id="bottom-wedge-domain", content="The following bottom-taper wedge widths, areas, lever arms and wedge terms apply only when the PNA lies within the bottom taper, including its boundaries. Outside this interval these quantities are inapplicable and show zero placeholders. The whole-trapezoid term below uses its own applicable branch.")
+
         the_width_at_the_pna_level_when_inside_the_bottom_trapezoid: Annotated[
             float,
             symbol(
@@ -702,7 +705,7 @@ def calculate(
                 description="The width at the PNA level when inside the bottom trapezoid",
                 unit="mm",
             ),
-        ] = width_of_bot_flange + (distance_to_plastic_neutral_axis_from_lower_boundary - outer_bot_flange_thickness) * bottom_trapezoid_gradient
+        ] = (width_of_bot_flange + (distance_to_plastic_neutral_axis_from_lower_boundary - outer_bot_flange_thickness) * bottom_trapezoid_gradient) if outer_bot_flange_thickness <= distance_to_plastic_neutral_axis_from_lower_boundary <= inner_bot_flange_thickness else 0
 
         area_bottom_wedge: Annotated[
             float,
@@ -710,15 +713,15 @@ def calculate(
                 id="A_bw_bot_trapz",
                 glyph="A_{bw,bot,trapz}",
                 description="Area bottom wedge",
-                unit="",
+                unit="mm^2",
             ),
         ] = (
-            (
+            ((
                 width_of_bot_flange
                 + the_width_at_the_pna_level_when_inside_the_bottom_trapezoid
             )
             / 2
-            * (distance_to_plastic_neutral_axis_from_lower_boundary - outer_bot_flange_thickness)
+            * (distance_to_plastic_neutral_axis_from_lower_boundary - outer_bot_flange_thickness)) if outer_bot_flange_thickness <= distance_to_plastic_neutral_axis_from_lower_boundary <= inner_bot_flange_thickness else 0
         )
 
         lever_arm_bottom_wedge: Annotated[
@@ -730,7 +733,7 @@ def calculate(
                 unit="mm",
             ),
         ] = (
-            (distance_to_plastic_neutral_axis_from_lower_boundary - outer_bot_flange_thickness)
+            ((distance_to_plastic_neutral_axis_from_lower_boundary - outer_bot_flange_thickness)
             / 3
             * (
                 (
@@ -741,7 +744,7 @@ def calculate(
                     the_width_at_the_pna_level_when_inside_the_bottom_trapezoid
                     + width_of_bot_flange
                 )
-            )
+            )) if outer_bot_flange_thickness <= distance_to_plastic_neutral_axis_from_lower_boundary <= inner_bot_flange_thickness else 0
         )
 
         bottom_wedge_term: Annotated[
@@ -753,7 +756,7 @@ def calculate(
                 unit="mm^3",
             ),
         ] = (
-            area_bottom_wedge * lever_arm_bottom_wedge
+            (area_bottom_wedge * lever_arm_bottom_wedge) if outer_bot_flange_thickness <= distance_to_plastic_neutral_axis_from_lower_boundary <= inner_bot_flange_thickness else 0
         )
 
         area_top_wedge: Annotated[
@@ -765,12 +768,12 @@ def calculate(
                 unit="mm^2",
             ),
         ] = (
-            (
+            ((
                 the_width_at_the_pna_level_when_inside_the_bottom_trapezoid
                 + web_thickness
             )
             / 2
-            * (inner_bot_flange_thickness - distance_to_plastic_neutral_axis_from_lower_boundary)
+            * (inner_bot_flange_thickness - distance_to_plastic_neutral_axis_from_lower_boundary)) if outer_bot_flange_thickness <= distance_to_plastic_neutral_axis_from_lower_boundary <= inner_bot_flange_thickness else 0
         )
 
         lever_arm_top_wedge: Annotated[
@@ -782,7 +785,7 @@ def calculate(
                 unit="mm",
             ),
         ] = (
-            (inner_bot_flange_thickness - distance_to_plastic_neutral_axis_from_lower_boundary)
+            ((inner_bot_flange_thickness - distance_to_plastic_neutral_axis_from_lower_boundary)
             / 3
             * (
                 (
@@ -793,7 +796,7 @@ def calculate(
                     the_width_at_the_pna_level_when_inside_the_bottom_trapezoid
                     + web_thickness
                 )
-            )
+            )) if outer_bot_flange_thickness <= distance_to_plastic_neutral_axis_from_lower_boundary <= inner_bot_flange_thickness else 0
         )
 
         top_wedge_term: Annotated[
@@ -805,8 +808,10 @@ def calculate(
                 unit="mm^3",
             ),
         ] = (
-            area_top_wedge * lever_arm_top_wedge
+            (area_top_wedge * lever_arm_top_wedge) if outer_bot_flange_thickness <= distance_to_plastic_neutral_axis_from_lower_boundary <= inner_bot_flange_thickness else 0
         )
+
+        applicable(id="bottom-taper-wedges", targets=('the_width_at_the_pna_level_when_inside_the_bottom_trapezoid', 'area_bottom_wedge', 'lever_arm_bottom_wedge', 'bottom_wedge_term', 'area_top_wedge', 'lever_arm_top_wedge', 'top_wedge_term'), explanation="Only applicable when the PNA lies within the bottom taper, including its boundaries. Zero is an inactive placeholder.", predicate=outer_bot_flange_thickness <= distance_to_plastic_neutral_axis_from_lower_boundary <= inner_bot_flange_thickness)
 
         bottom_trapezoid_term: Annotated[
             float,
@@ -858,6 +863,8 @@ def calculate(
             )
         )
 
+        text(id="top-wedge-domain", content="The following top-taper wedge widths, areas, lever arms and wedge terms apply only when the PNA lies within the top taper, including its boundaries. Outside this interval these quantities are inapplicable and show zero placeholders. The whole-trapezoid term below uses its own applicable branch.")
+
         the_width_at_the_pna_level_when_inside_the_top_trapezoid: Annotated[
             float,
             symbol(
@@ -866,13 +873,13 @@ def calculate(
                 description="The width at the PNA level when inside the top trapezoid",
                 unit="mm",
             ),
-        ] = web_thickness + (width_of_top_flange - web_thickness) * (
+        ] = (web_thickness + (width_of_top_flange - web_thickness) * (
             (
                 distance_to_plastic_neutral_axis_from_lower_boundary
                 - (section_depth - inner_top_flange_thickness)
             )
             / area_properties["tapered_top_flange_segment_vertical_length"]
-        )
+        )) if section_depth - inner_top_flange_thickness <= distance_to_plastic_neutral_axis_from_lower_boundary <= section_depth - outer_top_flange_thickness else 0
 
         area_bottom_wedge_component_a_bw_top_trapz: Annotated[
             float,
@@ -883,12 +890,12 @@ def calculate(
                 unit="mm^2",
             ),
         ] = (
-            (web_thickness + the_width_at_the_pna_level_when_inside_the_top_trapezoid)
+            ((web_thickness + the_width_at_the_pna_level_when_inside_the_top_trapezoid)
             / 2
             * (
                 distance_to_plastic_neutral_axis_from_lower_boundary
                 - (section_depth - inner_top_flange_thickness)
-            )
+            )) if section_depth - inner_top_flange_thickness <= distance_to_plastic_neutral_axis_from_lower_boundary <= section_depth - outer_top_flange_thickness else 0
         )
 
         lever_arm_bottom_wedge_component_y_bw_top_trapz: Annotated[
@@ -900,7 +907,7 @@ def calculate(
                 unit="mm",
             ),
         ] = (
-            (
+            ((
                 distance_to_plastic_neutral_axis_from_lower_boundary
                 - (section_depth - inner_top_flange_thickness)
             )
@@ -914,7 +921,7 @@ def calculate(
                     the_width_at_the_pna_level_when_inside_the_top_trapezoid
                     + web_thickness
                 )
-            )
+            )) if section_depth - inner_top_flange_thickness <= distance_to_plastic_neutral_axis_from_lower_boundary <= section_depth - outer_top_flange_thickness else 0
         )
 
         bottom_wedge_term_component_z_bw_top_trapz: Annotated[
@@ -926,8 +933,8 @@ def calculate(
                 unit="mm^3",
             ),
         ] = (
-            area_bottom_wedge_component_a_bw_top_trapz
-            * lever_arm_bottom_wedge_component_y_bw_top_trapz
+            (area_bottom_wedge_component_a_bw_top_trapz
+            * lever_arm_bottom_wedge_component_y_bw_top_trapz) if section_depth - inner_top_flange_thickness <= distance_to_plastic_neutral_axis_from_lower_boundary <= section_depth - outer_top_flange_thickness else 0
         )
 
         area_top_wedge_component_a_tw_top_trapz: Annotated[
@@ -939,7 +946,7 @@ def calculate(
                 unit="mm^2",
             ),
         ] = (
-            (
+            ((
                 the_width_at_the_pna_level_when_inside_the_top_trapezoid
                 + width_of_top_flange
             )
@@ -948,7 +955,7 @@ def calculate(
                 section_depth
                 - outer_top_flange_thickness
                 - distance_to_plastic_neutral_axis_from_lower_boundary
-            )
+            )) if section_depth - inner_top_flange_thickness <= distance_to_plastic_neutral_axis_from_lower_boundary <= section_depth - outer_top_flange_thickness else 0
         )
 
         lever_arm_top_wedge_component_y_tw_top_trapz: Annotated[
@@ -960,7 +967,7 @@ def calculate(
                 unit="mm",
             ),
         ] = (
-            (section_depth - outer_top_flange_thickness - distance_to_plastic_neutral_axis_from_lower_boundary)
+            ((section_depth - outer_top_flange_thickness - distance_to_plastic_neutral_axis_from_lower_boundary)
             / 3
             * (
                 (
@@ -971,7 +978,7 @@ def calculate(
                     the_width_at_the_pna_level_when_inside_the_top_trapezoid
                     + width_of_top_flange
                 )
-            )
+            )) if section_depth - inner_top_flange_thickness <= distance_to_plastic_neutral_axis_from_lower_boundary <= section_depth - outer_top_flange_thickness else 0
         )
 
         top_wedge_term_component_z_tw_top_trapz: Annotated[
@@ -983,9 +990,11 @@ def calculate(
                 unit="mm^3",
             ),
         ] = (
-            area_top_wedge_component_a_tw_top_trapz
-            * lever_arm_top_wedge_component_y_tw_top_trapz
+            (area_top_wedge_component_a_tw_top_trapz
+            * lever_arm_top_wedge_component_y_tw_top_trapz) if section_depth - inner_top_flange_thickness <= distance_to_plastic_neutral_axis_from_lower_boundary <= section_depth - outer_top_flange_thickness else 0
         )
+
+        applicable(id="top-taper-wedges", targets=('the_width_at_the_pna_level_when_inside_the_top_trapezoid', 'area_bottom_wedge_component_a_bw_top_trapz', 'lever_arm_bottom_wedge_component_y_bw_top_trapz', 'bottom_wedge_term_component_z_bw_top_trapz', 'area_top_wedge_component_a_tw_top_trapz', 'lever_arm_top_wedge_component_y_tw_top_trapz', 'top_wedge_term_component_z_tw_top_trapz'), explanation="Only applicable when the PNA lies within the top taper, including its boundaries. Zero is an inactive placeholder.", predicate=section_depth - inner_top_flange_thickness <= distance_to_plastic_neutral_axis_from_lower_boundary <= section_depth - outer_top_flange_thickness)
 
         top_trapezoid_term: Annotated[
             float,

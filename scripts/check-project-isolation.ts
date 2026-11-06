@@ -107,7 +107,7 @@ for (const [name, relative] of [
   run(name, directory, 'npm', ['install', '--no-audit', '--no-fund']);
   run(name, directory, 'npm', ['run', 'build']);
   run(name, directory, 'npm', ['run', 'typecheck']);
-  run(name, directory, 'npm', ['test']);
+  run(name, directory, 'npm', ['--ignore-scripts', 'test']);
   if (name !== 'demo') {
     const packed = run(name, directory, 'npm', [
       'pack',

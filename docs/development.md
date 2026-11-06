@@ -101,15 +101,15 @@ access. PDF checks also need Chromium and Poppler.
 ## Continuous integration
 
 [CI](../.github/workflows/ci.yml) runs on every pull request and pushes to `main`
-with Node 24 and Python 3.11 on Ubuntu and Windows Server 2025. It keeps these
-required Ubuntu job names,
-with PR execution selected by the changed files:
+with Node 24 and Python 3.11 on Ubuntu and Windows Server 2025. Every PR runs
+the same checks, including documentation-only changes. The required Ubuntu jobs are:
 
 - `quality`: dependency audit, lint, typechecking, workspace tests and demo build.
 - `isolation`: independent builds and tests for all projects.
 - `installed-packages`: npm archives, Python wheel, CLI/PDF acceptance and library
-  type/export/browser consumers. Both archive commands are required when this
-  job runs. Full installed consumers run on main, manual runs and before release.
+  type/export/browser consumers. `test:packages` builds and packs once, then
+  passes those archives to the library and initializer consumers. The standalone
+  consumer commands prepare their own archives when no directory is supplied.
 
 The `windows-installed` matrix runs the maintained
 [installed-user workflow](../tests/integration/installed/windows-user-workflow.ps1)
@@ -134,42 +134,21 @@ on PR creation, title edits and updates, without installing dependencies. Run
 uses the runner's Node runtime without checking out or executing repository code.
 Like other `pull_request` workflows, changes to the workflow itself require review.
 
-CI's `changes` job selects PR checks:
+All verification jobs run on PRs, pushes to `main`, manual runs and reusable
+release calls. Fixed scheduling keeps archive acceptance before merge without
+maintaining file classifications or skipped required checks. Documentation-only
+PRs also run the full suite.
 
-| Changed files | `quality` | `isolation` | `installed-packages` | `windows-installed` |
-| --- | --- | --- | --- | --- |
-| Only Windows workflow guides listed below | Skip | Skip | Skip | Run |
-| Only other `.md` files | Skip | Skip | Skip | Skip |
-| Only examples or integration tests, optionally with Markdown | Run | Skip | Skip | Run |
-| Package/app files or recognized dependency/build configuration | Run | Run | Skip | Run |
-| CI tooling, workflows or unrecognized paths | Run | Run | Run | Run |
+Within `quality`, typechecking builds the libraries. The job then builds the CLI
+and initializer before running tests with npm lifecycle prerequisites disabled,
+and invokes the demo launcher against those completed builds. Standalone package
+commands retain their build hooks. Isolation likewise builds and typechecks each
+copy before testing it without a second build.
 
-Windows guide selection covers `docs/development.md`, `docs/authoring.md`,
-`docs/rendering.md`, package README files and initializer template Markdown.
-The `run_windows` output selects both native shells, including for these
-Markdown-only changes.
-
-The workflow defines the recognized paths. Mixed PRs run every job required by
-any changed path. Rename detection is disabled so both old and new paths count,
-including deletions. Pushes to `main`, manual runs, reusable release calls, empty
-diffs and file-detection failures run the full suite. A detector job failure
-runs all checks; a missing output runs its affected job. Cancellation prevents
-these fallback jobs.
-
-Skipped job names remain present, which GitHub accepts for required jobs. This
-keeps branch protection unchanged. Routine PRs retain behavior, numerical,
-verification and document tests in `quality`; isolation still checks package/app
-independence. Packaging defects can reach main and require repair before release.
-For earlier installed-consumer feedback, manually run CI on the PR branch.
-Release publishing still depends on the full reusable CI workflow.
-
-`npm run test:ci` exercises the classifier in temporary Git repositories and
-checks the actual job conditions, fallback behavior and release dependencies.
-It also [compares the ten published PowerShell blocks](../scripts/check-windows-powershell-docs.test.ts)
-with the executed Windows workflow, allowing only line-ending and common
-indentation differences.
-PR title validation, dependency review and GitHub-managed CodeQL keep their own
-triggers.
+`npm run test:ci` checks the native Windows hosts and release dependencies and
+[compares the ten published PowerShell blocks](../scripts/check-windows-powershell-docs.test.ts)
+with the executed Windows workflow. PR title validation, dependency review and
+GitHub-managed CodeQL keep their own triggers.
 
 Keep all five check names stable and required in the `Protect main` ruleset.
 Do not add workflow-level path filters or allow failures on required checks. PR code runs with
@@ -193,14 +172,11 @@ retain their read-only tokens.
 The [security policy](../SECURITY.md) defines alert ownership, response targets
 and the manual fallback for failed automatic updates.
 
-The workspace and the three projects that use `tsup` pin esbuild to `0.28.2`
-through npm overrides. `tsup@8.5.1` still requires `^0.27.0`, which excludes the
-security fix in `0.28.1`; Vite's peer range already accepts `0.28.x`. The project
-overrides keep isolated builds on the patched version without reading root
-configuration. The browser-archive consumer also uses `0.28.2`. Validate changes
-to this pin through all required checks, including ESM/CJS builds, declarations,
-CLI/PDF acceptance and browser consumers. Remove the overrides when upstream
-ranges permit a patched version and fresh workspace/isolated installs confirm it.
+Playwright is pinned to the same exact version in the workspace and CLI.
+Fresh archive and isolated installs must resolve the same browser package as the
+locked workspace; update both manifests and the lockfile together. This avoids
+selecting a newly published Playwright version before its matching core package
+is available.
 
 The workspace and React package override the Tailwind CLI's Parcel watcher to
 `2.6.0`. Tailwind CLI `4.3.3` pins watcher `2.5.1`, which depends on vulnerable

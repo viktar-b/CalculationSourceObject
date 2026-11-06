@@ -150,11 +150,12 @@ Apply the [authoring naming rules](authoring.md#names-and-notation) to new varia
 
 Formula structure comes from value-tree functions. [Function specs](../packages/cso-core/src/sheet-model/functions.ts)
 define IDs and precedence; [MathML renderers](../packages/cso-react/src/mathml/function-renderers.tsx)
-define layout. The 38 calculation operations have constrained Python forms and
+define layout. The calculation operations have constrained Python forms and
 independent verification rules. The remaining `noop` and `stub` nodes retain
 rendering and Python export support for grouping and placeholders; they are not
-Python authoring functions or numerically verified operations. Logical `and` /
-`or` are verified only as predicates that join comparisons. The
+Python authoring functions or numerically verified operations. Logical `and`,
+`or`, `not` and Boolean-only `^` are verified only as predicates that combine
+comparisons. The
 [authoring guide](authoring.md#supported-source-and-document-content) defines
 accepted argument forms and numerical roles.
 

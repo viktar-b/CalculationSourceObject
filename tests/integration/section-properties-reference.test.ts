@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { ExecutionResponseSchema, verifyExecution } from '@cs-object/core';
 import { expect, it } from 'vitest';
 
@@ -35,6 +35,41 @@ function clipBelow(points: readonly Point[], height: number): Point[] {
 }
 
 it.each([
+  {
+    region: 'inactive bottom wedge singularity',
+    dimensions: [50, 5, 31.875, 3, 5, 30, 5, 10],
+    interval: [10, 45],
+  },
+  {
+    region: 'inactive top wedge singularity',
+    dimensions: [50, 5, 30, 5, 10, 31.875, 3, 5],
+    interval: [5, 40],
+  },
+  {
+    region: 'bottom flange/taper boundary',
+    dimensions: [100, 4, 28, 10, 14, 20, 30, 34],
+    interval: [29.99999999, 30.00000001],
+  },
+  {
+    region: 'bottom taper/web boundary',
+    dimensions: [100, 4, 36, 10, 14, 20, 30, 34],
+    interval: [33.99999999, 34.00000001],
+  },
+  {
+    region: 'top flange/taper boundary',
+    dimensions: [100, 4, 20, 30, 34, 28, 10, 14],
+    interval: [69.99999999, 70.00000001],
+  },
+  {
+    region: 'top taper/web boundary',
+    dimensions: [100, 4, 20, 30, 34, 36, 10, 14],
+    interval: [65.99999999, 66.00000001],
+  },
+  {
+    region: 'touching tapers',
+    dimensions: [50, 5, 40, 5, 25, 40, 5, 25],
+    interval: [24.99999999, 25.00000001],
+  },
   {
     region: 'top taper',
     dimensions: [100, 5, 50, 10, 15, 30, 5, 10],
@@ -105,6 +140,8 @@ it.each([
     const lower = moments(clipBelow(perimeter, pna));
     const plasticModulus =
       total.first - 2 * lower.first + pna * (2 * lower.area - total.area);
+    const rotated: Point[] = perimeter.map(([x, y]) => [-y, x]);
+    const plasticModulusY = -2 * moments(clipBelow(rotated, 0)).first;
     const baseline = new Map<string, number>();
     const translated = new Set([
       'lower_trapezoid_flange_boundary',
@@ -164,6 +201,33 @@ it.each([
           `Translation of ${output.name}, origin ${origin}`,
         ).toBeCloseTo(initial + shift, 6);
       }
+      const retainedText = response.execution.cso.sections
+        .flatMap((section) =>
+          section.items.flatMap((item) =>
+            item.kind === 'text' ? [item.text?.content ?? ''] : [],
+          ),
+        )
+        .join(' ');
+      expect(retainedText).toContain(
+        'Outside this interval these quantities are inapplicable',
+      );
+      expect(retainedText).toContain('Input requirement:');
+      for (const output of response.execution.authoring?.outputs ?? []) {
+        if (
+          !output.name.includes('wedge') &&
+          !output.name.startsWith('the_width_at_the_pna')
+        )
+          continue;
+        const topTaper =
+          output.name.includes('top_trapz') ||
+          output.name.endsWith('top_trapezoid');
+        const lower = topTaper ? depth - topInner : bottomOuter;
+        const upper = topTaper ? depth - topOuter : bottomInner;
+        if (pna < lower - 1e-8 || pna > upper + 1e-8) {
+          expect(output.value, `Inactive ${output.name}`).toBe(0);
+        }
+        expect(output.value, output.name).toBeGreaterThanOrEqual(-1e-8);
+      }
       const report = verifyExecution({ execution: response.execution });
       expect(report.ok, JSON.stringify(report.diagnostics)).toBe(true);
       const expected: Record<string, number> = {
@@ -185,6 +249,7 @@ it.each([
         plastic_neutral_axis_location: pna + origin,
         distance_to_plastic_neutral_axis_from_lower_boundary: pna,
         plastic_section_modulus_about_x_axis: plasticModulus,
+        plastic_section_mosulus_about_y_axis: plasticModulusY,
         lower_trapezoid_flange_boundary: bottomOuter + origin,
         lower_trapezoid_web_boundary: bottomInner + origin,
         upper_trapezoid_web_boundary: depth - topInner + origin,
@@ -203,3 +268,49 @@ it.each([
     }
   },
 );
+
+it.each([
+  { inputs: { section_depth: 20 }, message: 'overlapping flanges' },
+  { inputs: { section_depth: -1 }, message: 'positive' },
+  { inputs: { web_thickness: 0 }, message: 'positive' },
+  { inputs: { width_of_top_flange: -1 }, message: 'positive' },
+  { inputs: { outer_bot_flange_thickness: 0 }, message: 'positive' },
+  { inputs: { inner_top_flange_thickness: 0 }, message: 'positive' },
+  { inputs: { inner_top_flange_thickness: 10 }, message: 'taper heights' },
+  { inputs: { inner_bot_flange_thickness: 5 }, message: 'taper heights' },
+  { inputs: { inner_top_flange_thickness: 9 }, message: 'taper heights' },
+  { inputs: { width_of_bot_flange: 5 }, message: 'taper gradients' },
+  { inputs: { width_of_top_flange: 5 }, message: 'taper gradients' },
+  { inputs: { width_of_bot_flange: 4 }, message: 'taper gradients' },
+])('rejects unsupported geometry: $inputs', ({ inputs, message }) => {
+  for (const filename of ['calculate.cso.py', 'area_inertia.cso.py']) {
+    const result = spawnSync(
+      process.env.PYTHON ?? 'python3',
+      [
+        '-I',
+        '-m',
+        'cso_python',
+        'execute',
+        new URL(
+          `../../examples/section-properties/unequal_tapered_i_beam/${filename}`,
+          import.meta.url,
+        ).pathname,
+        '--function',
+        'calculate',
+        '--inputs-json',
+        JSON.stringify(inputs),
+      ],
+      { encoding: 'utf8' },
+    );
+    const response = ExecutionResponseSchema.parse(JSON.parse(result.stdout));
+    expect(response.ok).toBe(false);
+    expect(response.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'INPUT_PRECONDITION_FAILED',
+          message: expect.stringContaining(message),
+        }),
+      ]),
+    );
+  }
+});

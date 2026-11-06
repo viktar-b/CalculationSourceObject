@@ -283,11 +283,11 @@ export const createFormulaEvaluator = (
       diagnostic({
         address,
         code:
-          role === 'comparison' ? 'INVALID_CONDITIONAL' : 'NONNUMERIC_FORMULA',
+          role === 'predicate' ? 'INVALID_CONDITIONAL' : 'NONNUMERIC_FORMULA',
         message:
-          role === 'comparison'
-            ? 'A conditional test requires numeric comparisons.'
-            : 'A numeric operand cannot contain a comparison.',
+          role === 'predicate'
+            ? 'A conditional test requires a Boolean predicate.'
+            : 'A numeric operand cannot contain a Boolean predicate.',
       }),
     );
   }
@@ -364,7 +364,7 @@ export const createFormulaEvaluator = (
           role:
             resolved.operation.kind === 'comparison' ||
             resolved.operation.kind === 'logical'
-              ? 'comparison'
+              ? 'predicate'
               : 'number',
         };
       }
@@ -492,7 +492,7 @@ export const createFormulaEvaluator = (
         diagnostic({
           address,
           code: 'INVALID_CONDITIONAL',
-          message: 'A conditional test requires numeric comparisons.',
+          message: 'A conditional test requires a Boolean predicate.',
         }),
       );
     const shape = resolveOperation(test.funcSpec.id, test.funcArgs.length);
@@ -501,20 +501,39 @@ export const createFormulaEvaluator = (
         diagnostic({ address, code: shape.code, message: shape.message }),
       );
     if (shape.operation.kind === 'logical') {
-      const isAnd = shape.operation.operator === 'and';
-      for (const argument of test.funcArgs) {
-        const selected = evaluatePredicate(graph, argument.key, stack);
-        if (typeof selected !== 'boolean') return selected;
-        if (selected !== isAnd) return selected;
+      const operator = shape.operation.operator;
+      const left = evaluatePredicate(graph, test.funcArgs[0].key, stack);
+      if (typeof left !== 'boolean') return left;
+      switch (operator) {
+        case 'not':
+          return !left;
+        case 'xor': {
+          const right = evaluatePredicate(graph, test.funcArgs[1].key, stack);
+          return typeof right === 'boolean' ? left !== right : right;
+        }
+        case 'and':
+        case 'or': {
+          const isAnd = operator === 'and';
+          if (left !== isAnd) return left;
+          for (const argument of test.funcArgs.slice(1)) {
+            const selected = evaluatePredicate(graph, argument.key, stack);
+            if (typeof selected !== 'boolean') return selected;
+            if (selected !== isAnd) return selected;
+          }
+          return isAnd;
+        }
+        default: {
+          const exhaustive: never = operator;
+          return exhaustive;
+        }
       }
-      return isAnd;
     }
     if (shape.operation.kind !== 'comparison')
       return failure(
         diagnostic({
           address,
           code: 'INVALID_CONDITIONAL',
-          message: 'A conditional test requires numeric comparisons.',
+          message: 'A conditional test requires a Boolean predicate.',
         }),
       );
     const left = evaluateNode(
