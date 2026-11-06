@@ -19,6 +19,7 @@ export async function exerciseBrowser(options: {
   readonly outputs: Readonly<Record<string, number>>;
   readonly reportId: string;
   readonly reportTitle: string;
+  readonly referenceStatus?: 'passed' | 'not_applicable';
 }) {
   const browser = await chromium.launch({ headless: true });
   try {
@@ -115,7 +116,10 @@ export async function exerciseBrowser(options: {
     assert.equal(await page.locator('[data-slot=sheet-overlay]').count(), 0);
     await page.locator('iframe#report').waitFor({ state: 'visible' });
     assert(await page.locator('iframe#report').getAttribute('src'));
-    assert.match(await page.locator('button#pdf').innerText(), /review pending/i);
+    assert.match(
+      await page.locator('button#pdf').innerText(),
+      /review pending/i,
+    );
     assert.equal(await page.locator('#checks').isVisible(), true);
     const initialReportText = await page
       .frameLocator('iframe#report')
@@ -152,15 +156,17 @@ export async function exerciseBrowser(options: {
     assert(reportMatch?.[1]);
     const runBase = `/api/reports/${options.reportId}/runs/${reportMatch[1]}`;
     assert.equal(evidencePath, `${runBase}/evidence.json`);
-    assert.match(
-      await page.locator('#checks').innerText(),
-      /Human inspection\s+WIP/i,
-    );
-    if (options.reportId === 'rectangle-area')
+    const checksText = await page.locator('#checks').innerText();
+    assert.match(checksText, /Human inspection\s+WIP/i);
+    if (options.referenceStatus)
       assert.match(
-        await page.locator('#checks').innerText(),
-        /Independent reference\s+WIP/i,
+        checksText,
+        options.referenceStatus === 'passed'
+          ? /Independent reference\s+Passed/i
+          : /Independent reference\s+WIP/i,
       );
+    if (options.reportId === 'rectangle-area')
+      assert.match(checksText, /Independent reference\s+WIP/i);
     await page.setViewportSize({ width: 950, height: 900 });
     assert.equal(
       await page.evaluate(
@@ -230,6 +236,11 @@ export async function exerciseBrowser(options: {
       evidence.artifacts.pdf?.sha256,
       hashBytes(readFileSync(options.downloadPath)),
     );
+    if (options.referenceStatus)
+      assert.equal(
+        evidence.checks.independentReferenceAgreement?.status,
+        options.referenceStatus,
+      );
     if (options.reportId === 'rectangle-area') {
       await page.locator('[name=width]').fill('-0');
       await page.getByRole('button', { name: 'API', exact: true }).click();
@@ -270,6 +281,7 @@ export async function exerciseBrowser(options: {
         ),
       );
     }
+    return summary;
   } finally {
     await browser.close();
   }

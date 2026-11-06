@@ -29,8 +29,12 @@ The [initializer acceptance](installed/initializer-acceptance.ts) runs
 `npm create cs-object my-report` against a temporary loopback npm registry backed
 by actual archives. It installs the Python wheel into the generated project,
 starts `npm run dev`, and checks browser edits, the output-only calculation API,
-report/PDF evidence and restart. It also replaces the starter with a copy of the
-canonical two-panel calculation. Third-party dependencies still need network
+report/PDF evidence and restart. It executes the packaged composed-report/figure recipe and follows the shipped
+reference-binding recipe with independently established intermediate and output
+values. Correct, wrong and unmatched cases, formula/text changes and explicit
+rebinding are checked before browser edits, output-only curl and same-run HTML,
+PDF and evidence. Automatic results leave visual inspection and engineering
+approval separate. It also exercises a copy of the canonical two-panel calculation. Third-party dependencies still need network
 access. This tests installation without publishing a release.
 
 The canonical two-panel calculations and metadata stay in `examples/two-panel`.

@@ -125,6 +125,7 @@ export async function artifactSet(options: {
     readonly unit: string;
   }[];
   readonly referencePath?: string;
+  readonly referenceStatus?: 'passed' | 'not_applicable';
   readonly name: string;
   readonly reportId: string;
 }) {
@@ -183,7 +184,8 @@ export async function artifactSet(options: {
   assert.equal(evidence.checks.sourceToDocumentConsistency?.status, 'passed');
   assert.equal(
     evidence.checks.independentReferenceAgreement?.status,
-    options.referencePath ? 'passed' : 'not_applicable',
+    options.referenceStatus ??
+      (options.referencePath ? 'passed' : 'not_applicable'),
   );
   assert.equal(evidence.checks.documentContent?.status, 'passed');
   assert.equal(evidence.checks.rendering?.status, 'passed');
