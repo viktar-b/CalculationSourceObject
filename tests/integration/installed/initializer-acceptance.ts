@@ -28,6 +28,7 @@ import {
   writeJson,
 } from './_initializer-evidence.ts';
 import { exerciseGuidance } from './_initializer-guidance.ts';
+import { exerciseReferenceAuthoring } from './_initializer-references.ts';
 import {
   createCommandRunner,
   type DevServer,
@@ -219,7 +220,12 @@ try {
     ).trim(),
   );
   assert(pythonLocation.startsWith(`${join(project, '.venv')}${sep}`));
-  await exerciseGuidance({ project, installedPython, environment, run });
+  const { trial } = await exerciseGuidance({
+    project,
+    installedPython,
+    environment,
+    run,
+  });
 
   dev = await startDev({
     project,
@@ -456,6 +462,15 @@ try {
   await dev.stop();
   dev = undefined;
 
+  const referenceAuthoring = await exerciseReferenceAuthoring({
+    project,
+    trial,
+    installedPython,
+    root,
+    environment,
+    run,
+  });
+
   const qualification = join(root, 'qualification.json');
   writeJson(qualification, {
     ok: true,
@@ -470,6 +485,7 @@ try {
       sha256: hashBytes(readFileSync(item.archive)),
     })),
     pythonLocation,
+    referenceAuthoring,
     screenshots: [syntheticScreenshot, twoPanelScreenshot],
     browserDownloads: [syntheticDownload, twoPanelDownload],
     reports: [syntheticArtifacts, twoPanelArtifacts].map((item) => ({

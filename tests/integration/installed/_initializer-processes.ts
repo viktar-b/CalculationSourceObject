@@ -25,6 +25,7 @@ export type CommandRunner = (options: {
   readonly args: readonly string[];
   readonly env?: NodeJS.ProcessEnv;
   readonly timeoutMs?: number;
+  readonly expectedStatus?: number;
 }) => Promise<string>;
 
 export function createCommandRunner(
@@ -97,7 +98,7 @@ export function createCommandRunner(
               `${options.command} stdout exceeded ${maximumCapturedCharacters} characters; see ${log}`,
             ),
           );
-        if (status !== 0)
+        if (status !== (options.expectedStatus ?? 0))
           return rejectRun(
             new Error(
               `${options.command} ${options.args.join(' ')} exited ${status}; see ${log}\n${stderr}${stderrTruncated ? '\n[stderr truncated in memory; full output is in the log]' : ''}`,

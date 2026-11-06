@@ -171,4 +171,5 @@ export async function exerciseGuidance(options: {
     'data:image/svg+xml',
   ])
     assert(html.includes(expected), `Missing recipe content: ${expected}`);
+  return { trial };
 }
