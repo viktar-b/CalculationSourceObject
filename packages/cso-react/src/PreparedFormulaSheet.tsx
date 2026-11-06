@@ -2,6 +2,7 @@ import {
   type CalculationSourceSectionItem,
   type CalculationSourceSymbol,
   createSheetFromCalculationSourceObject,
+  getValueNodeByKey,
   type PreparedDocument,
   PreparedDocumentSchema,
   type PreparedDocumentSection,
@@ -12,7 +13,11 @@ import {
 } from '@cs-object/core';
 import { Fragment, type ReactElement, type ReactNode } from 'react';
 import { EngineeringMetadata } from './EngineeringMetadata.tsx';
-import { FormulaSheetSymbolRow } from './formula-sheet/FormulaSheetSymbolRow.tsx';
+import {
+  FormulaSheetSymbolRow,
+  type FormulaSheetSymbolRowProps,
+  bindingOrigin,
+} from './formula-sheet/FormulaSheetSymbolRow.tsx';
 import { FormulaSheetItemIndex } from './formula-sheet/FormulaSheetItemIndex.tsx';
 import { NumericalValue } from './formula-sheet/NumericalValue.tsx';
 import { GlyphMathBlock } from './mathml/GlyphMathBlock.tsx';
@@ -92,15 +97,44 @@ const notationSheet = (
     { id, label: id },
   ).sheet;
   const byId = new Map(sheet.symbols.map((symbol) => [symbol.id, symbol]));
+  const forwarded = new Set(
+    symbols
+      .filter((symbol) => symbol.metadata?.csoForwardedReturn === true)
+      .map((symbol) => symbol.id),
+  );
   return {
-    row: (symbolId: string, index: number): ReactElement => (
+    row: (
+      symbolId: string,
+      index: number,
+      options: Pick<
+        FormulaSheetSymbolRowProps,
+        'bindingOrigin' | 'compactBinding'
+      > = {},
+    ): ReactElement => (
       <FormulaSheetSymbolRow
         sheet={sheet}
         item={requiredItem(byId, symbolId)}
         sheetItemIndex={index}
         symbolicOnly={true}
+        compactBinding={options.compactBinding || forwarded.has(symbolId)}
+        bindingOrigin={options.bindingOrigin}
       />
     ),
+    origin: (symbolId: string, label: string): ReactNode =>
+      bindingOrigin({
+        sheet,
+        symbol: requiredItem(byId, symbolId),
+        label,
+        computedReference: true,
+      }),
+    isConnection: (symbolId: string): boolean => {
+      const symbol = requiredItem(byId, symbolId);
+      const root = getValueNodeByKey(
+        symbol.valueTree,
+        symbol.valueTree.rootKey,
+      );
+      return root.kind === 'symbol' || root.kind === 'literal';
+    },
     description: (symbolId: string): string =>
       requiredItem(byId, symbolId).description,
     formula: (symbolId: string, showGlyph = true): ReactElement => (
@@ -179,6 +213,50 @@ export const PreparedFormulaSheet = ({
       }
     };
     indexHelpers(helpers);
+    const origins = new Map<string, { path: string; symbolId: string }[]>();
+    const inputRows = (
+      items: readonly PreparedMethodContent[],
+    ): Extract<PreparedMethodContent, { kind: 'quantity' }>[] =>
+      items.flatMap((item) =>
+        item.kind === 'quantity' && item.role === 'input'
+          ? [item]
+          : item.kind === 'section'
+            ? inputRows(item.content)
+            : [],
+      );
+    const collectOrigins = (
+      items: readonly PreparedMethodContent[],
+      path: string[] = [],
+      active: ReadonlySet<string> = new Set(),
+    ): void => {
+      for (const item of items) {
+        if (item.kind === 'section') collectOrigins(item.content, path, active);
+        if (item.kind !== 'call') continue;
+        const helper = requiredItem(helperById, item.helperId);
+        if (active.has(helper.id))
+          throw new Error(`Cyclic helper '${helper.id}'`);
+        const callPath = [...path, item.binding];
+        for (const input of item.inputs) {
+          const quantity = inputRows(helper.content).find(
+            (row) => row.selectionName === input.name,
+          );
+          if (!quantity)
+            throw new Error(`Missing helper input '${input.name}'`);
+          const bindings = origins.get(quantity.symbolId) ?? [];
+          bindings.push({
+            path: callPath.join(' / '),
+            symbolId: input.symbolId,
+          });
+          origins.set(quantity.symbolId, bindings);
+        }
+        collectOrigins(
+          helper.content,
+          callPath,
+          new Set([...active, helper.id]),
+        );
+      }
+    };
+    collectOrigins(content);
     const renderItems = (
       items: readonly PreparedMethodContent[],
     ): ReactElement[] =>
@@ -217,7 +295,9 @@ export const PreparedFormulaSheet = ({
                       data-external-method-input={input.name}
                     >
                       <td colSpan={2} className="cso-external-quantity-cell">
-                        {notation.row(input.symbolId, symbolIndex++)}
+                        {notation.row(input.symbolId, symbolIndex++, {
+                          compactBinding: true,
+                        })}
                       </td>
                     </tr>
                   ))}
@@ -292,7 +372,18 @@ export const PreparedFormulaSheet = ({
               data-quantity={item.selectionName}
               data-formula={item.formulaText || undefined}
             >
-              {notation.row(item.symbolId, symbolIndex++)}
+              {notation.row(item.symbolId, symbolIndex++, {
+                bindingOrigin: origins
+                  .get(item.symbolId)
+                  ?.map((origin) => (
+                    <div key={origin.path}>
+                      {notation.origin(
+                        origin.symbolId,
+                        readableName(origin.path),
+                      )}
+                    </div>
+                  )),
+              })}
             </div>
           );
         }
@@ -354,24 +445,31 @@ export const PreparedFormulaSheet = ({
             </div>
           );
         }
+        const calculations = item.inputs.filter(
+          (input) => !notation.isConnection(input.symbolId),
+        );
         return (
           <div
             key={`call-${item.binding}`}
-            className="cso-method-call"
+            className={
+              explanation || calculations.length ? 'cso-method-call' : undefined
+            }
             data-call={item.binding}
           >
             {explanation}
-            <div className="cso-formula-terms">
-              {item.inputs.map((input) => (
-                <span
-                  key={input.name}
-                  data-formula={input.formulaText}
-                  className="cso-formula-term"
-                >
-                  {notation.formula(input.symbolId)}
-                </span>
-              ))}
-            </div>
+            {calculations.length ? (
+              <div className="cso-formula-terms">
+                {calculations.map((input) => (
+                  <span
+                    key={input.name}
+                    data-formula={input.formulaText}
+                    className="cso-formula-term"
+                  >
+                    {notation.formula(input.symbolId)}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
         );
       });
