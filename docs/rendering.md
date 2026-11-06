@@ -108,6 +108,11 @@ reference summaries list checked and uncovered outputs; they do not claim that
 an external algorithm was independently evaluated. Older captures retain their
 original meaning.
 
+A comparison's case headings show the captured case subscript, such as `fp`
+for `first_panel`, so table values can be matched to downstream qualified
+symbols. Row-oriented comparisons show it beside each case label. Unqualified
+cases keep their ordinary headings; no suffix is inferred from the display title.
+
 A comparison is one logical table. On screen it scrolls horizontally and keeps
 the identifying column visible. Print divides the authored column axis into
 parts that fit the page width, then continues a tall part onto later pages.

@@ -13,16 +13,17 @@ import {
 } from '@cs-object/core';
 import { Fragment, type ReactElement, type ReactNode } from 'react';
 import { EngineeringMetadata } from './EngineeringMetadata.tsx';
+import { FormulaSheetItemIndex } from './formula-sheet/FormulaSheetItemIndex.tsx';
 import {
+  bindingOrigin,
   FormulaSheetSymbolRow,
   type FormulaSheetSymbolRowProps,
-  bindingOrigin,
 } from './formula-sheet/FormulaSheetSymbolRow.tsx';
-import { FormulaSheetItemIndex } from './formula-sheet/FormulaSheetItemIndex.tsx';
 import { NumericalValue } from './formula-sheet/NumericalValue.tsx';
 import { GlyphMathBlock } from './mathml/GlyphMathBlock.tsx';
 import { InlineFormulaMath } from './mathml/InlineFormulaMath.tsx';
 import { UnitMathBlock } from './mathml/UnitMathBlock.tsx';
+import { tableCaseQualifier } from './table-case-notation.ts';
 
 export interface PreparedFormulaSheetProps {
   readonly document: PreparedDocument;
@@ -198,6 +199,14 @@ export const PreparedFormulaSheet = ({
     document.assets.map((asset) => [asset.asset.id, asset]),
   );
   const symbols = new Map(sheet.symbols.map((symbol) => [symbol.id, symbol]));
+  const capturedSymbols = [
+    ...document.detachedSymbols,
+    ...document.sections.flatMap((section) =>
+      section.items.flatMap((item) =>
+        item.kind === 'symbol' ? [item.symbol] : [],
+      ),
+    ),
+  ];
   let symbolIndex = 0;
   const renderMethodContent = (
     content: readonly PreparedMethodContent[],
@@ -724,6 +733,25 @@ export const PreparedFormulaSheet = ({
             );
           }
           case 'table': {
+            const caseHeading = (caseItem: (typeof item.cases)[number]) => {
+              const qualifier = tableCaseQualifier(
+                caseItem.invocationId,
+                capturedSymbols,
+              );
+              return (
+                <>
+                  {caseItem.heading}
+                  {qualifier ? (
+                    <span
+                      className="cso-comparison-case-qualifier"
+                      data-case-qualifier={qualifier}
+                    >
+                      Subscript: <GlyphMathBlock glyph={qualifier} />
+                    </span>
+                  ) : null}
+                </>
+              );
+            };
             const outcomeRows = item.outcomeRows ?? [];
             const rowIndices = new Map<string, number>();
             for (const group of item.groups)
@@ -1085,7 +1113,7 @@ export const PreparedFormulaSheet = ({
                               data-comparison-label=""
                               data-case-heading={caseItem.heading}
                             >
-                              {caseItem.heading}
+                              {caseHeading(caseItem)}
                             </th>
                             {item.groups.flatMap((group) =>
                               group.rows.map((row) => {
@@ -1154,7 +1182,7 @@ export const PreparedFormulaSheet = ({
                               data-case-heading={caseItem.heading}
                               data-comparison-column={index}
                             >
-                              {caseItem.heading}
+                              {caseHeading(caseItem)}
                             </th>
                           ))}
                         </tr>

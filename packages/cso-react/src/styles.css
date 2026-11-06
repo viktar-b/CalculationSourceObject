@@ -172,6 +172,8 @@ math {
 .cso-comparison td[data-outcome-kind] { text-align: center; white-space: normal; }
 .cso-comparison th[data-case-heading] { text-align: right; }
 .cso-comparison tbody th[data-case-heading] { text-align: left; }
+.cso-comparison-case-qualifier { display: flex; align-items: baseline; justify-content: flex-end; gap: 0.5ch; font-size: 0.9em; font-weight: 400; color: #475467; }
+.cso-comparison tbody .cso-comparison-case-qualifier { justify-content: flex-start; }
 .cso-comparison th[scope="colgroup"] { background: #f2f4f7; color: #344054; font-size: 10px; }
 .cso-comparison [data-comparison-label] { position: sticky; left: 0; z-index: 1; background: white; }
 .cso-comparison thead [data-comparison-label] { background: #f8fafc; }
