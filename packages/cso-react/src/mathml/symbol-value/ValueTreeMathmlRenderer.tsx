@@ -174,11 +174,11 @@ const ValueTreeFunctionMathmlView = ({
   const operator = getFunctionBinaryOperatorById(node.functionId);
   if (
     operator &&
-    argNodes.length > 2 &&
+    argNodes.length >= 2 &&
     (node.functionId === 'fg.and' || node.functionId === 'fg.or')
   ) {
     return (
-      <mrow>
+      <mtable columnalign="left" data-logical-lines="true">
         {argReactNodes.map((argument, index) => {
           const child = argNodes[index];
           const childOperator =
@@ -187,25 +187,28 @@ const ValueTreeFunctionMathmlView = ({
               : undefined;
           const grouped =
             childOperator !== undefined &&
-            childOperator.priority < operator.priority;
+            (childOperator.priority < operator.priority ||
+              (index > 0 && childOperator.priority === operator.priority));
           return (
-            <mrow key={child.key}>
-              {index > 0 && (
-                <mo form="infix" lspace="0.3em" rspace="0.3em">
-                  {operator.glyph}
-                </mo>
-              )}
-              {grouped ? (
-                <SymbolValueGroupMathmlView cursor={undefined}>
-                  {[argument]}
-                </SymbolValueGroupMathmlView>
-              ) : (
-                argument
-              )}
-            </mrow>
+            <mtr key={child.key}>
+              <mtd style={{ textAlign: 'left' }}>
+                {index > 0 && (
+                  <mo form="infix" lspace="0.3em" rspace="0.3em">
+                    {operator.glyph}
+                  </mo>
+                )}
+                {grouped ? (
+                  <SymbolValueGroupMathmlView cursor={undefined}>
+                    {[argument]}
+                  </SymbolValueGroupMathmlView>
+                ) : (
+                  argument
+                )}
+              </mtd>
+            </mtr>
           );
         })}
-      </mrow>
+      </mtable>
     );
   }
   if (operator && argNodes.length === 2) {
