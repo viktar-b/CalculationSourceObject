@@ -65,20 +65,11 @@ export const SymbolValueMathBlock = ({
         </div>
       )}
 
-      {showSymbolic && showGlyph && (
-        <div {...divProps}>
-          <math {...baseMathProps}>
-            <mrow>
-              <mo className="px-1 py-2">=</mo>
-            </mrow>
-          </math>
-        </div>
-      )}
-
       {showSymbolic && (
         <div {...divProps}>
           <math {...baseMathProps}>
             <mrow>
+              {showGlyph && <mo className="px-1 py-2">=</mo>}
               <SymbolValueMathmlView
                 sheet={sheet}
                 valueTree={symbol.valueTree}
@@ -90,20 +81,11 @@ export const SymbolValueMathBlock = ({
         </div>
       )}
 
-      {showNumeric && (showGlyph || showSymbolic) && (
-        <div {...divProps}>
-          <math {...baseMathProps}>
-            <mrow>
-              <mo className="px-1 py-2">=</mo>
-            </mrow>
-          </math>
-        </div>
-      )}
-
       {showNumeric && (
         <div {...divProps}>
           <math {...baseMathProps}>
             <mrow>
+              {(showGlyph || showSymbolic) && <mo className="px-1 py-2">=</mo>}
               <SymbolValueMathmlView
                 sheet={sheet}
                 valueTree={symbol.valueTree}

@@ -111,6 +111,79 @@ const namedFunctionMarkup = (
   );
 };
 
+test.each([
+  { parent: 'fg.and', nested: 'fg.or', arity: 2, fences: 1 },
+  { parent: 'fg.and', nested: 'fg.or', arity: 3, fences: 1 },
+  { parent: 'fg.or', nested: 'fg.and', arity: 2, fences: 0 },
+  { parent: 'fg.and', nested: 'fg.and', arity: 2, fences: 1 },
+])(
+  'logical continuation lines preserve $parent / $nested grouping with $arity operands',
+  ({ parent, nested, arity, fences }) => {
+    const logicalSheet = SheetDocumentSchema.parse({
+      ...sheet,
+      symbols: [
+        {
+          ...sheet.symbols[0],
+          valueTree: {
+            rootKey: 'root',
+            result: { kind: 'boolean', value: true },
+            nodes: [
+              {
+                kind: 'function',
+                key: 'root',
+                functionId: parent,
+                argKeys:
+                  arity === 2
+                    ? ['comparison-0', 'nested']
+                    : ['comparison-0', 'nested', 'comparison-3'],
+              },
+              {
+                kind: 'function',
+                key: 'nested',
+                functionId: nested,
+                argKeys: ['comparison-1', 'comparison-2'],
+              },
+              ...[0, 1, 2, 3].map((index) => ({
+                kind: 'function',
+                key: `comparison-${index}`,
+                functionId: 'fg.lt',
+                argKeys: ['one', 'two'],
+              })),
+              {
+                kind: 'literal',
+                key: 'one',
+                value: { kind: 'number', value: 1 },
+              },
+              {
+                kind: 'literal',
+                key: 'two',
+                value: { kind: 'number', value: 2 },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const symbol = logicalSheet.symbols[0];
+    if (!symbol) throw new Error('Missing logical symbol');
+    const markup = renderToStaticMarkup(
+      createElement(ValueTreeMathmlRenderer, {
+        sheet: logicalSheet,
+        valueTree: symbol.valueTree,
+        viewOptions: {},
+        noRootContainer: true,
+      }),
+    );
+    expect(htmlText(markup).replaceAll('&lt;', '<')).toBe(
+      `1.00 < 2.00 ${parent === 'fg.and' ? 'and' : 'or'} ${fences ? '( ' : ''}1.00 < 2.00 ${nested === 'fg.and' ? 'and' : 'or'} 1.00 < 2.00${fences ? ' )' : ''}${arity === 3 ? ' and 1.00 < 2.00' : ''}`,
+    );
+    expect(markup.match(/<mo fence="true">\(<\/mo>/g) ?? []).toHaveLength(
+      fences,
+    );
+    expect(markup.match(/data-logical-lines="true"/g)).toHaveLength(2);
+  },
+);
+
 describe('FormulaSheet rendering', () => {
   test('renders item indexes inline with the description text', () => {
     const html = renderToStaticMarkup(createElement(FormulaSheet, { sheet }));
@@ -386,7 +459,9 @@ describe.each([
         markup.match(/<math\b[^>]*>[\s\S]*?<\/math>/g) ?? []
       ).filter((math) => htmlText(math).includes('5.00'));
 
-      expect(formulas.map(htmlText)).toEqual(expected);
+      expect(formulas.map(htmlText)).toEqual(
+        expected.map((value) => `= ${value}`),
+      );
       expect(
         formulas.map(
           (math) => (math.match(/<mo fence="true">\(<\/mo>/g) ?? []).length,
