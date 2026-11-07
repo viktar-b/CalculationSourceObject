@@ -270,8 +270,9 @@ owns project creation, which uses its declared dependency versions.
 workflow. Run it from `main` and select `all`, `npm` or `python`. It runs the full
 CI workflow before publishing. Versions come from each package manifest;
 already published versions are skipped, allowing a partially completed release
-to be retried. Bump versions and update internal dependency pins, the initializer's
-Python requirement and the lockfile before running it.
+to be retried. For a new version, update the manifests, internal dependency pins,
+the initializer's Python requirement and the lockfile before running it. Keep the
+[changelog](../CHANGELOG.md) current with release scope.
 
 Both registries authenticate with GitHub OIDC. No npm or PyPI upload secrets are
 needed. Configure a GitHub Actions trusted publisher on each npm package
@@ -289,7 +290,10 @@ On npm, enable direct `npm publish` for each connection. Stage-only permission
 would require approval for every release. PyPI uses the same workflow filename
 for its trusted publisher. Registry-side setup is separate from checking in the
 workflow; a passing local check does not confirm OIDC authentication. Confirm the
-first release run in GitHub Actions and verify its versions in each registry.
+release run in GitHub Actions and verify every intended package version in its
+registry before announcing publication. Then record the publication date in the
+changelog. An unreleased entry describes the planned release, not registry
+availability.
 
 ## Documentation changes
 

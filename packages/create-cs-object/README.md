@@ -1,13 +1,14 @@
 # Create a local calculation project
 
-Use Node.js 24 or newer and Python 3.11 or newer. After the versioned npm and
-Python dependencies are published:
+Use Node.js 24 or newer and Python 3.11 or newer. Create and start a project with:
 
 ```sh
 npm create cs-object my-report
 cd my-report
 npm run dev
 ```
+
+See the [changelog](../../CHANGELOG.md) for release status and scope.
 
 In PowerShell 5.1 or 7, select Python 3.11+ and run the setup steps explicitly:
 
