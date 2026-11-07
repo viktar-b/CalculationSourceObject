@@ -1,9 +1,9 @@
 # Changelog
 
-## 1.0.0 (unreleased)
+## 1.0.0 (2026-11-07)
 
-This coordinated v1 release covers all five packages. Publication to npm and PyPI
-is pending.
+This coordinated v1 release covers all five packages, published to npm and PyPI.
+See the [GitHub release](https://github.com/viktar-b/CalculationSourceObject/releases/tag/v1.0.0).
 
 | Package | Registry | Version | Responsibility |
 | --- | --- | --- | --- |
