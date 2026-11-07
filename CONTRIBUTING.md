@@ -2,10 +2,21 @@
 
 Issues and design discussion are welcome.
 
-Pin the package versions you use. Supported `.cso.py` authoring and public APIs
-follow their documented versioned contracts. Breaking changes require an
-explicit version change and migration guidance; existing calculations must be
-reverified after an upgrade.
+## Compatibility and versioning
+
+From `1.0.0`, backward-incompatible changes to documented `.cso.py` authoring or
+public APIs require a major package version and documentation of the changed
+contract. Backward-compatible additions use minor versions; backward-compatible
+fixes use patch versions. Internal implementation details are outside this
+compatibility policy.
+
+Package versions are separate from version numbers inside execution responses,
+documents and other data formats. Their documented contracts define which
+formats each package reads and writes; a matching number alone does not establish
+compatibility.
+
+Pin the package versions you use and reverify calculations when dependencies
+change. Keep release scope in the [changelog](CHANGELOG.md).
 
 ## Bugs
 
