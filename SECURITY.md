@@ -8,8 +8,9 @@ for `viktar-b/CalculationSourceObject`.
 
 ## Supported versions
 
-Only the latest `main` of this repository is supported. No older release line
-is maintained.
+Security fixes target the latest stable published version of each package.
+Older release lines are not maintained. Development on `main` prepares future
+releases and does not replace support for the latest stable published packages.
 
 ## Ownership and response targets
 

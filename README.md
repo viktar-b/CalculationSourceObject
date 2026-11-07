@@ -106,7 +106,7 @@ dependency-free loop and optional SciPy quadrature with an analytic expectation.
 
 The [initializer](packages/create-cs-object/README.md) creates a standalone project
 with a Python calculation and a browser app. It requires Node 24 and Python 3.11+.
-For a published release, create and start a project with:
+Install and start a project with:
 
 ```sh
 npm create cs-object my-report
@@ -119,9 +119,9 @@ and Chromium for PDF generation. Your coding agent edits the calculation and its
 brief. The local app derives editable inputs from that calculation, verifies API
 results on the server, and offers its report as HTML and PDF.
 
-The packages are prepared for release; this repository does not establish their
-availability on npm or PyPI. [Installed-package acceptance](tests/integration/README.md)
-tests the generated experience using actual archives before publication.
+[Installed-package acceptance](tests/integration/README.md) tests the generated
+experience using actual npm archives and a Python wheel. See the
+[changelog](CHANGELOG.md) for release status and scope.
 
 ## Start your first calculation
 
@@ -154,9 +154,11 @@ reports. To explore the example locally, run `npm run dev` after setup.
 CSO's supported calculation, verification, report and project-initializer
 features are coordinated at version `1.0.0`. The authoring guide defines the
 supported Python subset and the package schemas define the versioned data
-contracts. Pin package versions and rerun verification after upgrades. Source
-consistency and independent numerical agreement remain separate from human
-engineering approval.
+contracts. The [compatibility policy](CONTRIBUTING.md#compatibility-and-versioning)
+defines package versioning; the [security policy](SECURITY.md#supported-versions)
+defines release support. Pin package versions and rerun verification when
+dependencies change. Source consistency and independent numerical agreement
+remain separate from human engineering approval.
 
 - [Authoring guide](docs/authoring.md)
 - [Python library](packages/cso-python/README.md),
