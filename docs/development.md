@@ -288,12 +288,16 @@ the PyPI project `cs-object`, using these exact values:
 
 On npm, enable direct `npm publish` for each connection. Stage-only permission
 would require approval for every release. PyPI uses the same workflow filename
-for its trusted publisher. Registry-side setup is separate from checking in the
-workflow; a passing local check does not confirm OIDC authentication. Confirm the
-release run in GitHub Actions and verify every intended package version in its
-registry before announcing publication. Then record the publication date in the
-changelog. An unreleased entry describes the planned release, not registry
-availability.
+for its trusted publisher. Validate a new npm connection with its first publish
+before the deadline shown in its settings. If npm marks a connection as expired,
+recreate it with the same repository, workflow and publishing permissions. A run
+that skips an already published package version does not validate its connection.
+
+Registry-side setup is separate from checking in the workflow; a passing local
+check does not confirm OIDC authentication. Confirm the release run in GitHub
+Actions and verify every intended package version in its registry before
+announcing publication. Then record the publication date in the changelog. An
+unreleased entry describes the planned release, not registry availability.
 
 ## Documentation changes
 
