@@ -186,6 +186,16 @@ try {
   await run({
     cwd: join(root, 'my-report'),
     command: 'npm',
+    args: [
+      'audit',
+      '--audit-level=low',
+      '--json',
+      '--registry=https://registry.npmjs.org/',
+    ],
+  });
+  await run({
+    cwd: join(root, 'my-report'),
+    command: 'npm',
     args: ['run', 'build'],
   });
 
