@@ -109,7 +109,9 @@ the same checks, including documentation-only changes. The required Ubuntu jobs 
 - `installed-packages`: npm archives, Python wheel, CLI/PDF acceptance and library
   type/export/browser consumers. `test:packages` builds and packs once, then
   passes those archives to the library and initializer consumers. The standalone
-  consumer commands prepare their own archives when no directory is supplied.
+  consumer commands prepare their own archives when no directory is supplied. The
+  generated initializer project is audited against npm and must have no known
+  dependency findings, including development dependencies.
 
 The `windows-installed` matrix runs the maintained
 [installed-user workflow](../tests/integration/installed/windows-user-workflow.ps1)

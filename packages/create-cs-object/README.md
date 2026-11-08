@@ -59,6 +59,9 @@ brief, reference storage, and agent-neutral authoring guidance. Its editable
 React and TypeScript page uses Vite, Tailwind and the selected shadcn preset.
 `npm run dev` starts that page and the CLI calculation and report API on localhost.
 The initializer contains no calculation server implementation.
+The template owns its shadcn Tailwind utilities in `src/shadcn.css`, with the
+upstream MIT attribution. Adding components still uses `npx shadcn@latest`; the
+shadcn CLI is not installed as a project dependency.
 The page's navbar report menu reads `reports.json`; each configured report runs
 through its own local CLI process.
 

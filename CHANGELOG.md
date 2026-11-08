@@ -1,5 +1,12 @@
 # Changelog
 
+## create-cs-object 1.0.1 (unreleased)
+
+- Keep the shadcn Tailwind utilities in the generated template with MIT
+  attribution, removing the full shadcn CLI dependency and its audit findings.
+- Audit generated projects during installed-package acceptance, failing on
+  low-or-higher dependency findings.
+
 ## 1.0.0 (2026-11-07)
 
 This coordinated v1 release covers all five packages, published to npm and PyPI.

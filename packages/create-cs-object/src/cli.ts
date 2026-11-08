@@ -69,7 +69,6 @@ try {
             cn: '^0.4.0',
             react: '^19.2.8',
             'react-dom': '^19.2.8',
-            shadcn: '^4.21.0',
             tailwindcss: '^4',
             'tw-animate-css': '^1.4.0',
             vite: '^8',
